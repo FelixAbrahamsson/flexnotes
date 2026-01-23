@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+    margin: 0;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-primary {
+    @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500;
+  }
+
+  .input {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+  }
+}
+
+/* TipTap editor styles */
+.tiptap {
+  @apply outline-none min-h-[100px];
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  @apply text-gray-400 float-left h-0 pointer-events-none;
+  content: attr(data-placeholder);
+}
+
+.tiptap ul[data-type="taskList"] {
+  @apply list-none p-0;
+}
+
+.tiptap ul[data-type="taskList"] li {
+  @apply flex items-start gap-2;
+}
+
+.tiptap ul[data-type="taskList"] li > label {
+  @apply flex-shrink-0 mt-0.5;
+}
+
+.tiptap ul[data-type="taskList"] li > div {
+  @apply flex-1;
+}
+
+.tiptap ul[data-type="taskList"] li[data-checked="true"] > div {
+  @apply text-gray-400 line-through;
+}
+
+/* Prose styling for markdown content */
+.prose {
+  @apply text-gray-900;
+}
+
+.prose h1 {
+  @apply text-2xl font-bold mt-6 mb-4;
+}
+
+.prose h2 {
+  @apply text-xl font-bold mt-5 mb-3;
+}
+
+.prose h3 {
+  @apply text-lg font-semibold mt-4 mb-2;
+}
+
+.prose p {
+  @apply my-2;
+}
+
+.prose ul {
+  @apply list-disc pl-6 my-2;
+}
+
+.prose ol {
+  @apply list-decimal pl-6 my-2;
+}
+
+.prose li {
+  @apply my-1;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-gray-300 pl-4 italic text-gray-600 my-4;
+}
+
+.prose code {
+  @apply bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-primary-700;
+}
+
+.prose pre {
+  @apply bg-gray-100 p-3 rounded-lg overflow-x-auto my-4;
+}
+
+.prose pre code {
+  @apply bg-transparent p-0;
+}
+
+.prose hr {
+  @apply border-gray-200 my-6;
+}
+
+.prose strong {
+  @apply font-semibold;
+}
+
+.prose a {
+  @apply text-primary-600 underline;
+}
+
+.prose img {
+  @apply rounded-lg max-w-full h-auto my-4;
+}
+
+/* Hide scrollbar but allow scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
