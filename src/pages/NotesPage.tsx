@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useCallback } from 'react'
 import { Plus, Search, Archive, LogOut } from 'lucide-react'
+import { hapticLight } from '@/hooks/useCapacitor'
 import { useNoteStore } from '@/stores/noteStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useTagStore } from '@/stores/tagStore'
@@ -47,9 +48,10 @@ export function NotesPage() {
   const pinnedNotes = filteredNotes.filter(n => n.is_pinned)
   const unpinnedNotes = filteredNotes.filter(n => !n.is_pinned)
 
-  const handleCreateNote = async () => {
+  const handleCreateNote = useCallback(async () => {
+    hapticLight()
     await createNote()
-  }
+  }, [createNote])
 
   const handleCloseEditor = () => {
     setActiveNote(null)
@@ -176,7 +178,7 @@ export function NotesPage() {
       {!showArchived && (
         <button
           onClick={handleCreateNote}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-primary-600 text-white rounded-full shadow-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 flex items-center justify-center"
+          className="fixed right-6 w-14 h-14 bg-primary-600 text-white rounded-full shadow-lg hover:bg-primary-700 active:bg-primary-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 flex items-center justify-center transition-transform active:scale-95 native-fab bottom-6"
           title="Create new note"
         >
           <Plus className="w-6 h-6" />

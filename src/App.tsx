@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
+import { useCapacitorInit } from '@/hooks/useCapacitor'
 import { LoginPage } from '@/pages/LoginPage'
 import { SignupPage } from '@/pages/SignupPage'
 import { NotesPage } from '@/pages/NotesPage'
@@ -44,6 +45,9 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const initialize = useAuthStore(state => state.initialize)
+
+  // Initialize Capacitor for native apps
+  useCapacitorInit()
 
   useEffect(() => {
     initialize()

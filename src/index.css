@@ -139,3 +139,72 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Mobile-specific styles */
+@layer utilities {
+  /* Safe area padding utilities */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
+  .px-safe {
+    padding-left: env(safe-area-inset-left, 0);
+    padding-right: env(safe-area-inset-right, 0);
+  }
+
+  /* Touch-friendly tap targets */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Pull-to-refresh indicator space */
+  .pull-indicator {
+    padding-top: 60px;
+    margin-top: -60px;
+  }
+}
+
+/* Native app adjustments */
+@supports (padding: env(safe-area-inset-top)) {
+  .native-header {
+    padding-top: calc(env(safe-area-inset-top) + 0.75rem);
+  }
+
+  .native-footer {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
+  }
+
+  .native-fab {
+    bottom: calc(env(safe-area-inset-bottom) + 1.5rem);
+  }
+}
+
+/* Prevent text selection on UI elements */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Active state for touch devices */
+@media (hover: none) {
+  .btn:active {
+    @apply opacity-80;
+  }
+
+  .touch-active:active {
+    @apply bg-gray-100;
+  }
+}
+
+/* Better focus styles for touch */
+@media (pointer: coarse) {
+  .btn:focus {
+    @apply ring-0 ring-offset-0;
+  }
+}
