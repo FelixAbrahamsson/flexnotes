@@ -116,16 +116,62 @@ export function NotesPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-2 sm:gap-4">
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex-shrink-0">
-            {showTrash ? 'Trash' : showArchived ? 'Archive' : 'Notes'}
-          </h1>
+        {/* Top row: Title and actions */}
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+              {showTrash ? 'Trash' : showArchived ? 'Archive' : 'Notes'}
+            </h1>
+            <SyncStatus />
+          </div>
 
-          {/* Sync status */}
-          <SyncStatus />
+          <div className="flex items-center gap-1">
+            {/* Archive toggle */}
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className={`btn btn-ghost p-2 ${showArchived ? 'bg-gray-200 dark:bg-gray-700' : ''}`}
+              title={showArchived ? 'Show active notes' : 'Show archived notes'}
+            >
+              <Archive className="w-5 h-5" />
+            </button>
 
-          {/* Search */}
-          <div className="flex-1 relative">
+            {/* Trash toggle */}
+            <button
+              onClick={() => setShowTrash(!showTrash)}
+              className={`btn btn-ghost p-2 relative ${showTrash ? 'bg-gray-200 dark:bg-gray-700' : ''}`}
+              title={showTrash ? 'Show active notes' : 'Show trash'}
+            >
+              <Trash2 className="w-5 h-5" />
+              {trashCount > 0 && !showTrash && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                  {trashCount > 9 ? '9+' : trashCount}
+                </span>
+              )}
+            </button>
+
+            {/* Settings */}
+            <button
+              onClick={() => setShowSettings(true)}
+              className="btn btn-ghost p-2"
+              title="Settings"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+
+            {/* User menu */}
+            <button
+              onClick={signOut}
+              className="btn btn-ghost p-2"
+              title={`Sign out (${user?.email})`}
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Search row */}
+        <div className="max-w-4xl mx-auto px-4 pb-3">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
             <input
               type="text"
@@ -135,47 +181,6 @@ export function NotesPage() {
               className="w-full pl-9 pr-3 py-2 bg-gray-100 dark:bg-gray-700 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
             />
           </div>
-
-          {/* Archive toggle */}
-          <button
-            onClick={() => setShowArchived(!showArchived)}
-            className={`btn btn-ghost p-2 ${showArchived ? 'bg-gray-200 dark:bg-gray-700' : ''}`}
-            title={showArchived ? 'Show active notes' : 'Show archived notes'}
-          >
-            <Archive className="w-5 h-5" />
-          </button>
-
-          {/* Trash toggle */}
-          <button
-            onClick={() => setShowTrash(!showTrash)}
-            className={`btn btn-ghost p-2 relative ${showTrash ? 'bg-gray-200 dark:bg-gray-700' : ''}`}
-            title={showTrash ? 'Show active notes' : 'Show trash'}
-          >
-            <Trash2 className="w-5 h-5" />
-            {trashCount > 0 && !showTrash && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                {trashCount > 9 ? '9+' : trashCount}
-              </span>
-            )}
-          </button>
-
-          {/* Settings */}
-          <button
-            onClick={() => setShowSettings(true)}
-            className="btn btn-ghost p-2"
-            title="Settings"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
-
-          {/* User menu */}
-          <button
-            onClick={signOut}
-            className="btn btn-ghost p-2"
-            title={`Sign out (${user?.email})`}
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
         </div>
 
         {/* Tag filter */}
