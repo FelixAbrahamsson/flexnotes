@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { LoginPage } from '@/pages/LoginPage'
 import { SignupPage } from '@/pages/SignupPage'
 import { NotesPage } from '@/pages/NotesPage'
+import { SharedNotePage } from '@/pages/SharedNotePage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, initialized } = useAuthStore()
@@ -74,6 +75,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route path="/shared/:token" element={<SharedNotePage />} />
     </Routes>
   )
 }

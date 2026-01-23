@@ -10,6 +10,7 @@ import {
   FileText,
   Tag,
   ImagePlus,
+  Share2,
 } from 'lucide-react'
 import { useNoteStore } from '@/stores/noteStore'
 import { useTagStore } from '@/stores/tagStore'
@@ -20,6 +21,7 @@ import { MarkdownEditor } from './MarkdownEditor'
 import { TagBadge } from '@/components/tags/TagBadge'
 import { TagPicker } from '@/components/tags/TagPicker'
 import { ImageGallery, ImageViewer } from '@/components/images/ImageGallery'
+import { ShareModal } from '@/components/sharing/ShareModal'
 import { processImage } from '@/services/imageProcessor'
 import type { NoteType } from '@/types'
 
@@ -39,6 +41,7 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showTypeMenu, setShowTypeMenu] = useState(false)
   const [showTagPicker, setShowTagPicker] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
   const [viewingImage, setViewingImage] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -267,6 +270,16 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
                   <div className="fixed inset-0" onClick={() => setShowMenu(false)} />
                   <div className="absolute right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
                     <button
+                      onClick={() => {
+                        setShowMenu(false)
+                        setShowShareModal(true)
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 w-full"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      Share
+                    </button>
+                    <button
                       onClick={handleToggleArchive}
                       className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 w-full"
                     >
@@ -371,6 +384,15 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
       {/* Full-screen image viewer */}
       {viewingImage && (
         <ImageViewer url={viewingImage} onClose={() => setViewingImage(null)} />
+      )}
+
+      {/* Share modal */}
+      {showShareModal && (
+        <ShareModal
+          noteId={note.id}
+          noteTitle={note.title}
+          onClose={() => setShowShareModal(false)}
+        />
       )}
     </div>
   )
