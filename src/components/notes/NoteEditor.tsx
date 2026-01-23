@@ -56,6 +56,30 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
     }
   }, [note, fetchImagesForNote])
 
+  // Handle ESC key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // Close sub-modals first, then the main modal
+        if (viewingImage) {
+          setViewingImage(null)
+        } else if (showShareModal) {
+          setShowShareModal(false)
+        } else if (showTagPicker) {
+          setShowTagPicker(false)
+        } else if (showTypeMenu) {
+          setShowTypeMenu(false)
+        } else if (showMenu) {
+          setShowMenu(false)
+        } else {
+          onClose()
+        }
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [showMenu, showTypeMenu, showTagPicker, showShareModal, viewingImage, onClose])
+
   useEffect(() => {
     if (note) {
       setTitle(note.title || '')

@@ -25,6 +25,7 @@ interface NoteState {
   // Actions
   fetchNotes: () => Promise<void>
   createNote: (note?: NewNote) => Promise<Note | null>
+  createNoteFromImport: (note: Omit<Note, 'id'> & { id: string }) => Promise<string>
   updateNote: (id: string, updates: Partial<Note>) => Promise<void>
   deleteNote: (id: string) => Promise<void>
   trashNote: (id: string) => Promise<void>
@@ -242,6 +243,38 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     } catch (error) {
       set({ error: (error as Error).message })
       return null
+    }
+  },
+
+  // Create note from imported data (preserves id and timestamps)
+  createNoteFromImport: async (note) => {
+    try {
+      const localNote: LocalNote = {
+        ...note,
+        _syncStatus: 'pending',
+        _localUpdatedAt: note.updated_at,
+      }
+
+      // Save to local DB
+      await db.notes.add(localNote)
+
+      // Queue for sync
+      await queueChange('note', note.id, 'create')
+
+      // Update UI state
+      const uiNote: Note = {
+        ...note,
+        _pendingSync: true,
+      }
+
+      set(state => ({
+        notes: [uiNote, ...state.notes],
+      }))
+
+      return note.id
+    } catch (error) {
+      console.error('Failed to import note:', error)
+      throw error
     }
   },
 

@@ -4,15 +4,30 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 
 ## Features
 
+### Note Management
 - **Multiple Note Types**: Plain text, checklists, and rich markdown with WYSIWYG editing
-- **Tag Organization**: Create tags to organize and filter your notes
-- **Image Support**: Attach images with automatic compression and WebP conversion
+- **Tag Organization**: Create, edit, and delete tags to organize and filter your notes
+- **Image Support**: Attach images via button, drag & drop, or paste with automatic compression
+- **Pin & Archive**: Pin important notes and archive completed ones
+- **Trash Bin**: Deleted notes go to trash with 30-day retention before permanent deletion
+- **Quick Actions**: Archive or delete notes directly from the note card
+- **Auto-Cleanup**: Empty notes are automatically deleted when closed
+- **Search**: Full-text search across note titles and content
+
+### Sync & Storage
 - **Offline-First**: Works without internet, syncs when back online
 - **Real-Time Sync**: Changes sync across devices instantly via Supabase Realtime
 - **Shareable Notes**: Generate links to share notes with read or write access
-- **Pin & Archive**: Pin important notes and archive completed ones
-- **Search**: Full-text search across note titles and content
-- **Cross-Platform**: Web, iOS, and Android via Capacitor
+
+### User Experience
+- **Dark/Light Theme**: Toggle between dark, light, or system-based theme
+- **Configurable Layout**: Choose 1, 2, or 3 notes per row in the grid view
+- **Keyboard Shortcuts**: Press ESC to close modals, click outside to dismiss
+- **Google Keep Import**: Import notes from Google Takeout export
+
+### Cross-Platform
+- **Web**: Modern PWA with offline support
+- **iOS & Android**: Native apps via Capacitor
 
 ## Tech Stack
 
@@ -82,13 +97,15 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 src/
 ├── components/          # React components
 │   ├── images/         # Image gallery and viewer
+│   ├── import/         # Google Keep importer
 │   ├── notes/          # Note editors (text, list, markdown)
 │   ├── sharing/        # Share modal
-│   └── tags/           # Tag picker and filter
+│   └── tags/           # Tag picker, filter, and manager
 ├── hooks/              # Custom React hooks
 ├── pages/              # Page components
 ├── services/           # API and business logic
 │   ├── db.ts           # Dexie.js IndexedDB setup
+│   ├── googleKeepImport.ts # Google Keep import parser
 │   ├── imageProcessor.ts # Image compression
 │   ├── share.ts        # Sharing service
 │   ├── supabase.ts     # Supabase client
@@ -97,11 +114,31 @@ src/
 │   ├── authStore.ts    # Authentication state
 │   ├── imageStore.ts   # Image state
 │   ├── noteStore.ts    # Notes state
+│   ├── preferencesStore.ts # User preferences (theme, layout)
 │   ├── shareStore.ts   # Sharing state
 │   ├── syncStore.ts    # Sync state
 │   └── tagStore.ts     # Tags state
 └── types/              # TypeScript types
 ```
+
+## Importing from Google Keep
+
+You can import your existing notes from Google Keep:
+
+1. Go to [Google Takeout](https://takeout.google.com/)
+2. Click "Deselect all", then select only **Google Keep**
+3. Click "Next step" and choose your export options
+4. Create the export and download the ZIP file
+5. In Felix Notes, open **Settings** (gear icon)
+6. Scroll to "Import from Google Keep" and select the ZIP file
+7. Wait for the import to complete
+
+The importer will:
+- Convert all Keep notes to text notes
+- Preserve titles, content, and timestamps
+- Convert Keep labels to tags (creates new tags automatically)
+- Skip trashed notes
+- Show progress and any errors during import
 
 ## Database Schema
 
