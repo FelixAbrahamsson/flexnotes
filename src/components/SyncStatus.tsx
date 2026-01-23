@@ -8,11 +8,11 @@ export function SyncStatus() {
   // Show different states
   if (!isOnline) {
     return (
-      <div className="flex items-center gap-1.5 text-yellow-600" title="Offline - changes will sync when online">
+      <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-500" title="Offline - changes will sync when online">
         <CloudOff className="w-4 h-4" />
-        <span className="text-xs">Offline</span>
+        <span className="text-xs hidden sm:inline">Offline</span>
         {pendingCount > 0 && (
-          <span className="text-xs bg-yellow-100 px-1.5 py-0.5 rounded-full">
+          <span className="text-xs bg-yellow-100 dark:bg-yellow-900/50 px-1.5 py-0.5 rounded-full">
             {pendingCount}
           </span>
         )}
@@ -22,45 +22,45 @@ export function SyncStatus() {
 
   if (isSyncing) {
     return (
-      <div className="flex items-center gap-1.5 text-primary-600" title="Syncing...">
+      <div className="flex items-center gap-1.5 text-primary-600 dark:text-primary-400" title="Syncing...">
         <RefreshCw className="w-4 h-4 animate-spin" />
-        <span className="text-xs">Syncing</span>
+        <span className="text-xs hidden sm:inline">Syncing</span>
       </div>
     )
   }
 
   if (conflicts.length > 0) {
     return (
-      <div className="flex items-center gap-1.5 text-orange-600" title="Conflicts need resolution">
+      <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-500" title="Conflicts need resolution">
         <AlertCircle className="w-4 h-4" />
-        <span className="text-xs">{conflicts.length} conflict(s)</span>
+        <span className="text-xs hidden sm:inline">{conflicts.length} conflict(s)</span>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="flex items-center gap-1.5 text-red-600" title={error}>
+      <div className="flex items-center gap-1.5 text-red-600 dark:text-red-500" title={error}>
         <AlertCircle className="w-4 h-4" />
-        <span className="text-xs">Sync error</span>
+        <span className="text-xs hidden sm:inline">Sync error</span>
       </div>
     )
   }
 
   if (pendingCount > 0) {
     return (
-      <div className="flex items-center gap-1.5 text-gray-500" title={`${pendingCount} changes pending`}>
+      <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400" title={`${pendingCount} changes pending`}>
         <Cloud className="w-4 h-4" />
-        <span className="text-xs">{pendingCount} pending</span>
+        <span className="text-xs hidden sm:inline">{pendingCount} pending</span>
       </div>
     )
   }
 
   // All synced
   return (
-    <div className="flex items-center gap-1.5 text-green-600" title="All changes synced">
+    <div className="flex items-center gap-1.5 text-green-600 dark:text-green-500" title="All changes synced">
       <Cloud className="w-4 h-4" />
-      <span className="text-xs">Synced</span>
+      <span className="text-xs hidden sm:inline">Synced</span>
     </div>
   )
 }

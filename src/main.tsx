@@ -2,6 +2,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
+// Import preferences store early to apply theme before render
+import './stores/preferencesStore'
 import App from './App'
 
 createRoot(document.getElementById('root')!).render(

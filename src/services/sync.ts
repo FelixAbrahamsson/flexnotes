@@ -94,6 +94,12 @@ async function processChange(change: PendingChange, userId: string): Promise<voi
   }
 }
 
+// Helper to strip local-only fields from note data before syncing to server
+function stripLocalOnlyFields(noteData: Record<string, unknown>): Record<string, unknown> {
+  const { is_deleted, deleted_at, ...cleanData } = noteData
+  return cleanData
+}
+
 async function processNoteChange(change: PendingChange, userId: string): Promise<void> {
   const { entityId, operation, data } = change
 
@@ -102,9 +108,18 @@ async function processNoteChange(change: PendingChange, userId: string): Promise
       const localNote = await db.notes.get(entityId)
       if (!localNote) return
 
+      // Don't sync notes that are already in trash
+      if (localNote.is_deleted) {
+        // Just mark as synced locally - it will be deleted later
+        await db.notes.update(entityId, { _syncStatus: 'synced' })
+        return
+      }
+
       const { _syncStatus, _localUpdatedAt, _serverUpdatedAt, ...noteData } = localNote
+      const cleanData = stripLocalOnlyFields(noteData)
+
       const { error } = await supabase.from('notes').insert({
-        ...noteData,
+        ...cleanData,
         owner_id: userId,
       })
 
@@ -121,6 +136,14 @@ async function processNoteChange(change: PendingChange, userId: string): Promise
       const localNote = await db.notes.get(entityId)
       if (!localNote) return
 
+      // If note is in trash, delete from server instead of updating
+      if (localNote.is_deleted) {
+        const { error } = await supabase.from('notes').delete().eq('id', entityId)
+        if (error && !error.message.includes('not found')) throw error
+        await db.notes.update(entityId, { _syncStatus: 'synced' })
+        return
+      }
+
       // Check for conflicts
       const { data: serverNote } = await supabase
         .from('notes')
@@ -134,10 +157,13 @@ async function processNoteChange(change: PendingChange, userId: string): Promise
         throw new Error('Conflict detected - server has newer version')
       }
 
+      // Strip local-only fields from update data
+      const cleanData = data ? stripLocalOnlyFields(data as Record<string, unknown>) : {}
+
       const { error } = await supabase
         .from('notes')
         .update({
-          ...data,
+          ...cleanData,
           updated_at: getCurrentTimestamp(),
           version: localNote.version,
         })
@@ -273,6 +299,9 @@ export async function fullSync(userId: string): Promise<void> {
 
       const localNoteData: LocalNote = {
         ...note,
+        // Add default values for local-only trash fields
+        is_deleted: false,
+        deleted_at: null,
         _syncStatus: 'synced',
         _localUpdatedAt: note.updated_at,
         _serverUpdatedAt: note.updated_at,
@@ -341,6 +370,9 @@ export async function incrementalSync(userId: string): Promise<void> {
 
     const localNoteData: LocalNote = {
       ...note,
+      // Add default values for local-only trash fields
+      is_deleted: false,
+      deleted_at: null,
       _syncStatus: 'synced',
       _localUpdatedAt: note.updated_at,
       _serverUpdatedAt: note.updated_at,
@@ -383,11 +415,12 @@ export async function resolveConflict(
     if (!localNote) return
 
     const { _syncStatus, _localUpdatedAt, _serverUpdatedAt, ...noteData } = localNote
+    const cleanData = stripLocalOnlyFields(noteData)
 
     const { error } = await supabase
       .from('notes')
       .upsert({
-        ...noteData,
+        ...cleanData,
         owner_id: userId,
         updated_at: getCurrentTimestamp(),
         version: (localNote.version || 0) + 1,

@@ -57,6 +57,22 @@ class NotesDatabase extends Dexie {
       pendingChanges: 'id, entityType, entityId, timestamp',
       syncMeta: 'key',
     })
+
+    // Version 2: Add is_deleted and deleted_at for trash
+    this.version(2).stores({
+      notes: 'id, owner_id, is_archived, is_pinned, is_deleted, deleted_at, updated_at, _syncStatus',
+      tags: 'id, owner_id, name, _syncStatus',
+      noteTags: '[note_id+tag_id], note_id, tag_id, _syncStatus',
+      images: 'id, note_id, _syncStatus',
+      pendingChanges: 'id, entityType, entityId, timestamp',
+      syncMeta: 'key',
+    }).upgrade(tx => {
+      // Add is_deleted and deleted_at to existing notes
+      return tx.table('notes').toCollection().modify(note => {
+        note.is_deleted = note.is_deleted ?? false
+        note.deleted_at = note.deleted_at ?? null
+      })
+    })
   }
 }
 

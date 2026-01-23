@@ -9,6 +9,7 @@
 
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
+    @apply dark:bg-gray-900 dark:text-gray-100;
     margin: 0;
   }
 }
@@ -16,6 +17,7 @@
 @layer components {
   .btn {
     @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none;
+    @apply dark:focus:ring-offset-gray-900;
   }
 
   .btn-primary {
@@ -24,14 +26,26 @@
 
   .btn-secondary {
     @apply bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500;
+    @apply dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600;
   }
 
   .btn-ghost {
     @apply bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500;
+    @apply dark:text-gray-300 dark:hover:bg-gray-800;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
   }
 
   .input {
     @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder-gray-400;
+  }
+
+  .card {
+    @apply bg-white border border-gray-200 rounded-xl shadow-sm;
+    @apply dark:bg-gray-800 dark:border-gray-700;
   }
 }
 
@@ -42,6 +56,7 @@
 
 .tiptap p.is-editor-empty:first-child::before {
   @apply text-gray-400 float-left h-0 pointer-events-none;
+  @apply dark:text-gray-500;
   content: attr(data-placeholder);
 }
 
@@ -63,11 +78,13 @@
 
 .tiptap ul[data-type="taskList"] li[data-checked="true"] > div {
   @apply text-gray-400 line-through;
+  @apply dark:text-gray-500;
 }
 
 /* Prose styling for markdown content */
 .prose {
   @apply text-gray-900;
+  @apply dark:text-gray-100;
 }
 
 .prose h1 {
@@ -100,14 +117,17 @@
 
 .prose blockquote {
   @apply border-l-4 border-gray-300 pl-4 italic text-gray-600 my-4;
+  @apply dark:border-gray-600 dark:text-gray-400;
 }
 
 .prose code {
   @apply bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-primary-700;
+  @apply dark:bg-gray-800 dark:text-primary-400;
 }
 
 .prose pre {
   @apply bg-gray-100 p-3 rounded-lg overflow-x-auto my-4;
+  @apply dark:bg-gray-800;
 }
 
 .prose pre code {
@@ -116,6 +136,7 @@
 
 .prose hr {
   @apply border-gray-200 my-6;
+  @apply dark:border-gray-700;
 }
 
 .prose strong {
@@ -124,6 +145,7 @@
 
 .prose a {
   @apply text-primary-600 underline;
+  @apply dark:text-primary-400;
 }
 
 .prose img {
@@ -199,6 +221,7 @@
 
   .touch-active:active {
     @apply bg-gray-100;
+    @apply dark:bg-gray-700;
   }
 }
 

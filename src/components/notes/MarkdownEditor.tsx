@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useImperativeHandle, forwardRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -24,15 +24,18 @@ interface MarkdownEditorProps {
   content: string
   onChange: (content: string) => void
   onImageUpload?: () => void
+  onImageDrop?: (files: FileList) => void
   placeholder?: string
 }
 
-export function MarkdownEditor({
-  content,
-  onChange,
-  onImageUpload,
-  placeholder
-}: MarkdownEditorProps) {
+export interface MarkdownEditorHandle {
+  insertImage: (url: string) => void
+}
+
+export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
+  function MarkdownEditor({ content, onChange, onImageUpload, onImageDrop, placeholder }, ref) {
+  const [isDragging, setIsDragging] = useState(false)
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -59,7 +62,7 @@ export function MarkdownEditor({
     },
     editorProps: {
       attributes: {
-        class: 'tiptap prose prose-sm max-w-none focus:outline-none min-h-[200px]',
+        class: 'tiptap prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[200px] text-gray-900 dark:text-gray-100',
       },
     },
   })
@@ -78,27 +81,66 @@ export function MarkdownEditor({
     }
   }, [editor])
 
-  const addImage = useCallback((url: string) => {
+  // Expose insertImage method via ref
+  const insertImage = useCallback((url: string) => {
     if (editor) {
       editor.chain().focus().setImage({ src: url }).run()
     }
   }, [editor])
 
-  // Expose addImage method
-  useEffect(() => {
-    if (editor && onImageUpload) {
-      (editor as unknown as { addImage: (url: string) => void }).addImage = addImage
+  useImperativeHandle(ref, () => ({
+    insertImage,
+  }), [insertImage])
+
+  // Handle drag and drop
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragging(true)
     }
-  }, [editor, addImage, onImageUpload])
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const files = e.dataTransfer.files
+    if (files.length > 0 && onImageDrop) {
+      // Filter to only image files
+      const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'))
+      if (imageFiles.length > 0) {
+        const dt = new DataTransfer()
+        imageFiles.forEach(f => dt.items.add(f))
+        onImageDrop(dt.files)
+      }
+    }
+  }, [onImageDrop])
 
   if (!editor) {
     return null
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div
+      className={`border rounded-lg overflow-hidden transition-colors ${
+        isDragging
+          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+          : 'border-gray-200 dark:border-gray-700'
+      }`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       {/* Toolbar */}
-      <div className="flex items-center gap-1 p-2 border-b border-gray-200 bg-gray-50 flex-wrap">
+      <div className="flex items-center gap-1 p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex-wrap">
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
           isActive={editor.isActive('heading', { level: 1 })}
@@ -203,12 +245,17 @@ export function MarkdownEditor({
       </div>
 
       {/* Editor */}
-      <div className="p-3">
+      <div className="p-3 bg-white dark:bg-gray-900">
         <EditorContent editor={editor} />
+        {isDragging && (
+          <div className="text-center text-sm text-primary-600 dark:text-primary-400 py-4">
+            Drop images here
+          </div>
+        )}
       </div>
     </div>
   )
-}
+})
 
 interface ToolbarButtonProps {
   onClick: () => void
@@ -221,8 +268,8 @@ function ToolbarButton({ onClick, isActive, title, children }: ToolbarButtonProp
   return (
     <button
       onClick={onClick}
-      className={`p-1.5 rounded hover:bg-gray-200 transition-colors ${
-        isActive ? 'bg-gray-200 text-primary-600' : 'text-gray-600'
+      className={`p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors ${
+        isActive ? 'bg-gray-200 dark:bg-gray-700 text-primary-600 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400'
       }`}
       title={title}
       type="button"
@@ -233,15 +280,6 @@ function ToolbarButton({ onClick, isActive, title, children }: ToolbarButtonProp
 }
 
 function ToolbarDivider() {
-  return <div className="w-px h-5 bg-gray-300 mx-1" />
+  return <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1" />
 }
 
-// Export a method to add images programmatically
-export function useMarkdownEditor() {
-  return {
-    addImageToEditor: (editor: unknown, url: string) => {
-      const e = editor as { chain: () => { focus: () => { setImage: (opts: { src: string }) => { run: () => void } } } }
-      e.chain().focus().setImage({ src: url }).run()
-    }
-  }
-}

@@ -8,6 +8,8 @@ export interface Note {
   note_type: NoteType
   is_pinned: boolean
   is_archived: boolean
+  is_deleted: boolean
+  deleted_at: string | null
   created_at: string
   updated_at: string
   version: number

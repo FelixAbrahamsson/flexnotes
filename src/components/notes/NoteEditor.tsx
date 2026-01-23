@@ -17,7 +17,7 @@ import { useTagStore } from '@/stores/tagStore'
 import { useImageStore } from '@/stores/imageStore'
 import { TextEditor } from './TextEditor'
 import { ListEditor } from './ListEditor'
-import { MarkdownEditor } from './MarkdownEditor'
+import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor'
 import { TagBadge } from '@/components/tags/TagBadge'
 import { TagPicker } from '@/components/tags/TagPicker'
 import { ImageGallery, ImageViewer } from '@/components/images/ImageGallery'
@@ -45,6 +45,7 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
   const [viewingImage, setViewingImage] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const markdownEditorRef = useRef<MarkdownEditorHandle>(null)
 
   const noteTags = note ? getTagsForNote(note.id) : []
 
@@ -156,10 +157,11 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
         const image = await uploadImage(note.id, file)
 
         if (image && note.note_type === 'markdown') {
-          // Insert into markdown editor
+          // Insert into markdown editor at cursor position
           const url = getImageUrl(image.storage_path)
-          const newContent = content + `\n\n![](${url})\n`
-          setContent(newContent)
+          if (markdownEditorRef.current) {
+            markdownEditorRef.current.insertImage(url)
+          }
         }
       } catch (error) {
         console.error('Image upload failed:', error)
@@ -180,11 +182,11 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
   return (
     <div className="fixed inset-0 z-50 bg-black/50" onClick={handleClose}>
       <div
-        className="absolute inset-x-0 bottom-0 top-0 sm:inset-4 sm:top-auto sm:bottom-auto sm:left-1/2 sm:-translate-x-1/2 sm:max-w-2xl sm:rounded-xl bg-white shadow-xl flex flex-col max-h-full sm:max-h-[80vh]"
+        className="absolute inset-x-0 bottom-0 top-0 sm:inset-4 sm:top-auto sm:bottom-auto sm:left-1/2 sm:-translate-x-1/2 sm:max-w-2xl sm:rounded-xl bg-white dark:bg-gray-800 shadow-xl flex flex-col max-h-full sm:max-h-[80vh]"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <button
               onClick={handleClose}
@@ -221,24 +223,24 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
               {showTypeMenu && (
                 <>
                   <div className="fixed inset-0" onClick={() => setShowTypeMenu(false)} />
-                  <div className="absolute right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                  <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10">
                     <button
                       onClick={() => handleChangeType('text')}
-                      className={`flex items-center gap-2 px-4 py-2 text-sm w-full hover:bg-gray-50 ${note.note_type === 'text' ? 'text-primary-600' : 'text-gray-700'}`}
+                      className={`flex items-center gap-2 px-4 py-2 text-sm w-full hover:bg-gray-50 dark:hover:bg-gray-700 ${note.note_type === 'text' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-300'}`}
                     >
                       <Type className="w-4 h-4" />
                       Text
                     </button>
                     <button
                       onClick={() => handleChangeType('list')}
-                      className={`flex items-center gap-2 px-4 py-2 text-sm w-full hover:bg-gray-50 ${note.note_type === 'list' ? 'text-primary-600' : 'text-gray-700'}`}
+                      className={`flex items-center gap-2 px-4 py-2 text-sm w-full hover:bg-gray-50 dark:hover:bg-gray-700 ${note.note_type === 'list' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-300'}`}
                     >
                       <List className="w-4 h-4" />
                       List
                     </button>
                     <button
                       onClick={() => handleChangeType('markdown')}
-                      className={`flex items-center gap-2 px-4 py-2 text-sm w-full hover:bg-gray-50 ${note.note_type === 'markdown' ? 'text-primary-600' : 'text-gray-700'}`}
+                      className={`flex items-center gap-2 px-4 py-2 text-sm w-full hover:bg-gray-50 dark:hover:bg-gray-700 ${note.note_type === 'markdown' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-300'}`}
                     >
                       <FileText className="w-4 h-4" />
                       Markdown
@@ -268,27 +270,27 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
               {showMenu && (
                 <>
                   <div className="fixed inset-0" onClick={() => setShowMenu(false)} />
-                  <div className="absolute right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                  <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10">
                     <button
                       onClick={() => {
                         setShowMenu(false)
                         setShowShareModal(true)
                       }}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 w-full"
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 w-full"
                     >
                       <Share2 className="w-4 h-4" />
                       Share
                     </button>
                     <button
                       onClick={handleToggleArchive}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 w-full"
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 w-full"
                     >
                       <Archive className="w-4 h-4" />
                       {note.is_archived ? 'Unarchive' : 'Archive'}
                     </button>
                     <button
                       onClick={handleDelete}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full"
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 w-full"
                     >
                       <Trash2 className="w-4 h-4" />
                       Delete
@@ -318,7 +320,7 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
             value={title}
             onChange={e => setTitle(e.target.value)}
             placeholder="Title"
-            className="w-full text-xl font-semibold text-gray-900 placeholder-gray-400 border-0 focus:outline-none focus:ring-0 p-0 mb-3"
+            className="w-full text-xl font-semibold text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-transparent border-0 focus:outline-none focus:ring-0 p-0 mb-3"
           />
 
           {/* Tags */}
@@ -333,7 +335,7 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
               ))}
               <button
                 onClick={() => setShowTagPicker(!showTagPicker)}
-                className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 px-2 py-1 hover:bg-gray-100 rounded"
+                className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
               >
                 <Tag className="w-3 h-3" />
                 {noteTags.length === 0 ? 'Add tag' : 'Edit'}
@@ -357,10 +359,12 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
             <ListEditor content={content} onChange={setContent} />
           ) : note.note_type === 'markdown' ? (
             <MarkdownEditor
+              ref={markdownEditorRef}
               content={content}
               onChange={setContent}
               placeholder="Start typing... Use the toolbar for formatting."
               onImageUpload={handleImageButtonClick}
+              onImageDrop={handleImageUpload}
             />
           ) : (
             <TextEditor
