@@ -61,6 +61,7 @@ export interface ListItem {
   id: string
   text: string
   checked: boolean
+  indent?: number // 0 = no indent, 1 = one level, etc.
 }
 
 export interface ListContent {
