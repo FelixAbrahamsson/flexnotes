@@ -43,6 +43,7 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
   const [showTagPicker, setShowTagPicker] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
   const [viewingImage, setViewingImage] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const markdownEditorRef = useRef<MarkdownEditorHandle>(null)
@@ -169,7 +170,7 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
     setShowTypeMenu(false)
   }
 
-  const handleImageUpload = async (files: FileList | null) => {
+  const handleImageUpload = useCallback(async (files: FileList | null) => {
     if (!files || !note) return
 
     for (const file of Array.from(files)) {
@@ -191,11 +192,48 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
         console.error('Image upload failed:', error)
       }
     }
-  }
+  }, [note, uploadImage, getImageUrl])
 
   const handleImageButtonClick = () => {
     fileInputRef.current?.click()
   }
+
+  // Drag and drop handlers for the entire modal
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragging(true)
+    }
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    // Only set to false if leaving the container
+    const rect = e.currentTarget.getBoundingClientRect()
+    if (
+      e.clientX < rect.left ||
+      e.clientX > rect.right ||
+      e.clientY < rect.top ||
+      e.clientY > rect.bottom
+    ) {
+      setIsDragging(false)
+    }
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    if (!note || note.note_type === 'list') return
+
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      handleImageUpload(files)
+    }
+  }, [note, handleImageUpload])
 
   if (!note) {
     return null
@@ -204,11 +242,33 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
   const showImageGallery = note.note_type !== 'list'
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50" onClick={handleClose}>
+    <div
+      className="fixed inset-0 z-50 bg-black/50"
+      onClick={handleClose}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div
         className="absolute inset-x-0 bottom-0 top-0 sm:inset-4 sm:top-auto sm:bottom-auto sm:left-1/2 sm:-translate-x-1/2 sm:max-w-2xl sm:rounded-xl bg-white dark:bg-gray-800 shadow-xl flex flex-col max-h-full sm:max-h-[80vh]"
         onClick={e => e.stopPropagation()}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
       >
+        {/* Drop overlay */}
+        {isDragging && note.note_type !== 'list' && (
+          <div
+            className="absolute inset-0 z-50 bg-primary-500/20 dark:bg-primary-500/30 flex items-center justify-center rounded-xl"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+          >
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg text-center">
+              <ImagePlus className="w-12 h-12 text-primary-500 mx-auto mb-2" />
+              <p className="text-lg font-medium text-gray-900 dark:text-gray-100">Drop images here</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Images will be uploaded to this note</p>
+            </div>
+          </div>
+        )}
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
           <div className="flex items-center gap-2">

@@ -10,6 +10,8 @@ import {
 } from '@/services/sync'
 import { clearLocalData, type LocalNote } from '@/services/db'
 import { supabase } from '@/services/supabase'
+import { useNoteStore } from './noteStore'
+import { useTagStore } from './tagStore'
 
 interface SyncState {
   isSyncing: boolean
@@ -76,6 +78,10 @@ export const useSyncStore = create<SyncState>((set, get) => ({
         conflicts,
         lastSyncTime: new Date().toISOString(),
       })
+
+      // Refresh note and tag stores to update UI with new sync status
+      await useNoteStore.getState().loadFromLocal()
+      await useTagStore.getState().loadFromLocal()
     } catch (error) {
       set({ error: (error as Error).message })
     } finally {
@@ -100,6 +106,10 @@ export const useSyncStore = create<SyncState>((set, get) => ({
         conflicts,
         lastSyncTime: new Date().toISOString(),
       })
+
+      // Refresh note and tag stores to update UI with new sync status
+      await useNoteStore.getState().loadFromLocal()
+      await useTagStore.getState().loadFromLocal()
     } catch (error) {
       set({ error: (error as Error).message })
     } finally {
