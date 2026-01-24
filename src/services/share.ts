@@ -87,34 +87,38 @@ export async function updateSharePermission(
 export async function getSharedNote(
   shareToken: string
 ): Promise<{ note: Note; permission: 'read' | 'write' } | { error: string }> {
-  // First, get the share record
-  const { data: share, error: shareError } = await supabase
-    .from('note_shares')
-    .select('*')
-    .eq('share_token', shareToken)
-    .single()
+  // Use the database function to get the note with permission
+  // This bypasses RLS and works for anonymous users
+  const { data, error } = await supabase
+    .rpc('get_shared_note_with_permission', { p_share_token: shareToken })
 
-  if (shareError || !share) {
-    return { error: 'Share link not found or has been revoked' }
+  if (error) {
+    console.error('Share lookup error:', error)
+    return { error: 'Failed to look up share link' }
   }
 
-  // Check if expired
-  if (share.expires_at && new Date(share.expires_at) < new Date()) {
-    return { error: 'This share link has expired' }
+  if (!data || !data.id) {
+    return { error: 'Share link not found, has expired, or has been revoked' }
   }
 
-  // Get the note
-  const { data: note, error: noteError } = await supabase
-    .from('notes')
-    .select('*')
-    .eq('id', share.note_id)
-    .single()
-
-  if (noteError || !note) {
-    return { error: 'Note not found' }
+  // Convert the result to a Note object
+  const note: Note = {
+    id: data.id,
+    owner_id: data.owner_id,
+    title: data.title,
+    content: data.content,
+    note_type: data.note_type as 'text' | 'list' | 'markdown',
+    is_pinned: data.is_pinned,
+    is_archived: data.is_archived,
+    is_deleted: false,
+    deleted_at: null,
+    created_at: data.created_at,
+    updated_at: data.updated_at,
+    version: data.version,
+    sort_order: data.sort_order ?? 0,
   }
 
-  return { note, permission: share.permission }
+  return { note, permission: data.permission as 'read' | 'write' }
 }
 
 // Update a shared note (requires write permission)
@@ -122,35 +126,23 @@ export async function updateSharedNote(
   shareToken: string,
   updates: Partial<Pick<Note, 'title' | 'content'>>
 ): Promise<{ error: Error | null }> {
-  // Verify write permission
-  const { data: share, error: shareError } = await supabase
-    .from('note_shares')
-    .select('*')
-    .eq('share_token', shareToken)
-    .single()
-
-  if (shareError || !share) {
-    return { error: new Error('Share link not found') }
-  }
-
-  if (share.permission !== 'write') {
-    return { error: new Error('You do not have write permission') }
-  }
-
-  if (share.expires_at && new Date(share.expires_at) < new Date()) {
-    return { error: new Error('This share link has expired') }
-  }
-
-  // Update the note
+  // Use the database function which handles permission checking
   const { error } = await supabase
-    .from('notes')
-    .update({
-      ...updates,
-      updated_at: new Date().toISOString(),
+    .rpc('update_shared_note', {
+      p_share_token: shareToken,
+      p_title: updates.title ?? null,
+      p_content: updates.content ?? null,
     })
-    .eq('id', share.note_id)
 
-  return { error: error as Error | null }
+  if (error) {
+    // The database function throws an exception if permission is denied
+    if (error.message.includes('no write permission') || error.message.includes('Invalid share token')) {
+      return { error: new Error('Share link not found or you do not have write permission') }
+    }
+    return { error: new Error(error.message) }
+  }
+
+  return { error: null }
 }
 
 // Copy text to clipboard

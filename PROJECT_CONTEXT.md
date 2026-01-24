@@ -104,7 +104,7 @@ src/
 │
 ├── pages/               # Page-level components
 │   ├── AuthPage.tsx     # Login/signup
-│   ├── NotesPage.tsx    # Main notes view
+│   ├── NotesPage.tsx    # Main notes view with drag-and-drop reordering
 │   └── SharedNotePage.tsx # Public shared note view
 │
 ├── services/            # Business logic (no React)
@@ -162,6 +162,8 @@ Main note operations:
 - Trash/restore/permanent delete
 - Filters: archived, trash, search, tags
 - `deleteNoteIfEmpty()` - Auto-cleanup empty notes
+- `reorderNotes()` - Drag-and-drop reordering with sort_order persistence
+- Pagination: `getPaginatedNotes()`, `loadMoreNotes()`, `hasMoreNotes()`
 
 ### `src/stores/preferencesStore.ts`
 User preferences with persistence:
@@ -222,7 +224,7 @@ interface PendingChange {
 
 ```sql
 -- Main tables
-notes (id, owner_id, title, content, note_type, is_pinned, is_archived, version, created_at, updated_at)
+notes (id, owner_id, title, content, note_type, is_pinned, is_archived, sort_order, version, created_at, updated_at)
 tags (id, owner_id, name, color, created_at)
 note_tags (note_id, tag_id)
 note_images (id, note_id, storage_path, filename, size, width, height, created_at)
@@ -230,7 +232,7 @@ note_shares (id, note_id, token, permission, created_at, expires_at)
 profiles (id, email, display_name, created_at)
 ```
 
-**Note:** `is_deleted` and `deleted_at` are local-only fields for trash functionality. They are stripped before syncing to Supabase.
+**Note:** `is_deleted` and `deleted_at` are local-only fields for trash functionality. They are stripped before syncing to Supabase. The `sort_order` field uses negative timestamps for default ordering (newest first) and supports fractional values for inserting between notes.
 
 ## Patterns & Conventions
 
@@ -352,6 +354,9 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 ## Key Dependencies
 
 - `@tiptap/react` - Rich text editor
+- `@tiptap/extension-code-block-lowlight` - Syntax highlighting for code blocks
+- `lowlight` - Syntax highlighting engine
+- `@dnd-kit/core`, `@dnd-kit/sortable` - Drag-and-drop for note reordering
 - `dexie` - IndexedDB wrapper
 - `zustand` - State management
 - `@supabase/supabase-js` - Backend client
@@ -370,3 +375,5 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 8. **Touch events on mobile**: HTML5 drag API doesn't work on mobile. Use manual touch handlers with `touchstart`, `touchmove`, `touchend`.
 9. **Stale closures**: Event handlers attached to `document` capture variables at attachment time. Use refs to access current state.
 10. **Google Keep import**: Modern exports use JSON format, not HTML. The importer handles both.
+11. **Mobile drag-to-reorder**: On mobile, `touch-action: none` is required for dragging but blocks scrolling. Solution: use a "reorder mode" toggle that only enables drag when explicitly activated. The button is hidden on desktop (`sm:hidden`) where dragging works without conflicts.
+12. **Share links for anonymous users**: RLS blocks anonymous queries to `note_shares`. Use the `get_shared_note_with_permission()` database function with `SECURITY DEFINER` to bypass RLS for share lookups.

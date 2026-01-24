@@ -80,7 +80,7 @@ export function SharedNotePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
       </div>
     )
@@ -88,13 +88,13 @@ export function SharedNotePage() {
 
   if (error || !note) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 max-w-md w-full text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
             Unable to access note
           </h1>
-          <p className="text-gray-600 mb-6">{error || 'Note not found'}</p>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">{error || 'Note not found'}</p>
           <Link to="/" className="btn btn-primary">
             Go to app
           </Link>
@@ -104,13 +104,13 @@ export function SharedNotePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link
             to="/"
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+            className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
           >
             <ArrowLeft className="w-5 h-5" />
             <span className="text-sm">Open app</span>
@@ -118,22 +118,22 @@ export function SharedNotePage() {
 
           <div className="flex items-center gap-2">
             {permission === 'write' ? (
-              <div className="flex items-center gap-1.5 text-orange-600">
+              <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400">
                 <Edit3 className="w-4 h-4" />
                 <span className="text-sm">Can edit</span>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 text-blue-600">
+              <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
                 <Eye className="w-4 h-4" />
                 <span className="text-sm">View only</span>
               </div>
             )}
 
             {saving && (
-              <span className="text-xs text-gray-500">Saving...</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">Saving...</span>
             )}
             {!saving && lastSaved && (
-              <span className="text-xs text-green-600">Saved</span>
+              <span className="text-xs text-green-600 dark:text-green-400">Saved</span>
             )}
           </div>
         </div>
@@ -141,7 +141,7 @@ export function SharedNotePage() {
 
       {/* Content */}
       <main className="max-w-3xl mx-auto px-4 py-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           {/* Title */}
           {permission === 'write' ? (
             <input
@@ -149,11 +149,11 @@ export function SharedNotePage() {
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="Title"
-              className="w-full text-2xl font-semibold text-gray-900 placeholder-gray-400 border-0 focus:outline-none focus:ring-0 p-0 mb-4"
+              className="w-full text-2xl font-semibold text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 border-0 focus:outline-none focus:ring-0 p-0 mb-4 bg-transparent"
             />
           ) : (
             title && (
-              <h1 className="text-2xl font-semibold text-gray-900 mb-4">
+              <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
                 {title}
               </h1>
             )
@@ -186,7 +186,7 @@ export function SharedNotePage() {
         </div>
 
         {/* Footer */}
-        <div className="mt-4 text-center text-xs text-gray-400">
+        <div className="mt-4 text-center text-xs text-gray-400 dark:text-gray-500">
           Shared via Felix Notes
         </div>
       </main>
@@ -208,7 +208,7 @@ function SharedNoteContent({ note }: { note: Note }) {
                   className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                     item.checked
                       ? 'bg-primary-600 border-primary-600'
-                      : 'border-gray-300'
+                      : 'border-gray-300 dark:border-gray-600'
                   }`}
                 >
                   {item.checked && (
@@ -221,7 +221,7 @@ function SharedNoteContent({ note }: { note: Note }) {
                   )}
                 </div>
                 <span
-                  className={`text-gray-900 ${item.checked ? 'line-through text-gray-400' : ''}`}
+                  className={`text-gray-900 dark:text-gray-100 ${item.checked ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}
                 >
                   {item.text}
                 </span>
@@ -238,7 +238,7 @@ function SharedNoteContent({ note }: { note: Note }) {
   if (note.note_type === 'markdown') {
     return (
       <div
-        className="prose prose-sm max-w-none"
+        className="prose prose-sm dark:prose-invert max-w-none"
         dangerouslySetInnerHTML={{ __html: note.content }}
       />
     )
@@ -246,6 +246,6 @@ function SharedNoteContent({ note }: { note: Note }) {
 
   // Plain text
   return (
-    <div className="whitespace-pre-wrap text-gray-900">{note.content}</div>
+    <div className="whitespace-pre-wrap text-gray-900 dark:text-gray-100">{note.content}</div>
   )
 }

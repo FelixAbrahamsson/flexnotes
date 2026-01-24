@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pin, Archive, Trash2, MoreVertical, RotateCcw } from 'lucide-react'
+import { Pin, Archive, Trash2, MoreVertical, RotateCcw, Share2 } from 'lucide-react'
 import type { Note, Tag } from '@/types'
 import { TagBadge } from '@/components/tags/TagBadge'
 
@@ -10,10 +10,11 @@ interface NoteCardProps {
   onArchive?: () => void
   onDelete?: () => void
   onRestore?: () => void
+  onShare?: () => void
   showRestore?: boolean
 }
 
-export function NoteCard({ note, tags, onClick, onArchive, onDelete, onRestore, showRestore }: NoteCardProps) {
+export function NoteCard({ note, tags, onClick, onArchive, onDelete, onRestore, onShare, showRestore }: NoteCardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const displayTitle = note.title || 'Untitled'
   const preview = getContentPreview(note.content, note.note_type)
@@ -39,6 +40,12 @@ export function NoteCard({ note, tags, onClick, onArchive, onDelete, onRestore, 
     e.stopPropagation()
     setShowMenu(false)
     onRestore?.()
+  }
+
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setShowMenu(false)
+    onShare?.()
   }
 
   return (
@@ -91,7 +98,7 @@ export function NoteCard({ note, tags, onClick, onArchive, onDelete, onRestore, 
       </div>
 
       {/* Quick actions menu - always visible on mobile, hover on desktop */}
-      {(onArchive || onDelete || onRestore) && (
+      {(onArchive || onDelete || onRestore || onShare) && (
         <div className="absolute top-2 right-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           <button
             onClick={handleMenuClick}
@@ -111,6 +118,15 @@ export function NoteCard({ note, tags, onClick, onArchive, onDelete, onRestore, 
                   >
                     <RotateCcw className="w-4 h-4" />
                     Restore
+                  </button>
+                )}
+                {onShare && !showRestore && (
+                  <button
+                    onClick={handleShare}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 w-full"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    Share
                   </button>
                 )}
                 {onArchive && !showRestore && (

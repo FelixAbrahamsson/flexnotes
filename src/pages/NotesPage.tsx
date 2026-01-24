@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState, useRef } from 'react'
-import { Plus, Search, Archive, Trash2, Settings, Trash } from 'lucide-react'
+import { Plus, Search, Archive, Trash2, Settings, Trash, ArrowUpDown } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -27,6 +27,7 @@ import { NoteEditor } from '@/components/notes/NoteEditor'
 import { TagFilter } from '@/components/tags/TagFilter'
 import { SyncStatus } from '@/components/SyncStatus'
 import { SettingsModal } from '@/components/SettingsModal'
+import { ShareModal } from '@/components/sharing/ShareModal'
 import type { Note, Tag } from '@/types'
 
 // Sortable wrapper for NoteCard
@@ -37,8 +38,10 @@ interface SortableNoteCardProps {
   onArchive?: () => void
   onDelete: () => void
   onRestore?: () => void
+  onShare?: () => void
   showRestore?: boolean
   isDragDisabled?: boolean
+  reorderMode?: boolean
 }
 
 function SortableNoteCard({
@@ -48,8 +51,10 @@ function SortableNoteCard({
   onArchive,
   onDelete,
   onRestore,
+  onShare,
   showRestore,
   isDragDisabled,
+  reorderMode,
 }: SortableNoteCardProps) {
   const {
     attributes,
@@ -65,7 +70,8 @@ function SortableNoteCard({
     transition,
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 1000 : 'auto',
-    touchAction: isDragDisabled ? 'auto' : 'none', // Disable browser touch handling for drag
+    // Only disable touch scrolling when in reorder mode (mobile) or when dragging
+    touchAction: (reorderMode && !isDragDisabled) ? 'none' : 'auto',
   }
 
   return (
@@ -83,6 +89,7 @@ function SortableNoteCard({
         onArchive={onArchive}
         onDelete={onDelete}
         onRestore={onRestore}
+        onShare={onShare}
         showRestore={showRestore}
       />
     </div>
@@ -123,6 +130,8 @@ export function NotesPage() {
   const { notesPerRow } = usePreferencesStore()
 
   const [showSettings, setShowSettings] = useState(false)
+  const [shareNoteId, setShareNoteId] = useState<string | null>(null)
+  const [reorderMode, setReorderMode] = useState(false)
 
   // Track modal stack for back button handling
   const modalStackRef = useRef<ModalType[]>([])
@@ -207,19 +216,31 @@ export function NotesPage() {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 10, // 10px movement required before drag starts
+        distance: 8, // 8px movement required before drag starts
       },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 250, // 250ms hold before drag starts on touch
-        tolerance: 8, // Allow 8px movement during the delay
+        delay: 150, // Short delay since user explicitly enabled reorder mode
+        tolerance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   )
+
+  // Exit reorder mode when switching views
+  useEffect(() => {
+    if (showArchived || showTrash) {
+      setReorderMode(false)
+    }
+  }, [showArchived, showTrash])
+
+  // Handle drag start - give haptic feedback to indicate drag mode activated
+  const handleDragStart = useCallback(() => {
+    hapticLight()
+  }, [])
 
   // Handle drag end
   const handleDragEnd = useCallback((event: DragEndEvent) => {
@@ -292,6 +313,15 @@ export function NotesPage() {
     closeModalNormally('settings')
   }, [closeModalNormally])
 
+  const handleShare = useCallback((noteId: string) => {
+    hapticLight()
+    setShareNoteId(noteId)
+  }, [])
+
+  const handleCloseShare = useCallback(() => {
+    setShareNoteId(null)
+  }, [])
+
   // Grid classes based on notesPerRow setting (respects setting on all screen sizes)
   const gridClasses = {
     1: 'grid-cols-1',
@@ -313,6 +343,21 @@ export function NotesPage() {
           </div>
 
           <div className="flex items-center gap-1">
+            {/* Reorder mode toggle - only show on mobile in main notes view */}
+            {!showArchived && !showTrash && (
+              <button
+                onClick={() => setReorderMode(!reorderMode)}
+                className={`btn p-2 sm:hidden ${
+                  reorderMode
+                    ? 'bg-primary-100 hover:bg-primary-200 dark:bg-primary-900 dark:hover:bg-primary-800 text-primary-700 dark:text-primary-300'
+                    : 'btn-ghost'
+                }`}
+                title={reorderMode ? 'Exit reorder mode' : 'Reorder notes'}
+              >
+                <ArrowUpDown className="w-5 h-5" />
+              </button>
+            )}
+
             {/* Archive toggle */}
             <button
               onClick={() => setShowArchived(!showArchived)}
@@ -379,6 +424,21 @@ export function NotesPage() {
 
       {/* Main content */}
       <main className="max-w-4xl mx-auto px-4 py-6">
+        {/* Reorder mode banner */}
+        {reorderMode && (
+          <div className="flex items-center justify-between mb-4 p-3 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg">
+            <p className="text-sm text-primary-800 dark:text-primary-200">
+              Drag notes to reorder them
+            </p>
+            <button
+              onClick={() => setReorderMode(false)}
+              className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
+            >
+              Done
+            </button>
+          </div>
+        )}
+
         {/* Trash header */}
         {showTrash && trashCount > 0 && (
           <div className="flex items-center justify-between mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
@@ -426,6 +486,7 @@ export function NotesPage() {
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
             <div className="space-y-6">
@@ -448,7 +509,9 @@ export function NotesPage() {
                           onClick={() => handleOpenNote(note.id)}
                           onArchive={() => handleArchive(note.id, note.is_archived)}
                           onDelete={() => handleDelete(note.id)}
+                          onShare={() => handleShare(note.id)}
                           isDragDisabled={searchQuery.length > 0 || selectedTagIds.length > 0}
+                          reorderMode={reorderMode}
                         />
                       ))}
                     </div>
@@ -478,8 +541,10 @@ export function NotesPage() {
                           onArchive={!showTrash ? () => handleArchive(note.id, note.is_archived) : undefined}
                           onDelete={showTrash ? () => handlePermanentDelete(note.id) : () => handleDelete(note.id)}
                           onRestore={showTrash ? () => handleRestore(note.id) : undefined}
+                          onShare={!showTrash ? () => handleShare(note.id) : undefined}
                           showRestore={showTrash}
                           isDragDisabled={showTrash || searchQuery.length > 0 || selectedTagIds.length > 0}
+                          reorderMode={reorderMode}
                         />
                       ))}
                     </div>
@@ -520,6 +585,15 @@ export function NotesPage() {
       {/* Settings modal */}
       {showSettings && (
         <SettingsModal onClose={handleCloseSettings} />
+      )}
+
+      {/* Share modal */}
+      {shareNoteId && (
+        <ShareModal
+          noteId={shareNoteId}
+          noteTitle={paginatedNotes.find(n => n.id === shareNoteId)?.title || null}
+          onClose={handleCloseShare}
+        />
       )}
     </div>
   )

@@ -26,7 +26,12 @@ export function ShareModal({ noteId, noteTitle, onClose }: ShareModalProps) {
     const result = await createShare(noteId, newPermission)
 
     if ('url' in result) {
-      await handleCopy(result.url, 'new')
+      // Copy the URL directly (it's already complete)
+      const success = await copyToClipboard(result.url)
+      if (success) {
+        setCopiedId('new')
+        setTimeout(() => setCopiedId(null), 2000)
+      }
     }
     setCreating(false)
   }
@@ -55,32 +60,32 @@ export function ShareModal({ noteId, noteTitle, onClose }: ShareModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div>
-            <h2 className="text-lg font-semibold">Share Note</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Share Note</h2>
             {noteTitle && (
-              <p className="text-sm text-gray-500 truncate max-w-[250px]">
+              <p className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-[250px]">
                 {noteTitle}
               </p>
             )}
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-500 dark:text-gray-400"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Create new share */}
-        <div className="p-4 border-b bg-gray-50">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
           <div className="flex items-center gap-2">
             <select
               value={newPermission}
               onChange={e => setNewPermission(e.target.value as 'read' | 'write')}
-              className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             >
               <option value="read">Can view</option>
               <option value="write">Can edit</option>
@@ -90,8 +95,12 @@ export function ShareModal({ noteId, noteTitle, onClose }: ShareModalProps) {
               disabled={creating}
               className="btn btn-primary flex items-center gap-2"
             >
-              <Link className="w-4 h-4" />
-              {creating ? 'Creating...' : 'Create Link'}
+              {copiedId === 'new' ? (
+                <Check className="w-4 h-4" />
+              ) : (
+                <Link className="w-4 h-4" />
+              )}
+              {creating ? 'Creating...' : copiedId === 'new' ? 'Copied!' : 'Create Link'}
             </button>
           </div>
         </div>
@@ -103,14 +112,14 @@ export function ShareModal({ noteId, noteTitle, onClose }: ShareModalProps) {
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600" />
             </div>
           ) : shares.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               <Globe className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p>No share links yet</p>
               <p className="text-sm">Create a link to share this note</p>
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                 Active Links ({shares.length})
               </p>
               {shares.map(share => (
@@ -155,7 +164,9 @@ function ShareLinkItem({
   return (
     <div
       className={`p-3 rounded-lg border ${
-        expired ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'
+        expired
+          ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+          : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600'
       }`}
     >
       <div className="flex items-center justify-between mb-2">
@@ -165,11 +176,11 @@ function ShareLinkItem({
           ) : (
             <Globe className="w-4 h-4 text-blue-500" />
           )}
-          <span className="text-sm font-medium">
+          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
             {share.permission === 'write' ? 'Can edit' : 'Can view'}
           </span>
           {expired && (
-            <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">
+            <span className="text-xs bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">
               Expired
             </span>
           )}
@@ -177,26 +188,26 @@ function ShareLinkItem({
         <div className="flex items-center gap-1">
           <button
             onClick={onCopy}
-            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition-colors"
             title="Copy link"
           >
             {copied ? (
-              <Check className="w-4 h-4 text-green-600" />
+              <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
             ) : (
-              <Copy className="w-4 h-4 text-gray-500" />
+              <Copy className="w-4 h-4 text-gray-500 dark:text-gray-400" />
             )}
           </button>
           <button
             onClick={onDelete}
-            className="p-1.5 hover:bg-red-100 rounded transition-colors"
+            className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
             title="Delete link"
           >
-            <Trash2 className="w-4 h-4 text-red-500" />
+            <Trash2 className="w-4 h-4 text-red-500 dark:text-red-400" />
           </button>
         </div>
       </div>
 
-      <div className="flex items-center justify-between text-xs text-gray-500">
+      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
         <span>Created {formatDate(share.created_at)}</span>
         {share.expires_at && (
           <span>
@@ -207,11 +218,11 @@ function ShareLinkItem({
 
       {/* Permission toggle */}
       {!expired && (
-        <div className="mt-2 pt-2 border-t">
+        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
           <select
             value={share.permission}
             onChange={e => onPermissionChange(e.target.value as 'read' | 'write')}
-            className="w-full text-sm px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+            className="w-full text-sm px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100"
           >
             <option value="read">View only</option>
             <option value="write">Can edit</option>

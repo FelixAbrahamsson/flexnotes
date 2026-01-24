@@ -5,14 +5,16 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 ## Features
 
 ### Note Management
-- **Multiple Note Types**: Plain text, checklists, and rich markdown with WYSIWYG editing
+- **Multiple Note Types**: Plain text, checklists, and rich markdown with WYSIWYG editing and syntax-highlighted code blocks
 - **Tag Organization**: Create, edit, and delete tags to organize and filter your notes
 - **Image Support**: Attach images via button, drag & drop, or paste with automatic compression
 - **Pin & Archive**: Pin important notes and archive completed ones
 - **Trash Bin**: Deleted notes go to trash with 30-day retention before permanent deletion
-- **Quick Actions**: Archive or delete notes directly from the note card
+- **Quick Actions**: Archive, delete, or share notes directly from the note card menu
 - **Auto-Cleanup**: Empty notes are automatically deleted when closed
 - **Search**: Full-text search across note titles and content
+- **Drag-to-Reorder**: Drag notes to reorder them (desktop: drag directly, mobile: tap reorder button first)
+- **Infinite Scroll**: Notes load progressively as you scroll for better performance
 
 ### List Notes
 - **Touch-Friendly Reordering**: Drag items up/down to reorder on mobile and desktop
@@ -24,6 +26,7 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 ### Sync & Storage
 - **Offline-First**: Works without internet, syncs when back online
 - **Real-Time Sync**: Changes sync across devices instantly via Supabase Realtime
+- **Cross-Device Order**: Custom note ordering syncs across all your devices
 - **Shareable Notes**: Generate links to share notes with read or write access
 
 ### User Experience
@@ -155,7 +158,7 @@ The importer will:
 The app uses the following Supabase tables:
 
 - `profiles` - User profiles
-- `notes` - Notes with content, type, and metadata
+- `notes` - Notes with content, type, metadata, and sort order
 - `tags` - User-created tags
 - `note_tags` - Many-to-many relationship between notes and tags
 - `note_images` - Image attachments for notes
