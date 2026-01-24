@@ -250,7 +250,7 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
       onDrop={handleDrop}
     >
       <div
-        className="absolute inset-x-0 bottom-0 top-0 sm:inset-4 sm:top-auto sm:bottom-auto sm:left-1/2 sm:-translate-x-1/2 sm:max-w-2xl sm:rounded-xl bg-white dark:bg-gray-800 shadow-xl flex flex-col max-h-full sm:max-h-[80vh]"
+        className="absolute inset-x-0 bottom-0 top-0 sm:inset-4 sm:top-12 sm:bottom-auto sm:left-1/2 sm:-translate-x-1/2 sm:max-w-2xl sm:rounded-xl bg-white dark:bg-gray-800 shadow-xl flex flex-col max-h-full sm:max-h-[calc(100vh-6rem)]"
         onClick={e => e.stopPropagation()}
         onDragOver={handleDragOver}
         onDrop={handleDrop}

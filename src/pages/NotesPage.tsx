@@ -1,8 +1,7 @@
 import { useEffect, useCallback, useState } from 'react'
-import { Plus, Search, Archive, LogOut, Trash2, Settings, Trash } from 'lucide-react'
+import { Plus, Search, Archive, Trash2, Settings, Trash } from 'lucide-react'
 import { hapticLight } from '@/hooks/useCapacitor'
 import { useNoteStore } from '@/stores/noteStore'
-import { useAuthStore } from '@/stores/authStore'
 import { useTagStore } from '@/stores/tagStore'
 import { useSyncStore } from '@/stores/syncStore'
 import { usePreferencesStore } from '@/stores/preferencesStore'
@@ -13,7 +12,6 @@ import { SyncStatus } from '@/components/SyncStatus'
 import { SettingsModal } from '@/components/SettingsModal'
 
 export function NotesPage() {
-  const { user, signOut } = useAuthStore()
   const {
     loading,
     activeNoteId,
@@ -156,15 +154,6 @@ export function NotesPage() {
               title="Settings"
             >
               <Settings className="w-5 h-5" />
-            </button>
-
-            {/* User menu */}
-            <button
-              onClick={signOut}
-              className="btn btn-ghost p-2"
-              title={`Sign out (${user?.email})`}
-            >
-              <LogOut className="w-5 h-5" />
             </button>
           </div>
         </div>

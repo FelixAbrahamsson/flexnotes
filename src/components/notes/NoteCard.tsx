@@ -87,14 +87,14 @@ export function NoteCard({ note, tags, onClick, onArchive, onDelete, onRestore, 
         </div>
       </button>
 
-      {/* Quick actions menu */}
+      {/* Quick actions menu - always visible on mobile, hover on desktop */}
       {(onArchive || onDelete || onRestore) && (
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute top-2 right-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           <button
             onClick={handleMenuClick}
             className="p-1.5 bg-white dark:bg-gray-700 rounded-lg shadow border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
           >
-            <MoreVertical className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            <MoreVertical className="w-4 h-4 text-gray-600 dark:text-gray-300" />
           </button>
 
           {showMenu && (

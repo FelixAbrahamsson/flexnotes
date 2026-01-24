@@ -475,9 +475,25 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       }))
 
       try {
+        // Check if note was synced to server (has synced status or no pending create)
+        const localNote = await db.notes.get(id)
+        const wasSynced = localNote && localNote._syncStatus === 'synced'
+
+        // Delete from local DB
         await db.notes.delete(id)
-        // Remove from pending changes since we're deleting
+        // Remove any existing pending changes for this note
         await db.pendingChanges.where('entityId').equals(id).delete()
+
+        // If note was synced to server, queue a delete operation
+        if (wasSynced) {
+          await queueChange('note', id, 'delete')
+          await useSyncStore.getState().refreshPendingCount()
+
+          if (navigator.onLine) {
+            useSyncStore.getState().sync()
+          }
+        }
+
         return true
       } catch (error) {
         set({ notes: previousNotes, error: (error as Error).message })

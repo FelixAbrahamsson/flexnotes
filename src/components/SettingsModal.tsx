@@ -1,8 +1,10 @@
-import { useEffect } from 'react'
-import { X, Sun, Moon, Monitor, Grid2X2, Grid3X3, LayoutList } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { X, Sun, Moon, Monitor, Grid2X2, Grid3X3, LayoutList, LogOut, Key } from 'lucide-react'
 import { usePreferencesStore } from '@/stores/preferencesStore'
+import { useAuthStore } from '@/stores/authStore'
 import { TagManager } from '@/components/tags/TagManager'
 import { GoogleKeepImport } from '@/components/import/GoogleKeepImport'
+import { supabase } from '@/services/supabase'
 
 interface SettingsModalProps {
   onClose: () => void
@@ -10,6 +12,51 @@ interface SettingsModalProps {
 
 export function SettingsModal({ onClose }: SettingsModalProps) {
   const { theme, notesPerRow, setTheme, setNotesPerRow } = usePreferencesStore()
+  const { user, signOut } = useAuthStore()
+  const [showPasswordChange, setShowPasswordChange] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordSuccess, setPasswordSuccess] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
+
+  const handleChangePassword = async () => {
+    setPasswordError('')
+    setPasswordSuccess(false)
+
+    if (newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match')
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) throw error
+
+      setPasswordSuccess(true)
+      setNewPassword('')
+      setConfirmPassword('')
+      setTimeout(() => {
+        setShowPasswordChange(false)
+        setPasswordSuccess(false)
+      }, 2000)
+    } catch (error) {
+      setPasswordError((error as Error).message)
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
+  const handleSignOut = () => {
+    signOut()
+    onClose()
+  }
 
   // Handle ESC key to close modal
   useEffect(() => {
@@ -147,6 +194,79 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
               Import from Google Keep
             </label>
             <GoogleKeepImport />
+          </div>
+
+          {/* Account section */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              Account
+            </label>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Signed in as {user?.email}
+            </p>
+
+            {/* Change password */}
+            {!showPasswordChange ? (
+              <button
+                onClick={() => setShowPasswordChange(true)}
+                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <Key className="w-4 h-4" />
+                Change password
+              </button>
+            ) : (
+              <div className="space-y-3 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="New password"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+                {passwordError && (
+                  <p className="text-sm text-red-600 dark:text-red-400">{passwordError}</p>
+                )}
+                {passwordSuccess && (
+                  <p className="text-sm text-green-600 dark:text-green-400">Password changed successfully!</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleChangePassword}
+                    disabled={changingPassword}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {changingPassword ? 'Changing...' : 'Change password'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowPasswordChange(false)
+                      setNewPassword('')
+                      setConfirmPassword('')
+                      setPasswordError('')
+                    }}
+                    className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Logout button */}
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-2 w-full px-4 py-2 mt-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign out
+            </button>
           </div>
         </div>
       </div>
