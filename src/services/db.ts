@@ -80,7 +80,17 @@ export const db = new NotesDatabase()
 
 // Helper to generate UUIDs locally
 export function generateLocalId(): string {
-  return crypto.randomUUID()
+  // crypto.randomUUID() is only available in secure contexts (HTTPS/localhost)
+  // Fallback for HTTP access over local network
+  if (typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  // Fallback UUID v4 generator
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
 }
 
 // Helper to get current ISO timestamp

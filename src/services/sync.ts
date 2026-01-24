@@ -101,7 +101,7 @@ function stripLocalOnlyFields(noteData: Record<string, unknown>): Record<string,
 }
 
 async function processNoteChange(change: PendingChange, userId: string): Promise<void> {
-  const { entityId, operation, data } = change
+  const { entityId, operation } = change
 
   switch (operation) {
     case 'create': {
@@ -144,12 +144,34 @@ async function processNoteChange(change: PendingChange, userId: string): Promise
         return
       }
 
-      // Check for conflicts
-      const { data: serverNote } = await supabase
+      // Check if note exists on server
+      const { data: serverNote, error: fetchError } = await supabase
         .from('notes')
         .select('version, updated_at')
         .eq('id', entityId)
         .single()
+
+      // If note doesn't exist on server, create it instead
+      if (fetchError && fetchError.code === 'PGRST116') {
+        console.log('Note not found on server, creating instead:', entityId)
+        const { _syncStatus, _localUpdatedAt, _serverUpdatedAt, ...noteData } = localNote
+        const cleanData = stripLocalOnlyFields(noteData)
+
+        const { error } = await supabase.from('notes').insert({
+          ...cleanData,
+          owner_id: userId,
+        })
+
+        if (error) throw error
+
+        await db.notes.update(entityId, {
+          _syncStatus: 'synced',
+          _serverUpdatedAt: getCurrentTimestamp(),
+        })
+        return
+      }
+
+      if (fetchError) throw fetchError
 
       if (serverNote && serverNote.version > localNote.version) {
         // Server has newer version - mark as conflict
@@ -158,14 +180,14 @@ async function processNoteChange(change: PendingChange, userId: string): Promise
       }
 
       // Strip local-only fields from update data
-      const cleanData = data ? stripLocalOnlyFields(data as Record<string, unknown>) : {}
+      const { _syncStatus, _localUpdatedAt, _serverUpdatedAt, ...noteData } = localNote
+      const cleanData = stripLocalOnlyFields(noteData)
 
       const { error } = await supabase
         .from('notes')
         .update({
           ...cleanData,
           updated_at: getCurrentTimestamp(),
-          version: localNote.version,
         })
         .eq('id', entityId)
 
