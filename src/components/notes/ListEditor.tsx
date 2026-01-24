@@ -36,6 +36,9 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
   const dropTargetRef = useRef<number | null>(null)
   const swipeStateRef = useRef(swipeState)
 
+  // Track the last content we saved to avoid resetting items from our own changes
+  const lastSavedContentRef = useRef<string>('')
+
   useEffect(() => {
     itemsRef.current = items
   }, [items])
@@ -49,7 +52,12 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
   }, [swipeState])
 
   // Parse content on mount and when it changes externally
+  // Skip if the content matches what we just saved (avoid resetting our own changes)
   useEffect(() => {
+    if (content === lastSavedContentRef.current) {
+      return // Skip - this is our own change coming back from the store
+    }
+
     try {
       const parsed: ListContent = JSON.parse(content || '{"items":[]}')
       const itemsWithIndent = (parsed.items || []).map(item => ({
@@ -64,7 +72,9 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
 
   const saveItems = useCallback((newItems: ListItem[]) => {
     const newContent: ListContent = { items: newItems }
-    onChange(JSON.stringify(newContent))
+    const contentStr = JSON.stringify(newContent)
+    lastSavedContentRef.current = contentStr
+    onChange(contentStr)
   }, [onChange])
 
   // Get an item and all its children (items with higher indent that follow it)

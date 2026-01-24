@@ -81,12 +81,16 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [showMenu, showTypeMenu, showTagPicker, showShareModal, viewingImage, onClose])
 
+  // Only sync from store when note ID changes (opening a different note)
+  // Don't overwrite local edits when the store updates from sync
+  const [lastNoteId, setLastNoteId] = useState<string | null>(null)
   useEffect(() => {
-    if (note) {
+    if (note && note.id !== lastNoteId) {
       setTitle(note.title || '')
       setContent(note.content)
+      setLastNoteId(note.id)
     }
-  }, [note])
+  }, [note, lastNoteId])
 
   const handleSave = useCallback(() => {
     if (!note) return
