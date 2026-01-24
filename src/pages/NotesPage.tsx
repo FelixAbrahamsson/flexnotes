@@ -161,11 +161,11 @@ export function NotesPage() {
     closeModalNormally('settings')
   }, [closeModalNormally])
 
-  // Grid classes based on notesPerRow setting
+  // Grid classes based on notesPerRow setting (respects setting on all screen sizes)
   const gridClasses = {
     1: 'grid-cols-1',
-    2: 'grid-cols-1 sm:grid-cols-2',
-    3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+    2: 'grid-cols-2',
+    3: 'grid-cols-3',
   }[notesPerRow]
 
   return (
