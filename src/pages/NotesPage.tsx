@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useState, useRef } from 'react'
 import { Plus, Search, Archive, Trash2, Settings, Trash } from 'lucide-react'
 import { hapticLight } from '@/hooks/useCapacitor'
 import { useNoteStore } from '@/stores/noteStore'
@@ -10,6 +10,8 @@ import { NoteEditor } from '@/components/notes/NoteEditor'
 import { TagFilter } from '@/components/tags/TagFilter'
 import { SyncStatus } from '@/components/SyncStatus'
 import { SettingsModal } from '@/components/SettingsModal'
+
+type ModalType = 'note' | 'settings'
 
 export function NotesPage() {
   const {
@@ -41,6 +43,43 @@ export function NotesPage() {
 
   const [showSettings, setShowSettings] = useState(false)
 
+  // Track modal stack for back button handling
+  const modalStackRef = useRef<ModalType[]>([])
+
+  // Push modal to history stack
+  const openModal = useCallback((modalType: ModalType) => {
+    modalStackRef.current.push(modalType)
+    window.history.pushState({ modal: modalType }, '')
+  }, [])
+
+  // Close modal and clean up history (when closing via UI, not back button)
+  const closeModalNormally = useCallback((modalType: ModalType) => {
+    const index = modalStackRef.current.lastIndexOf(modalType)
+    if (index !== -1) {
+      modalStackRef.current.splice(index, 1)
+      window.history.back()
+    }
+  }, [])
+
+  // Handle back button / swipe back
+  useEffect(() => {
+    const handlePopState = () => {
+      const topModal = modalStackRef.current.pop()
+      if (topModal === 'note') {
+        // Close note editor
+        if (activeNoteId) {
+          deleteNoteIfEmpty(activeNoteId)
+        }
+        setActiveNote(null)
+      } else if (topModal === 'settings') {
+        setShowSettings(false)
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [activeNoteId, deleteNoteIfEmpty, setActiveNote])
+
   // Initialize data and subscriptions
   useEffect(() => {
     fetchNotes()
@@ -63,8 +102,11 @@ export function NotesPage() {
 
   const handleCreateNote = useCallback(async () => {
     hapticLight()
-    await createNote()
-  }, [createNote])
+    const note = await createNote()
+    if (note) {
+      openModal('note')
+    }
+  }, [createNote, openModal])
 
   const handleCloseEditor = useCallback(async () => {
     if (activeNoteId) {
@@ -72,7 +114,8 @@ export function NotesPage() {
       await deleteNoteIfEmpty(activeNoteId)
     }
     setActiveNote(null)
-  }, [activeNoteId, deleteNoteIfEmpty, setActiveNote])
+    closeModalNormally('note')
+  }, [activeNoteId, deleteNoteIfEmpty, setActiveNote, closeModalNormally])
 
   const handleArchive = useCallback((noteId: string, isArchived: boolean) => {
     hapticLight()
@@ -102,6 +145,21 @@ export function NotesPage() {
       emptyTrash()
     }
   }, [emptyTrash, trashCount])
+
+  const handleOpenNote = useCallback((noteId: string) => {
+    setActiveNote(noteId)
+    openModal('note')
+  }, [setActiveNote, openModal])
+
+  const handleOpenSettings = useCallback(() => {
+    setShowSettings(true)
+    openModal('settings')
+  }, [openModal])
+
+  const handleCloseSettings = useCallback(() => {
+    setShowSettings(false)
+    closeModalNormally('settings')
+  }, [closeModalNormally])
 
   // Grid classes based on notesPerRow setting
   const gridClasses = {
@@ -149,7 +207,7 @@ export function NotesPage() {
 
             {/* Settings */}
             <button
-              onClick={() => setShowSettings(true)}
+              onClick={handleOpenSettings}
               className="btn btn-ghost p-2"
               title="Settings"
             >
@@ -239,7 +297,7 @@ export function NotesPage() {
                       key={note.id}
                       note={note}
                       tags={getTagsForNote(note.id)}
-                      onClick={() => setActiveNote(note.id)}
+                      onClick={() => handleOpenNote(note.id)}
                       onArchive={() => handleArchive(note.id, note.is_archived)}
                       onDelete={() => handleDelete(note.id)}
                     />
@@ -262,7 +320,7 @@ export function NotesPage() {
                       key={note.id}
                       note={note}
                       tags={getTagsForNote(note.id)}
-                      onClick={() => !showTrash && setActiveNote(note.id)}
+                      onClick={() => !showTrash && handleOpenNote(note.id)}
                       onArchive={!showTrash ? () => handleArchive(note.id, note.is_archived) : undefined}
                       onDelete={showTrash ? () => handlePermanentDelete(note.id) : () => handleDelete(note.id)}
                       onRestore={showTrash ? () => handleRestore(note.id) : undefined}
@@ -294,7 +352,7 @@ export function NotesPage() {
 
       {/* Settings modal */}
       {showSettings && (
-        <SettingsModal onClose={() => setShowSettings(false)} />
+        <SettingsModal onClose={handleCloseSettings} />
       )}
     </div>
   )
