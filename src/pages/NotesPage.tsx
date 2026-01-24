@@ -185,7 +185,11 @@ export function NotesPage() {
             {/* Archive toggle */}
             <button
               onClick={() => setShowArchived(!showArchived)}
-              className={`btn btn-ghost p-2 ${showArchived ? 'bg-gray-200 dark:bg-gray-700' : ''}`}
+              className={`btn p-2 ${
+                showArchived
+                  ? 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100'
+                  : 'btn-ghost'
+              }`}
               title={showArchived ? 'Show active notes' : 'Show archived notes'}
             >
               <Archive className="w-5 h-5" />
@@ -194,7 +198,11 @@ export function NotesPage() {
             {/* Trash toggle */}
             <button
               onClick={() => setShowTrash(!showTrash)}
-              className={`btn btn-ghost p-2 relative ${showTrash ? 'bg-gray-200 dark:bg-gray-700' : ''}`}
+              className={`btn p-2 relative ${
+                showTrash
+                  ? 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100'
+                  : 'btn-ghost'
+              }`}
               title={showTrash ? 'Show active notes' : 'Show trash'}
             >
               <Trash2 className="w-5 h-5" />
