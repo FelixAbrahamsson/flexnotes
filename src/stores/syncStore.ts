@@ -203,3 +203,10 @@ if (typeof window !== 'undefined') {
     useSyncStore.getState().setOnline(false)
   })
 }
+
+// Helper to trigger sync if online - use this instead of repeating the pattern
+export function triggerSyncIfOnline(): void {
+  if (navigator.onLine) {
+    useSyncStore.getState().sync()
+  }
+}

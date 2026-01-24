@@ -74,12 +74,3 @@ export interface NewNote {
   content?: string
   note_type?: NoteType
 }
-
-// Sync types
-export interface PendingChange {
-  id: string
-  note_id: string
-  operation: 'create' | 'update' | 'delete'
-  timestamp: string
-  data?: Partial<Note>
-}

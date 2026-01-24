@@ -5,7 +5,7 @@ import { db, generateLocalId, getCurrentTimestamp, type LocalNote } from '@/serv
 import { queueChange } from '@/services/sync'
 import { useAuthStore } from './authStore'
 import { useTagStore } from './tagStore'
-import { useSyncStore } from './syncStore'
+import { useSyncStore, triggerSyncIfOnline } from './syncStore'
 
 // Constants
 const TRASH_RETENTION_DAYS = 30
@@ -235,9 +235,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       }))
 
       // Try to sync immediately if online
-      if (navigator.onLine) {
-        useSyncStore.getState().sync()
-      }
+      triggerSyncIfOnline()
 
       return uiNote
     } catch (error) {
@@ -320,9 +318,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       await useSyncStore.getState().refreshPendingCount()
 
       // Try to sync if online
-      if (navigator.onLine) {
-        useSyncStore.getState().sync()
-      }
+      triggerSyncIfOnline()
     } catch (error) {
       // Revert on error - reload from local
       await get().loadFromLocal()
@@ -367,9 +363,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
 
       await useSyncStore.getState().refreshPendingCount()
 
-      if (navigator.onLine) {
-        useSyncStore.getState().sync()
-      }
+      triggerSyncIfOnline()
     } catch (error) {
       await get().loadFromLocal()
       set({ error: (error as Error).message })
@@ -409,9 +403,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
 
       await useSyncStore.getState().refreshPendingCount()
 
-      if (navigator.onLine) {
-        useSyncStore.getState().sync()
-      }
+      triggerSyncIfOnline()
     } catch (error) {
       await get().loadFromLocal()
       set({ error: (error as Error).message })
@@ -431,9 +423,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       await queueChange('note', id, 'delete')
       await useSyncStore.getState().refreshPendingCount()
 
-      if (navigator.onLine) {
-        useSyncStore.getState().sync()
-      }
+      triggerSyncIfOnline()
     } catch (error) {
       set({ notes: previousNotes, error: (error as Error).message })
     }
@@ -495,10 +485,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
         if (wasSynced) {
           await queueChange('note', id, 'delete')
           await useSyncStore.getState().refreshPendingCount()
-
-          if (navigator.onLine) {
-            useSyncStore.getState().sync()
-          }
+          triggerSyncIfOnline()
         }
 
         return true

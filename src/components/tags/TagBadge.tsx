@@ -20,7 +20,7 @@ const DEFAULT_COLORS = [
   '#ec4899', // pink
 ]
 
-export function getTagColor(tag: Tag): string {
+function getTagColor(tag: Tag): string {
   if (tag.color) return tag.color
   // Generate consistent color from tag name
   const hash = tag.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)

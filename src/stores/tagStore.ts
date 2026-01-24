@@ -4,7 +4,7 @@ import { supabase } from '@/services/supabase'
 import { db, generateLocalId, getCurrentTimestamp, type LocalTag, type LocalNoteTag } from '@/services/db'
 import { queueChange } from '@/services/sync'
 import { useAuthStore } from './authStore'
-import { useSyncStore } from './syncStore'
+import { triggerSyncIfOnline } from './syncStore'
 
 interface TagState {
   tags: Tag[]
@@ -175,9 +175,7 @@ export const useTagStore = create<TagState>((set, get) => ({
         tags: [...state.tags, uiTag].sort((a, b) => a.name.localeCompare(b.name))
       }))
 
-      if (navigator.onLine) {
-        useSyncStore.getState().sync()
-      }
+      triggerSyncIfOnline()
 
       return uiTag
     } catch (error) {
@@ -200,9 +198,7 @@ export const useTagStore = create<TagState>((set, get) => ({
 
       await queueChange('tag', id, 'update', updates)
 
-      if (navigator.onLine) {
-        useSyncStore.getState().sync()
-      }
+      triggerSyncIfOnline()
     } catch (error) {
       await get().loadFromLocal()
       set({ error: (error as Error).message })
@@ -223,9 +219,7 @@ export const useTagStore = create<TagState>((set, get) => ({
       await db.noteTags.where('tag_id').equals(id).delete()
       await queueChange('tag', id, 'delete')
 
-      if (navigator.onLine) {
-        useSyncStore.getState().sync()
-      }
+      triggerSyncIfOnline()
     } catch (error) {
       set({ tags: previousTags, noteTags: previousNoteTags, error: (error as Error).message })
     }
@@ -251,9 +245,7 @@ export const useTagStore = create<TagState>((set, get) => ({
       await db.noteTags.put(ntData)
       await queueChange('noteTag', `${noteId}:${tagId}`, 'create')
 
-      if (navigator.onLine) {
-        useSyncStore.getState().sync()
-      }
+      triggerSyncIfOnline()
     } catch (error) {
       set(state => ({
         noteTags: state.noteTags.filter(
@@ -280,9 +272,7 @@ export const useTagStore = create<TagState>((set, get) => ({
         .delete()
       await queueChange('noteTag', `${noteId}:${tagId}`, 'delete')
 
-      if (navigator.onLine) {
-        useSyncStore.getState().sync()
-      }
+      triggerSyncIfOnline()
     } catch (error) {
       set({ noteTags: previousNoteTags, error: (error as Error).message })
     }
