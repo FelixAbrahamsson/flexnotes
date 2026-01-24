@@ -9,6 +9,7 @@ import { useSyncStore, triggerSyncIfOnline } from './syncStore'
 
 // Constants
 const TRASH_RETENTION_DAYS = 30
+const NOTES_PER_PAGE = 20
 
 interface NoteState {
   notes: Note[]
@@ -21,6 +22,9 @@ interface NoteState {
   showTrash: boolean
   selectedTagIds: string[]
   searchQuery: string
+
+  // Pagination
+  displayLimit: number
 
   // Actions
   fetchNotes: () => Promise<void>
@@ -42,8 +46,14 @@ interface NoteState {
   setSelectedTagIds: (ids: string[]) => void
   setSearchQuery: (query: string) => void
 
+  // Pagination actions
+  loadMoreNotes: () => void
+  resetDisplayLimit: () => void
+  hasMoreNotes: () => boolean
+
   // Computed
   getFilteredNotes: () => Note[]
+  getPaginatedNotes: () => Note[]
   getActiveNote: () => Note | undefined
   getTrashedNotes: () => Note[]
   getTrashCount: () => number
@@ -89,6 +99,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   showTrash: false,
   selectedTagIds: [],
   searchQuery: '',
+  displayLimit: NOTES_PER_PAGE,
 
   // Load notes from local IndexedDB first
   loadFromLocal: async () => {
@@ -504,19 +515,33 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   },
 
   setShowArchived: (show: boolean) => {
-    set({ showArchived: show, showTrash: false })
+    set({ showArchived: show, showTrash: false, displayLimit: NOTES_PER_PAGE })
   },
 
   setShowTrash: (show: boolean) => {
-    set({ showTrash: show, showArchived: false })
+    set({ showTrash: show, showArchived: false, displayLimit: NOTES_PER_PAGE })
   },
 
   setSelectedTagIds: (ids: string[]) => {
-    set({ selectedTagIds: ids })
+    set({ selectedTagIds: ids, displayLimit: NOTES_PER_PAGE })
   },
 
   setSearchQuery: (query: string) => {
-    set({ searchQuery: query })
+    set({ searchQuery: query, displayLimit: NOTES_PER_PAGE })
+  },
+
+  loadMoreNotes: () => {
+    set(state => ({ displayLimit: state.displayLimit + NOTES_PER_PAGE }))
+  },
+
+  resetDisplayLimit: () => {
+    set({ displayLimit: NOTES_PER_PAGE })
+  },
+
+  hasMoreNotes: () => {
+    const { displayLimit } = get()
+    const allFiltered = get().getFilteredNotes()
+    return allFiltered.length > displayLimit
   },
 
   getFilteredNotes: () => {
@@ -555,6 +580,12 @@ export const useNoteStore = create<NoteState>((set, get) => ({
 
       return true
     })
+  },
+
+  getPaginatedNotes: () => {
+    const { displayLimit } = get()
+    const allFiltered = get().getFilteredNotes()
+    return allFiltered.slice(0, displayLimit)
   },
 
   getTrashedNotes: () => {

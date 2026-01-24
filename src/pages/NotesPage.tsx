@@ -32,9 +32,11 @@ export function NotesPage() {
     setShowArchived,
     setShowTrash,
     setSearchQuery,
-    getFilteredNotes,
+    getPaginatedNotes,
     getTrashCount,
     deleteNoteIfEmpty,
+    loadMoreNotes,
+    hasMoreNotes,
   } = useNoteStore()
 
   const { tags, fetchTags, fetchNoteTags, getTagsForNote } = useTagStore()
@@ -95,10 +97,32 @@ export function NotesPage() {
     }
   }, [fetchNotes, fetchTags, fetchNoteTags, subscribeToChanges, refreshPendingCount])
 
-  const filteredNotes = getFilteredNotes()
-  const pinnedNotes = filteredNotes.filter(n => n.is_pinned && !showTrash)
-  const unpinnedNotes = filteredNotes.filter(n => !n.is_pinned || showTrash)
+  const paginatedNotes = getPaginatedNotes()
+  const pinnedNotes = paginatedNotes.filter(n => n.is_pinned && !showTrash)
+  const unpinnedNotes = paginatedNotes.filter(n => !n.is_pinned || showTrash)
   const trashCount = getTrashCount()
+  const canLoadMore = hasMoreNotes()
+
+  // Ref for infinite scroll sentinel
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const sentinel = loadMoreRef.current
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && canLoadMore && !loading) {
+          loadMoreNotes()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [canLoadMore, loading, loadMoreNotes])
 
   const handleCreateNote = useCallback(async () => {
     hapticLight()
@@ -263,11 +287,11 @@ export function NotesPage() {
           </div>
         )}
 
-        {loading && filteredNotes.length === 0 ? (
+        {loading && paginatedNotes.length === 0 ? (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
           </div>
-        ) : filteredNotes.length === 0 ? (
+        ) : paginatedNotes.length === 0 ? (
           <div className="text-center py-12">
             <div className="mb-4">
               {showTrash ? (
@@ -337,6 +361,16 @@ export function NotesPage() {
                   ))}
                 </div>
               </section>
+            )}
+
+            {/* Load more sentinel */}
+            {canLoadMore && (
+              <div
+                ref={loadMoreRef}
+                className="flex items-center justify-center py-8"
+              >
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600" />
+              </div>
             )}
           </div>
         )}
