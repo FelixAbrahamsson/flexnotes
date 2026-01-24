@@ -12,7 +12,7 @@ export function GoogleKeepImport() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { createNoteFromImport } = useNoteStore()
-  const { createTag, addTagToNote, tags } = useTagStore()
+  const { createTag, addTagToNote } = useTagStore()
   const { user } = useAuthStore()
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,6 +29,44 @@ export function GoogleKeepImport() {
       const parseResult = await parseGoogleKeepZip(file)
       setResult(parseResult)
 
+      // Collect all unique labels first
+      const allLabels = new Set<string>()
+      for (const note of parseResult.notes) {
+        for (const label of note.labels) {
+          allLabels.add(label.toLowerCase())
+        }
+      }
+
+      // Create a map of label -> tag for the import session
+      // This avoids race conditions with tag creation
+      const labelToTagId = new Map<string, string>()
+
+      // Pre-create all tags
+      for (const label of allLabels) {
+        // Check existing tags (get fresh from store each time)
+        const currentTags = useTagStore.getState().tags
+        let existingTag = currentTags.find(t => t.name.toLowerCase() === label.toLowerCase())
+
+        if (!existingTag) {
+          // Find original case label for display
+          let originalLabel = label
+          for (const note of parseResult.notes) {
+            const found = note.labels.find(l => l.toLowerCase() === label)
+            if (found) {
+              originalLabel = found
+              break
+            }
+          }
+
+          const newTag = await createTag(originalLabel)
+          if (newTag) {
+            labelToTagId.set(label, newTag.id)
+          }
+        } else {
+          labelToTagId.set(label, existingTag.id)
+        }
+      }
+
       // Import each note
       let imported = 0
       for (const importedNote of parseResult.notes) {
@@ -39,18 +77,16 @@ export function GoogleKeepImport() {
           // Create the note
           const noteId = await createNoteFromImport(note)
 
-          // Handle labels -> tags
+          // Handle labels -> tags using our pre-created map
           for (const label of importedNote.labels) {
-            // Find or create tag
-            let tag = tags.find(t => t.name.toLowerCase() === label.toLowerCase())
-            if (!tag) {
-              const newTag = await createTag(label)
-              if (newTag) {
-                tag = newTag
+            const tagId = labelToTagId.get(label.toLowerCase())
+            if (tagId) {
+              try {
+                await addTagToNote(noteId, tagId)
+              } catch (tagError) {
+                // Ignore tag errors - they're not critical
+                console.warn('Failed to add tag to note:', tagError)
               }
-            }
-            if (tag) {
-              await addTagToNote(noteId, tag.id)
             }
           }
 

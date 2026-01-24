@@ -249,14 +249,21 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   // Create note from imported data (preserves id and timestamps)
   createNoteFromImport: async (note) => {
     try {
+      // Check if note already exists in store (prevent duplicates)
+      const existingNote = get().notes.find(n => n.id === note.id)
+      if (existingNote) {
+        console.log('Note already exists, skipping:', note.id)
+        return note.id
+      }
+
       const localNote: LocalNote = {
         ...note,
         _syncStatus: 'pending',
         _localUpdatedAt: note.updated_at,
       }
 
-      // Save to local DB
-      await db.notes.add(localNote)
+      // Save to local DB (use put to handle re-imports gracefully)
+      await db.notes.put(localNote)
 
       // Queue for sync
       await queueChange('note', note.id, 'create')
