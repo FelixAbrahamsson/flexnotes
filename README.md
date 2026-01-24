@@ -14,6 +14,13 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 - **Auto-Cleanup**: Empty notes are automatically deleted when closed
 - **Search**: Full-text search across note titles and content
 
+### List Notes
+- **Touch-Friendly Reordering**: Drag items up/down to reorder on mobile and desktop
+- **Swipe to Indent**: Swipe left/right on the grip handle to change indentation
+- **Hierarchical Drag**: Dragging a parent item moves all its children too
+- **Nested Lists**: Support for up to 5 levels of indentation
+- **Keyboard Shortcuts**: Tab/Shift+Tab to indent, Enter to add item, Backspace on empty to outdent/delete
+
 ### Sync & Storage
 - **Offline-First**: Works without internet, syncs when back online
 - **Real-Time Sync**: Changes sync across devices instantly via Supabase Realtime
@@ -23,7 +30,9 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 - **Dark/Light Theme**: Toggle between dark, light, or system-based theme
 - **Configurable Layout**: Choose 1, 2, or 3 notes per row in the grid view
 - **Keyboard Shortcuts**: Press ESC to close modals, click outside to dismiss
-- **Google Keep Import**: Import notes from Google Takeout export
+- **Google Keep Import**: Import notes from Google Takeout export (supports both JSON and HTML formats)
+- **Account Management**: Change password from settings
+- **Mobile-Optimized**: Touch-friendly controls, visible action menus on mobile
 
 ### Cross-Platform
 - **Web**: Modern PWA with offline support
@@ -134,7 +143,8 @@ You can import your existing notes from Google Keep:
 7. Wait for the import to complete
 
 The importer will:
-- Convert all Keep notes to text notes
+- Import text notes and list notes (checklists preserved as lists)
+- Support both JSON (current) and HTML (legacy) export formats
 - Preserve titles, content, and timestamps
 - Convert Keep labels to tags (creates new tags automatically)
 - Skip trashed notes

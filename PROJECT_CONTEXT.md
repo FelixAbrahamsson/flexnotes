@@ -96,7 +96,7 @@ src/
 │   ├── notes/           # NoteCard, NoteEditor, TextEditor, ListEditor, MarkdownEditor
 │   ├── sharing/         # ShareModal
 │   ├── tags/            # TagBadge, TagFilter, TagPicker, TagManager
-│   ├── SettingsModal.tsx
+│   ├── SettingsModal.tsx  # Theme, layout, tags, import, password, logout
 │   └── SyncStatus.tsx
 │
 ├── hooks/               # Custom React hooks
@@ -147,6 +147,14 @@ Handles syncing between local and server:
 - `processPendingChanges()` - Push local changes to server
 - `fullSync()` / `incrementalSync()` - Pull changes from server
 - `resolveConflict()` - Handle version conflicts
+- Handles edge case where note exists locally but not on server (creates instead of updates)
+
+### `src/services/googleKeepImport.ts`
+Parses Google Keep Takeout exports:
+- `parseGoogleKeepZip()` - Extracts and parses notes from ZIP
+- `parseKeepJSON()` - Parses current JSON format with `textContent`, `listContent`, `labels`
+- `parseKeepHTML()` - Parses legacy HTML format
+- `convertImportedNote()` - Converts to app's note format, preserving list items
 
 ### `src/stores/noteStore.ts`
 Main note operations:
@@ -168,7 +176,17 @@ Modal for editing a note:
 - Tag picker
 - Type switcher (text/list/markdown)
 - Image upload/gallery
-- Auto-save on changes
+- Auto-save on changes (500ms debounce)
+- Tracks `lastNoteId` to prevent sync from overwriting local edits
+
+### `src/components/notes/ListEditor.tsx`
+List/checklist editor with mobile-friendly interactions:
+- Touch and mouse drag support for reordering
+- Swipe gestures for indentation changes
+- Uses refs (`itemsRef`, `dragStateRef`, `dropTargetRef`) to avoid stale closures
+- Direction detection: first 10px of movement determines vertical vs horizontal mode
+- Hierarchical drag: moving a parent moves all children
+- Tracks `lastSavedContentRef` to prevent content prop from resetting local state
 
 ### `src/components/notes/MarkdownEditor.tsx`
 TipTap-based rich text editor:
@@ -249,7 +267,26 @@ const { _syncStatus, _localUpdatedAt, is_deleted, deleted_at, ...serverData } = 
 ```
 
 ### ID Generation
-Local IDs use UUID v4 via `crypto.randomUUID()` to avoid conflicts.
+Local IDs use UUID v4 via `crypto.randomUUID()` with a fallback for non-HTTPS contexts:
+```typescript
+export function generateLocalId(): string {
+  if (typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  // Fallback for HTTP (e.g., local network testing)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, ...)
+}
+```
+
+### Avoiding Stale Closures in Event Handlers
+When attaching event handlers to `document` (e.g., for drag/drop), use refs to access current state:
+```typescript
+const itemsRef = useRef(items)
+useEffect(() => { itemsRef.current = items }, [items])
+
+// In event handler attached to document:
+const currentItems = itemsRef.current // Always current
+```
 
 ## Common Tasks
 
@@ -295,6 +332,16 @@ npm run build        # Production build
 npm run preview      # Preview production build
 ```
 
+### Testing on Mobile via Local Network
+
+To test on a phone connected to the same WiFi:
+
+```bash
+npm run dev -- --host
+```
+
+This exposes the dev server on your local IP (e.g., `http://192.168.0.120:5173`). Note that `crypto.randomUUID()` won't work over HTTP, but the app has a fallback.
+
 ## Environment Variables
 
 ```
@@ -316,5 +363,10 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 1. **Sync fields**: Never send `_syncStatus`, `_localUpdatedAt`, `is_deleted`, `deleted_at` to Supabase
 2. **TipTap drops**: Use `editorProps.handleDrop`, not React `onDrop` (TipTap intercepts events)
 3. **Theme persistence**: Theme is read from localStorage before React hydrates to prevent flash
-4. **Empty notes**: Auto-deleted on close - check `isNoteEmpty()` in noteStore
+4. **Empty notes**: Auto-deleted on close - check `isNoteEmpty()` in noteStore. Deletion also syncs to server if note was previously synced.
 5. **Trash**: Local-only feature. Trashed notes are deleted from server immediately
+6. **Sync race conditions**: NoteEditor and ListEditor track their own state to prevent `loadFromLocal()` from overwriting user edits during sync
+7. **crypto.randomUUID**: Only available in secure contexts (HTTPS/localhost). Use `generateLocalId()` which has a fallback.
+8. **Touch events on mobile**: HTML5 drag API doesn't work on mobile. Use manual touch handlers with `touchstart`, `touchmove`, `touchend`.
+9. **Stale closures**: Event handlers attached to `document` capture variables at attachment time. Use refs to access current state.
+10. **Google Keep import**: Modern exports use JSON format, not HTML. The importer handles both.
