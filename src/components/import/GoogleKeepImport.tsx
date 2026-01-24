@@ -4,6 +4,7 @@ import { parseGoogleKeepZip, convertImportedNote, type ImportResult } from '@/se
 import { useNoteStore } from '@/stores/noteStore'
 import { useTagStore } from '@/stores/tagStore'
 import { useAuthStore } from '@/stores/authStore'
+import { triggerSyncIfOnline } from '@/stores/syncStore'
 
 export function GoogleKeepImport() {
   const [importing, setImporting] = useState(false)
@@ -96,6 +97,11 @@ export function GoogleKeepImport() {
           console.error('Failed to import note:', error)
           parseResult.errors.push(`Failed to import "${importedNote.title}"`)
         }
+      }
+
+      // Trigger sync after all imports complete
+      if (imported > 0) {
+        triggerSyncIfOnline()
       }
 
       // Update result with final counts
