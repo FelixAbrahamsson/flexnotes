@@ -1,5 +1,22 @@
 import { useEffect, useCallback, useState, useRef } from 'react'
 import { Plus, Search, Archive, Trash2, Settings, Trash } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { hapticLight } from '@/hooks/useCapacitor'
 import { useNoteStore } from '@/stores/noteStore'
 import { useTagStore } from '@/stores/tagStore'
@@ -10,6 +27,67 @@ import { NoteEditor } from '@/components/notes/NoteEditor'
 import { TagFilter } from '@/components/tags/TagFilter'
 import { SyncStatus } from '@/components/SyncStatus'
 import { SettingsModal } from '@/components/SettingsModal'
+import type { Note, Tag } from '@/types'
+
+// Sortable wrapper for NoteCard
+interface SortableNoteCardProps {
+  note: Note
+  tags: Tag[]
+  onClick: () => void
+  onArchive?: () => void
+  onDelete: () => void
+  onRestore?: () => void
+  showRestore?: boolean
+  isDragDisabled?: boolean
+}
+
+function SortableNoteCard({
+  note,
+  tags,
+  onClick,
+  onArchive,
+  onDelete,
+  onRestore,
+  showRestore,
+  isDragDisabled,
+}: SortableNoteCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: note.id, disabled: isDragDisabled })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1000 : 'auto',
+    touchAction: isDragDisabled ? 'auto' : 'none', // Disable browser touch handling for drag
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={isDragDisabled ? '' : 'cursor-grab active:cursor-grabbing'}
+      {...attributes}
+      {...listeners}
+    >
+      <NoteCard
+        note={note}
+        tags={tags}
+        onClick={onClick}
+        onArchive={onArchive}
+        onDelete={onDelete}
+        onRestore={onRestore}
+        showRestore={showRestore}
+      />
+    </div>
+  )
+}
 
 type ModalType = 'note' | 'settings'
 
@@ -37,6 +115,7 @@ export function NotesPage() {
     deleteNoteIfEmpty,
     loadMoreNotes,
     hasMoreNotes,
+    reorderNotes,
   } = useNoteStore()
 
   const { tags, fetchTags, fetchNoteTags, getTagsForNote } = useTagStore()
@@ -123,6 +202,34 @@ export function NotesPage() {
     observer.observe(sentinel)
     return () => observer.disconnect()
   }, [canLoadMore, loading, loadMoreNotes])
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 10, // 10px movement required before drag starts
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250, // 250ms hold before drag starts on touch
+        tolerance: 8, // Allow 8px movement during the delay
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  // Handle drag end
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (over && active.id !== over.id) {
+      hapticLight()
+      reorderNotes(active.id as string, over.id as string)
+    }
+  }, [reorderNotes])
 
   const handleCreateNote = useCallback(async () => {
     hapticLight()
@@ -316,63 +423,81 @@ export function NotesPage() {
             )}
           </div>
         ) : (
-          <div className="space-y-6">
-            {/* Pinned notes */}
-            {pinnedNotes.length > 0 && (
-              <section>
-                <h2 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-                  Pinned
-                </h2>
-                <div className={`grid gap-3 ${gridClasses}`}>
-                  {pinnedNotes.map(note => (
-                    <NoteCard
-                      key={note.id}
-                      note={note}
-                      tags={getTagsForNote(note.id)}
-                      onClick={() => handleOpenNote(note.id)}
-                      onArchive={() => handleArchive(note.id, note.is_archived)}
-                      onDelete={() => handleDelete(note.id)}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Other notes / Trash notes */}
-            {unpinnedNotes.length > 0 && (
-              <section>
-                {pinnedNotes.length > 0 && !showTrash && (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="space-y-6">
+              {/* Pinned notes */}
+              {pinnedNotes.length > 0 && (
+                <section>
                   <h2 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-                    Others
+                    Pinned
                   </h2>
-                )}
-                <div className={`grid gap-3 ${gridClasses}`}>
-                  {unpinnedNotes.map(note => (
-                    <NoteCard
-                      key={note.id}
-                      note={note}
-                      tags={getTagsForNote(note.id)}
-                      onClick={() => !showTrash && handleOpenNote(note.id)}
-                      onArchive={!showTrash ? () => handleArchive(note.id, note.is_archived) : undefined}
-                      onDelete={showTrash ? () => handlePermanentDelete(note.id) : () => handleDelete(note.id)}
-                      onRestore={showTrash ? () => handleRestore(note.id) : undefined}
-                      showRestore={showTrash}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
+                  <SortableContext
+                    items={pinnedNotes.map(n => n.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className={`grid gap-3 ${gridClasses}`}>
+                      {pinnedNotes.map(note => (
+                        <SortableNoteCard
+                          key={note.id}
+                          note={note}
+                          tags={getTagsForNote(note.id)}
+                          onClick={() => handleOpenNote(note.id)}
+                          onArchive={() => handleArchive(note.id, note.is_archived)}
+                          onDelete={() => handleDelete(note.id)}
+                          isDragDisabled={searchQuery.length > 0 || selectedTagIds.length > 0}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </section>
+              )}
 
-            {/* Load more sentinel */}
-            {canLoadMore && (
-              <div
-                ref={loadMoreRef}
-                className="flex items-center justify-center py-8"
-              >
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600" />
-              </div>
-            )}
-          </div>
+              {/* Other notes / Trash notes */}
+              {unpinnedNotes.length > 0 && (
+                <section>
+                  {pinnedNotes.length > 0 && !showTrash && (
+                    <h2 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+                      Others
+                    </h2>
+                  )}
+                  <SortableContext
+                    items={unpinnedNotes.map(n => n.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className={`grid gap-3 ${gridClasses}`}>
+                      {unpinnedNotes.map(note => (
+                        <SortableNoteCard
+                          key={note.id}
+                          note={note}
+                          tags={getTagsForNote(note.id)}
+                          onClick={() => !showTrash && handleOpenNote(note.id)}
+                          onArchive={!showTrash ? () => handleArchive(note.id, note.is_archived) : undefined}
+                          onDelete={showTrash ? () => handlePermanentDelete(note.id) : () => handleDelete(note.id)}
+                          onRestore={showTrash ? () => handleRestore(note.id) : undefined}
+                          showRestore={showTrash}
+                          isDragDisabled={showTrash || searchQuery.length > 0 || selectedTagIds.length > 0}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </section>
+              )}
+
+              {/* Load more sentinel */}
+              {canLoadMore && (
+                <div
+                  ref={loadMoreRef}
+                  className="flex items-center justify-center py-8"
+                >
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600" />
+                </div>
+              )}
+            </div>
+          </DndContext>
         )}
       </main>
 

@@ -73,6 +73,22 @@ class NotesDatabase extends Dexie {
         note.deleted_at = note.deleted_at ?? null
       })
     })
+
+    // Version 3: Add sort_order for manual note ordering
+    this.version(3).stores({
+      notes: 'id, owner_id, is_archived, is_pinned, is_deleted, deleted_at, sort_order, _syncStatus',
+      tags: 'id, owner_id, name, _syncStatus',
+      noteTags: '[note_id+tag_id], note_id, tag_id, _syncStatus',
+      images: 'id, note_id, _syncStatus',
+      pendingChanges: 'id, entityType, entityId, timestamp',
+      syncMeta: 'key',
+    }).upgrade(tx => {
+      // Add sort_order to existing notes based on updated_at (newest = lowest sort_order)
+      return tx.table('notes').toCollection().modify((note) => {
+        // Use negative timestamp so newer notes have lower sort_order (appear first)
+        note.sort_order = note.sort_order ?? -new Date(note.updated_at).getTime()
+      })
+    })
   }
 }
 

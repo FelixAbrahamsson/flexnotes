@@ -321,9 +321,11 @@ export async function fullSync(userId: string): Promise<void> {
 
       const localNoteData: LocalNote = {
         ...note,
-        // Add default values for local-only trash fields
+        // Add default values for local-only fields
         is_deleted: false,
         deleted_at: null,
+        // Use server sort_order if available, otherwise preserve local or use timestamp
+        sort_order: note.sort_order ?? localNote?.sort_order ?? -new Date(note.updated_at).getTime(),
         _syncStatus: 'synced',
         _localUpdatedAt: note.updated_at,
         _serverUpdatedAt: note.updated_at,
@@ -392,9 +394,11 @@ export async function incrementalSync(userId: string): Promise<void> {
 
     const localNoteData: LocalNote = {
       ...note,
-      // Add default values for local-only trash fields
+      // Add default values for local-only fields
       is_deleted: false,
       deleted_at: null,
+      // Use server sort_order if available, otherwise preserve local or use timestamp
+      sort_order: note.sort_order ?? localNote?.sort_order ?? -new Date(note.updated_at).getTime(),
       _syncStatus: 'synced',
       _localUpdatedAt: note.updated_at,
       _serverUpdatedAt: note.updated_at,

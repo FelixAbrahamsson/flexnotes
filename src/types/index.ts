@@ -13,6 +13,7 @@ export interface Note {
   created_at: string
   updated_at: string
   version: number
+  sort_order: number
   // Local-only fields
   _pendingSync?: boolean
   _localUpdatedAt?: string

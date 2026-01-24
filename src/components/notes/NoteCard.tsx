@@ -43,9 +43,12 @@ export function NoteCard({ note, tags, onClick, onArchive, onDelete, onRestore, 
 
   return (
     <div className="relative group">
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onClick}
-        className="w-full text-left p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-primary-500"
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
+        className="w-full text-left p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer select-none"
       >
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-medium text-gray-900 dark:text-gray-100 line-clamp-1">{displayTitle}</h3>
@@ -85,7 +88,7 @@ export function NoteCard({ note, tags, onClick, onArchive, onDelete, onRestore, 
             </>
           )}
         </div>
-      </button>
+      </div>
 
       {/* Quick actions menu - always visible on mobile, hover on desktop */}
       {(onArchive || onDelete || onRestore) && (

@@ -322,6 +322,7 @@ export function convertImportedNote(imported: ImportedNote, ownerId: string): Om
     version: 1,
     created_at: imported.createdAt,
     updated_at: imported.updatedAt,
+    sort_order: -new Date(imported.updatedAt).getTime(),
   }
 }
 

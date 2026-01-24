@@ -39,6 +39,7 @@ interface NoteState {
   cleanupOldTrash: () => Promise<void>
   setActiveNote: (id: string | null) => void
   deleteNoteIfEmpty: (id: string) => Promise<boolean>
+  reorderNotes: (activeId: string, overId: string) => Promise<void>
 
   // Filter actions
   setShowArchived: (show: boolean) => void
@@ -117,13 +118,14 @@ export const useNoteStore = create<NoteState>((set, get) => ({
         ...note,
         is_deleted: note.is_deleted ?? false,
         deleted_at: note.deleted_at ?? null,
+        sort_order: note.sort_order ?? -new Date(note.updated_at).getTime(),
         _pendingSync: _syncStatus === 'pending',
       }))
 
-      // Sort: pinned first, then by updated_at
+      // Sort: pinned first, then by sort_order (lower = earlier/top)
       notes.sort((a, b) => {
         if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1
-        return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        return a.sort_order - b.sort_order
       })
 
       set({ notes })
@@ -159,6 +161,8 @@ export const useNoteStore = create<NoteState>((set, get) => ({
             ...serverNote,
             is_deleted: serverNote.is_deleted ?? false,
             deleted_at: serverNote.deleted_at ?? null,
+            // Use server sort_order if available, otherwise preserve local or use timestamp
+            sort_order: serverNote.sort_order ?? localNote?.sort_order ?? -new Date(serverNote.updated_at).getTime(),
             _syncStatus: 'synced',
             _localUpdatedAt: serverNote.updated_at,
             _serverUpdatedAt: serverNote.updated_at,
@@ -211,6 +215,13 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     const id = generateLocalId()
     const now = getCurrentTimestamp()
 
+    // Get lowest sort_order from existing notes and subtract 1 to place new note at top
+    const existingNotes = get().notes.filter(n => !n.is_deleted && !n.is_archived)
+    const minSortOrder = existingNotes.length > 0
+      ? Math.min(...existingNotes.map(n => n.sort_order))
+      : 0
+    const sortOrder = minSortOrder - 1
+
     const newNote: LocalNote = {
       id,
       owner_id: user.id,
@@ -224,6 +235,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       created_at: now,
       updated_at: now,
       version: 1,
+      sort_order: sortOrder,
       _syncStatus: 'pending',
       _localUpdatedAt: now,
     }
@@ -512,6 +524,80 @@ export const useNoteStore = create<NoteState>((set, get) => ({
 
   setActiveNote: (id: string | null) => {
     set({ activeNoteId: id })
+  },
+
+  reorderNotes: async (activeId: string, overId: string) => {
+    const { notes, showArchived, showTrash } = get()
+
+    // Get the filtered notes (same view user is seeing)
+    const filteredNotes = notes.filter(note => {
+      if (showTrash) return note.is_deleted
+      if (note.is_deleted) return false
+      return note.is_archived === showArchived
+    })
+
+    // Separate pinned and unpinned
+    const pinnedNotes = filteredNotes.filter(n => n.is_pinned && !showTrash)
+    const unpinnedNotes = filteredNotes.filter(n => !n.is_pinned || showTrash)
+
+    // Find which list the active note is in
+    const activeInPinned = pinnedNotes.some(n => n.id === activeId)
+    const targetList = activeInPinned ? pinnedNotes : unpinnedNotes
+
+    // Find indices
+    const oldIndex = targetList.findIndex(n => n.id === activeId)
+    const newIndex = targetList.findIndex(n => n.id === overId)
+
+    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
+
+    // Calculate new sort_order
+    let newSortOrder: number
+
+    if (newIndex === 0) {
+      // Moving to top
+      newSortOrder = targetList[0].sort_order - 1
+    } else if (newIndex === targetList.length - 1) {
+      // Moving to bottom
+      newSortOrder = targetList[targetList.length - 1].sort_order + 1
+    } else if (newIndex < oldIndex) {
+      // Moving up - place between newIndex-1 and newIndex
+      const above = targetList[newIndex - 1]
+      const below = targetList[newIndex]
+      newSortOrder = (above.sort_order + below.sort_order) / 2
+    } else {
+      // Moving down - place between newIndex and newIndex+1
+      const above = targetList[newIndex]
+      const below = targetList[newIndex + 1]
+      newSortOrder = (above.sort_order + below.sort_order) / 2
+    }
+
+    // Update state optimistically
+    set(state => ({
+      notes: state.notes.map(n =>
+        n.id === activeId ? { ...n, sort_order: newSortOrder } : n
+      ).sort((a, b) => {
+        if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1
+        return a.sort_order - b.sort_order
+      })
+    }))
+
+    // Persist to database
+    try {
+      const now = getCurrentTimestamp()
+      await db.notes.update(activeId, {
+        sort_order: newSortOrder,
+        _syncStatus: 'pending',
+        _localUpdatedAt: now,
+      })
+
+      await queueChange('note', activeId, 'update', { sort_order: newSortOrder })
+      await useSyncStore.getState().refreshPendingCount()
+      triggerSyncIfOnline()
+    } catch (error) {
+      // Reload on error
+      await get().loadFromLocal()
+      set({ error: (error as Error).message })
+    }
   },
 
   setShowArchived: (show: boolean) => {
