@@ -5,6 +5,12 @@ import Placeholder from '@tiptap/extension-placeholder'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Image from '@tiptap/extension-image'
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import { common, createLowlight } from 'lowlight'
+
+// Create lowlight instance with common languages (js, ts, python, css, html, json, bash, etc.)
+const lowlight = createLowlight(common)
+
 import {
   Bold,
   Italic,
@@ -47,6 +53,14 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       StarterKit.configure({
         heading: {
           levels: [1, 2, 3],
+        },
+        // Disable default code block in favor of CodeBlockLowlight
+        codeBlock: false,
+      }),
+      CodeBlockLowlight.configure({
+        lowlight,
+        HTMLAttributes: {
+          class: 'hljs',
         },
       }),
       Placeholder.configure({

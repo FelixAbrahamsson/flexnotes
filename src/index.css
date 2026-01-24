@@ -134,6 +134,82 @@
   @apply bg-transparent p-0;
 }
 
+/* Syntax highlighting theme (works with lowlight/highlight.js) */
+.hljs {
+  @apply bg-gray-100 text-gray-900;
+  @apply dark:bg-gray-800 dark:text-gray-100;
+}
+
+.hljs-comment,
+.hljs-quote {
+  @apply text-gray-500 italic;
+  @apply dark:text-gray-400;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-addition {
+  @apply text-purple-600;
+  @apply dark:text-purple-400;
+}
+
+.hljs-number,
+.hljs-string,
+.hljs-meta .hljs-meta-string,
+.hljs-literal,
+.hljs-doctag,
+.hljs-regexp {
+  @apply text-green-600;
+  @apply dark:text-green-400;
+}
+
+.hljs-title,
+.hljs-section,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class {
+  @apply text-blue-600 font-semibold;
+  @apply dark:text-blue-400;
+}
+
+.hljs-attribute,
+.hljs-attr,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-class .hljs-title,
+.hljs-type {
+  @apply text-orange-600;
+  @apply dark:text-orange-400;
+}
+
+.hljs-symbol,
+.hljs-bullet,
+.hljs-subst,
+.hljs-meta,
+.hljs-meta .hljs-keyword,
+.hljs-selector-attr,
+.hljs-selector-pseudo,
+.hljs-link {
+  @apply text-cyan-600;
+  @apply dark:text-cyan-400;
+}
+
+.hljs-built_in,
+.hljs-deletion {
+  @apply text-red-600;
+  @apply dark:text-red-400;
+}
+
+.hljs-params {
+  @apply text-gray-700;
+  @apply dark:text-gray-300;
+}
+
+.hljs-function {
+  @apply text-blue-600;
+  @apply dark:text-blue-400;
+}
+
 .prose hr {
   @apply border-gray-200 my-6;
   @apply dark:border-gray-700;

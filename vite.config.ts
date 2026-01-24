@@ -10,7 +10,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       devOptions: {
-        enabled: true,
+        enabled: false,
       },
       manifest: {
         name: 'Felix Notes',

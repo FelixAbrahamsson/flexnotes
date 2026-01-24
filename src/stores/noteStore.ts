@@ -160,7 +160,8 @@ export const useNoteStore = create<NoteState>((set, get) => ({
         const serverIds = new Set((data || []).map(n => n.id))
 
         for (const localNote of localNotes) {
-          if (!serverIds.has(localNote.id) && localNote._syncStatus === 'synced') {
+          // Don't delete notes that are in local trash - they're intentionally not on server
+          if (!serverIds.has(localNote.id) && localNote._syncStatus === 'synced' && !localNote.is_deleted) {
             await db.notes.delete(localNote.id)
           }
         }
