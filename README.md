@@ -6,34 +6,43 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 
 ### Note Management
 - **Multiple Note Types**: Plain text, checklists, and rich markdown with WYSIWYG editing and syntax-highlighted code blocks
-- **Tag Organization**: Create, edit, and delete tags to organize and filter your notes
+- **Tag Organization**: Create, edit, and reorder tags with custom colors (presets or color wheel)
+- **Smart Tag Filtering**: New notes automatically get the currently filtered tags applied
 - **Image Support**: Attach images via button, drag & drop, or paste with automatic compression
 - **Pin & Archive**: Pin important notes and archive completed ones
 - **Trash Bin**: Deleted notes go to trash with 30-day retention before permanent deletion
 - **Quick Actions**: Archive, delete, or share notes directly from the note card menu
+- **Drag-to-Archive/Trash**: When dragging notes, drop zones appear to quickly archive or trash
 - **Auto-Cleanup**: Empty notes are automatically deleted when closed
-- **Search**: Full-text search across note titles and content
+- **Search**: Full-text search with clear button to reset
 - **Drag-to-Reorder**: Drag notes to reorder them (desktop: drag directly, mobile: tap reorder button first)
+- **Fullscreen Mode**: Expand notes to fullscreen on desktop for distraction-free editing
 - **Infinite Scroll**: Notes load progressively as you scroll for better performance
 
 ### List Notes
 - **Touch-Friendly Reordering**: Drag items up/down to reorder on mobile and desktop
 - **Swipe to Indent**: Swipe left/right on the grip handle to change indentation
 - **Hierarchical Drag**: Dragging a parent item moves all its children too
+- **Hierarchical Checkbox**: Checking a parent item automatically checks all children
+- **Multi-line Items**: Shift+Enter (desktop) or newline button (mobile) to add line breaks within items
 - **Nested Lists**: Support for up to 5 levels of indentation
-- **Keyboard Shortcuts**: Tab/Shift+Tab to indent, Enter to add item, Backspace on empty to outdent/delete
+- **Keyboard Shortcuts**: Tab/Shift+Tab to indent, Enter to add item, Backspace on empty to delete
 
 ### Sync & Storage
 - **Offline-First**: Works without internet, syncs when back online
 - **Real-Time Sync**: Changes sync across devices instantly via Supabase Realtime
+- **Visibility Sync**: App automatically syncs when you switch back to it
+- **Pull-to-Refresh**: Pull down on mobile to manually trigger sync
 - **Cross-Device Order**: Custom note ordering syncs across all your devices
 - **Shareable Notes**: Generate links to share notes with read or write access
 
 ### User Experience
 - **Dark/Light Theme**: Toggle between dark, light, or system-based theme
+- **Themed Dialogs**: Custom confirmation dialogs that match the app theme
 - **Configurable Layout**: Choose 1, 2, or 3 notes per row in the grid view
 - **Keyboard Shortcuts**: Press ESC to close modals, click outside to dismiss
 - **Google Keep Import**: Import notes from Google Takeout export (supports both JSON and HTML formats)
+- **Authentication**: Email/password or Google SSO sign-in
 - **Account Management**: Change password from settings
 - **Mobile-Optimized**: Touch-friendly controls, visible action menus on mobile
 

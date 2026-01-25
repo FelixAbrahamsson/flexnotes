@@ -96,11 +96,14 @@ src/
 │   ├── notes/           # NoteCard, NoteEditor, TextEditor, ListEditor, MarkdownEditor
 │   ├── sharing/         # ShareModal
 │   ├── tags/            # TagBadge, TagFilter, TagPicker, TagManager
+│   ├── ui/              # Reusable UI components (ConfirmDialog, DropdownMenu)
 │   ├── SettingsModal.tsx  # Theme, layout, tags, import, password, logout
 │   └── SyncStatus.tsx
 │
 ├── hooks/               # Custom React hooks
-│   └── useCapacitor.ts  # Native platform utilities (haptics, etc.)
+│   ├── useCapacitor.ts  # Native platform utilities (haptics, etc.)
+│   ├── useImageUpload.ts # Image upload handling with drag & drop
+│   └── usePullToRefresh.ts # Pull-to-refresh gesture for mobile
 │
 ├── pages/               # Page-level components
 │   ├── AuthPage.tsx     # Login/signup
@@ -116,13 +119,13 @@ src/
 │   └── sync.ts          # Sync queue processing, conflict resolution
 │
 ├── stores/              # Zustand state stores
-│   ├── authStore.ts     # User authentication state
+│   ├── authStore.ts     # User authentication (email/password, Google SSO)
 │   ├── imageStore.ts    # Note images state
 │   ├── noteStore.ts     # Notes CRUD, trash, filters
 │   ├── preferencesStore.ts # Theme, layout preferences
 │   ├── shareStore.ts    # Share links state
-│   ├── syncStore.ts     # Sync status, online/offline
-│   └── tagStore.ts      # Tags and note-tag relationships
+│   ├── syncStore.ts     # Sync status, online/offline, visibility-based sync
+│   └── tagStore.ts      # Tags CRUD, reordering, note-tag relationships
 │
 ├── types/               # TypeScript type definitions
 │   └── index.ts         # Note, Tag, NoteTag, etc.
@@ -188,6 +191,8 @@ List/checklist editor with mobile-friendly interactions:
 - Uses refs (`itemsRef`, `dragStateRef`, `dropTargetRef`) to avoid stale closures
 - Direction detection: first 10px of movement determines vertical vs horizontal mode
 - Hierarchical drag: moving a parent moves all children
+- Hierarchical checkbox: checking a parent checks all children via `toggleChecked()`
+- Multi-line support: textarea input with Shift+Enter (desktop) or newline button (mobile)
 - Tracks `lastSavedContentRef` to prevent content prop from resetting local state
 
 ### `src/components/notes/MarkdownEditor.tsx`
@@ -195,6 +200,21 @@ TipTap-based rich text editor:
 - Toolbar with formatting buttons
 - Image drag & drop and paste handling
 - Exposes `insertImage()` via ref
+
+### `src/components/ui/ConfirmDialog.tsx`
+Context-based confirmation dialog system:
+- `ConfirmProvider` wraps app to provide `useConfirm()` hook
+- `useConfirm()` returns async function that resolves to boolean
+- Supports variants: 'danger' (red), 'warning' (yellow), 'default' (primary)
+- Customizable title, message, and button text
+- Replaces browser's `window.confirm()` with themed dialogs
+
+### `src/components/tags/TagManager.tsx`
+Tag management in settings:
+- Drag-to-reorder tags using dnd-kit
+- Edit tag name and color
+- Custom color picker with presets and color wheel
+- `getTagColor()` generates consistent color from tag name when no color set
 
 ## Database Schema
 
@@ -225,14 +245,14 @@ interface PendingChange {
 ```sql
 -- Main tables
 notes (id, owner_id, title, content, note_type, is_pinned, is_archived, sort_order, version, created_at, updated_at)
-tags (id, owner_id, name, color, created_at)
+tags (id, owner_id, name, color, sort_order, created_at)
 note_tags (note_id, tag_id)
 note_images (id, note_id, storage_path, filename, size, width, height, created_at)
 note_shares (id, note_id, token, permission, created_at, expires_at)
 profiles (id, email, display_name, created_at)
 ```
 
-**Note:** `is_deleted` and `deleted_at` are local-only fields for trash functionality. They are stripped before syncing to Supabase. The `sort_order` field uses negative timestamps for default ordering (newest first) and supports fractional values for inserting between notes.
+**Note:** `is_deleted` and `deleted_at` are local-only fields for trash functionality. They are stripped before syncing to Supabase. The `sort_order` field uses negative timestamps for default ordering (newest first) and supports fractional values for inserting between notes. Tag `sort_order` is local-only for custom tag ordering in the UI.
 
 ## Patterns & Conventions
 
@@ -377,3 +397,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 10. **Google Keep import**: Modern exports use JSON format, not HTML. The importer handles both.
 11. **Mobile drag-to-reorder**: On mobile, `touch-action: none` is required for dragging but blocks scrolling. Solution: use a "reorder mode" toggle that only enables drag when explicitly activated. The button is hidden on desktop (`sm:hidden`) where dragging works without conflicts.
 12. **Share links for anonymous users**: RLS blocks anonymous queries to `note_shares`. Use the `get_shared_note_with_permission()` database function with `SECURITY DEFINER` to bypass RLS for share lookups.
+13. **Tag sort_order**: Tag ordering is local-only. The `sort_order` field is preserved during sync from server to maintain user's custom order.
+14. **Confirmation dialogs**: Use `useConfirm()` hook instead of `window.confirm()`. Must be used within `ConfirmProvider`.
+15. **Multi-line list items**: ListEditor uses `<textarea>` instead of `<input>` to support newlines. Enter creates new item, Shift+Enter adds newline (desktop), newline button for mobile.
+16. **Hierarchical checkbox**: When checking a parent list item, use `toggleChecked()` which calls `getItemWithChildren()` to find and check all descendants.
