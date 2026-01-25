@@ -105,7 +105,7 @@ export function TagPicker({ noteId, selectedTags, onClose }: TagPickerProps) {
 
         {/* Color picker */}
         {showColorPicker && (
-          <div className="flex gap-2 mt-2 flex-wrap">
+          <div className="flex gap-2 mt-2 flex-wrap items-center">
             {DEFAULT_COLORS.map(color => (
               <button
                 key={color}
@@ -125,6 +125,20 @@ export function TagPicker({ noteId, selectedTags, onClose }: TagPickerProps) {
               className={`w-6 h-6 rounded-full bg-gray-400 ${!selectedColor ? 'ring-2 ring-offset-1 ring-offset-white dark:ring-offset-gray-800 ring-gray-400 dark:ring-gray-500' : ''}`}
               title="Auto"
             />
+            <label
+              className="w-6 h-6 rounded-full cursor-pointer transition-transform hover:scale-110 border border-gray-300 dark:border-gray-600"
+              style={{
+                background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)',
+              }}
+              title="Custom color"
+            >
+              <input
+                type="color"
+                value={selectedColor || '#6366f1'}
+                onChange={e => setSelectedColor(e.target.value)}
+                className="sr-only"
+              />
+            </label>
           </div>
         )}
       </div>

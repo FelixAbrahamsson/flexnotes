@@ -1,29 +1,38 @@
 import { useState } from 'react'
 import { Pencil, Trash2, Check, X } from 'lucide-react'
 import { useTagStore } from '@/stores/tagStore'
+import { DEFAULT_COLORS } from './TagBadge'
 import type { Tag } from '@/types'
 
 export function TagManager() {
   const { tags, updateTag, deleteTag } = useTagStore()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
+  const [editColor, setEditColor] = useState<string | null>(null)
+  const [showColorPicker, setShowColorPicker] = useState(false)
 
   const handleStartEdit = (tag: Tag) => {
     setEditingId(tag.id)
     setEditName(tag.name)
+    setEditColor(tag.color)
+    setShowColorPicker(false)
   }
 
   const handleSaveEdit = async () => {
     if (!editingId || !editName.trim()) return
 
-    await updateTag(editingId, { name: editName.trim() })
+    await updateTag(editingId, { name: editName.trim(), color: editColor })
     setEditingId(null)
     setEditName('')
+    setEditColor(null)
+    setShowColorPicker(false)
   }
 
   const handleCancelEdit = () => {
     setEditingId(null)
     setEditName('')
+    setEditColor(null)
+    setShowColorPicker(false)
   }
 
   const handleDelete = async (tag: Tag) => {
@@ -48,33 +57,72 @@ export function TagManager() {
           className="flex items-center gap-2 p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
         >
           {editingId === tag.id ? (
-            <>
-              <input
-                type="text"
-                value={editName}
-                onChange={e => setEditName(e.target.value)}
-                className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                autoFocus
-                onKeyDown={e => {
-                  if (e.key === 'Enter') handleSaveEdit()
-                  if (e.key === 'Escape') handleCancelEdit()
-                }}
-              />
-              <button
-                onClick={handleSaveEdit}
-                className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded"
-                title="Save"
-              >
-                <Check className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleCancelEdit}
-                className="p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                title="Cancel"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </>
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowColorPicker(!showColorPicker)}
+                  className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 flex-shrink-0 hover:scale-110 transition-transform"
+                  style={{ backgroundColor: editColor || '#6366f1' }}
+                  title="Change color"
+                />
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  autoFocus
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSaveEdit()
+                    if (e.key === 'Escape') handleCancelEdit()
+                  }}
+                />
+                <button
+                  onClick={handleSaveEdit}
+                  className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded"
+                  title="Save"
+                >
+                  <Check className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleCancelEdit}
+                  className="p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                  title="Cancel"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              {showColorPicker && (
+                <div className="flex gap-2 flex-wrap pl-8 items-center">
+                  {DEFAULT_COLORS.map(color => (
+                    <button
+                      key={color}
+                      onClick={() => {
+                        setEditColor(color)
+                        setShowColorPicker(false)
+                      }}
+                      className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${
+                        editColor === color ? 'ring-2 ring-offset-2 ring-offset-white dark:ring-offset-gray-800 ring-gray-400 dark:ring-gray-500' : ''
+                      }`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                  <label
+                    className="w-6 h-6 rounded-full cursor-pointer transition-transform hover:scale-110 border border-gray-300 dark:border-gray-600"
+                    style={{
+                      background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)',
+                    }}
+                    title="Custom color"
+                  >
+                    <input
+                      type="color"
+                      value={editColor || '#6366f1'}
+                      onChange={e => setEditColor(e.target.value)}
+                      className="sr-only"
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
           ) : (
             <>
               <div
