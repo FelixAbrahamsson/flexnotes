@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Pin, Archive, Trash2, MoreVertical, RotateCcw, Share2 } from 'lucide-react'
 import type { Note, Tag } from '@/types'
 import { TagBadge } from '@/components/tags/TagBadge'
+import { DropdownMenu, DropdownMenuItem } from '@/components/ui/DropdownMenu'
+import { formatRelativeDate, getContentPreview } from '@/utils/formatters'
 
 interface NoteCardProps {
   note: Note
@@ -84,7 +86,7 @@ export function NoteCard({ note, tags, onClick, onArchive, onDelete, onRestore, 
 
         <div className="flex items-center gap-2 mt-3">
           <span className="text-xs text-gray-400 dark:text-gray-500">
-            {formatDate(note.updated_at)}
+            {formatRelativeDate(note.updated_at)}
           </span>
           <span className="text-xs text-gray-300 dark:text-gray-600">·</span>
           <span className="text-xs text-gray-400 dark:text-gray-500 capitalize">{note.note_type}</span>
@@ -107,104 +109,30 @@ export function NoteCard({ note, tags, onClick, onArchive, onDelete, onRestore, 
             <MoreVertical className="w-4 h-4 text-gray-600 dark:text-gray-300" />
           </button>
 
-          {showMenu && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setShowMenu(false) }} />
-              <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-20 min-w-[140px]">
-                {showRestore && onRestore && (
-                  <button
-                    onClick={handleRestore}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 w-full"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    Restore
-                  </button>
-                )}
-                {onShare && !showRestore && (
-                  <button
-                    onClick={handleShare}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 w-full"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    Share
-                  </button>
-                )}
-                {onArchive && !showRestore && (
-                  <button
-                    onClick={handleArchive}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 w-full"
-                  >
-                    <Archive className="w-4 h-4" />
-                    {note.is_archived ? 'Unarchive' : 'Archive'}
-                  </button>
-                )}
-                {onDelete && (
-                  <button
-                    onClick={handleDelete}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 w-full"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    {showRestore ? 'Delete forever' : 'Delete'}
-                  </button>
-                )}
-              </div>
-            </>
-          )}
+          <DropdownMenu open={showMenu} onClose={() => setShowMenu(false)}>
+            {showRestore && onRestore && (
+              <DropdownMenuItem icon={<RotateCcw className="w-4 h-4" />} onClick={handleRestore}>
+                Restore
+              </DropdownMenuItem>
+            )}
+            {onShare && !showRestore && (
+              <DropdownMenuItem icon={<Share2 className="w-4 h-4" />} onClick={handleShare}>
+                Share
+              </DropdownMenuItem>
+            )}
+            {onArchive && !showRestore && (
+              <DropdownMenuItem icon={<Archive className="w-4 h-4" />} onClick={handleArchive}>
+                {note.is_archived ? 'Unarchive' : 'Archive'}
+              </DropdownMenuItem>
+            )}
+            {onDelete && (
+              <DropdownMenuItem icon={<Trash2 className="w-4 h-4" />} onClick={handleDelete} variant="danger">
+                {showRestore ? 'Delete forever' : 'Delete'}
+              </DropdownMenuItem>
+            )}
+          </DropdownMenu>
         </div>
       )}
     </div>
   )
-}
-
-function getContentPreview(content: string, noteType: string): string {
-  if (!content) return ''
-
-  if (noteType === 'list') {
-    try {
-      const parsed = JSON.parse(content)
-      if (parsed.items && Array.isArray(parsed.items)) {
-        return parsed.items
-          .slice(0, 3)
-          .map((item: { text: string; checked: boolean }) =>
-            `${item.checked ? '✓' : '○'} ${item.text}`
-          )
-          .join('\n')
-      }
-    } catch {
-      return content
-    }
-  }
-
-  // For text and markdown, strip HTML tags but preserve newlines
-  // First replace <br>, </p>, </div> with newlines, then strip remaining tags
-  let text = content
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<\/div>/gi, '\n')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/\n{3,}/g, '\n\n') // Collapse multiple newlines
-    .trim()
-
-  return text.slice(0, 200)
-}
-
-function formatDate(dateString: string): string {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-
-  if (minutes < 1) return 'Just now'
-  if (minutes < 60) return `${minutes}m ago`
-  if (hours < 24) return `${hours}h ago`
-  if (days < 7) return `${days}d ago`
-
-  return date.toLocaleDateString()
 }

@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { X, Sun, Moon, Monitor, Grid2X2, Grid3X3, LayoutList, LogOut, Key } from 'lucide-react'
 import { usePreferencesStore } from '@/stores/preferencesStore'
 import { useAuthStore } from '@/stores/authStore'
+import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { TagManager } from '@/components/tags/TagManager'
 import { GoogleKeepImport } from '@/components/import/GoogleKeepImport'
 import { supabase } from '@/services/supabase'
@@ -58,16 +59,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
     onClose()
   }
 
-  // Handle ESC key to close modal
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  useEscapeKey(onClose)
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>

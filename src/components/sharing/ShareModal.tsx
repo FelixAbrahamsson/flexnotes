@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { X, Link, Copy, Check, Trash2, Globe, Edit3 } from 'lucide-react'
 import { useShareStore } from '@/stores/shareStore'
+import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { copyToClipboard } from '@/services/share'
+import { formatAbsoluteDate } from '@/utils/formatters'
 import type { NoteShare } from '@/types'
 
 interface ShareModalProps {
@@ -16,6 +18,8 @@ export function ShareModal({ noteId, noteTitle, onClose }: ShareModalProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [newPermission, setNewPermission] = useState<'read' | 'write'>('read')
   const [creating, setCreating] = useState(false)
+
+  useEscapeKey(onClose)
 
   useEffect(() => {
     fetchShares(noteId)
@@ -44,14 +48,6 @@ export function ShareModal({ noteId, noteTitle, onClose }: ShareModalProps) {
       setCopiedId(shareId)
       setTimeout(() => setCopiedId(null), 2000)
     }
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
   }
 
   const isExpired = (share: NoteShare): boolean => {
@@ -131,7 +127,7 @@ export function ShareModal({ noteId, noteTitle, onClose }: ShareModalProps) {
                   onCopy={() => handleCopy(share.share_token, share.id)}
                   onDelete={() => removeShare(share.id)}
                   onPermissionChange={perm => updatePermission(share.id, perm)}
-                  formatDate={formatDate}
+                  formatDate={formatAbsoluteDate}
                 />
               ))}
             </div>

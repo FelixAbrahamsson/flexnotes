@@ -15,6 +15,7 @@ import {
 import { useNoteStore } from '@/stores/noteStore'
 import { useTagStore } from '@/stores/tagStore'
 import { useImageStore } from '@/stores/imageStore'
+import { useImageUpload } from '@/hooks/useImageUpload'
 import { TextEditor } from './TextEditor'
 import { ListEditor } from './ListEditor'
 import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor'
@@ -22,7 +23,7 @@ import { TagBadge } from '@/components/tags/TagBadge'
 import { TagPicker } from '@/components/tags/TagPicker'
 import { ImageGallery, ImageViewer } from '@/components/images/ImageGallery'
 import { ShareModal } from '@/components/sharing/ShareModal'
-import { processImage } from '@/services/imageProcessor'
+import { DropdownMenu, DropdownMenuItem } from '@/components/ui/DropdownMenu'
 import type { NoteType } from '@/types'
 
 interface NoteEditorProps {
@@ -33,7 +34,7 @@ interface NoteEditorProps {
 export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
   const { getActiveNote, updateNote, deleteNote } = useNoteStore()
   const { getTagsForNote, removeTagFromNote } = useTagStore()
-  const { fetchImagesForNote, uploadImage, getImageUrl, uploading } = useImageStore()
+  const { fetchImagesForNote } = useImageStore()
   const note = getActiveNote()
 
   const [title, setTitle] = useState('')
@@ -43,10 +44,23 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
   const [showTagPicker, setShowTagPicker] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
   const [viewingImage, setViewingImage] = useState<string | null>(null)
-  const [isDragging, setIsDragging] = useState(false)
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const markdownEditorRef = useRef<MarkdownEditorHandle>(null)
+
+  const {
+    isDragging,
+    uploading,
+    fileInputRef,
+    handleImageUpload,
+    handleImageButtonClick,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+  } = useImageUpload({
+    noteId: note?.id,
+    noteType: note?.note_type,
+    onImageInsert: (url) => markdownEditorRef.current?.insertImage(url),
+  })
 
   const noteTags = note ? getTagsForNote(note.id) : []
 
@@ -174,71 +188,6 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
     setShowTypeMenu(false)
   }
 
-  const handleImageUpload = useCallback(async (files: FileList | null) => {
-    if (!files || !note) return
-
-    for (const file of Array.from(files)) {
-      if (!file.type.startsWith('image/')) continue
-
-      try {
-        // Process and upload
-        await processImage(file) // Validate first
-        const image = await uploadImage(note.id, file)
-
-        if (image && note.note_type === 'markdown') {
-          // Insert into markdown editor at cursor position
-          const url = getImageUrl(image.storage_path)
-          if (markdownEditorRef.current) {
-            markdownEditorRef.current.insertImage(url)
-          }
-        }
-      } catch (error) {
-        console.error('Image upload failed:', error)
-      }
-    }
-  }, [note, uploadImage, getImageUrl])
-
-  const handleImageButtonClick = () => {
-    fileInputRef.current?.click()
-  }
-
-  // Drag and drop handlers for the entire modal
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.dataTransfer.types.includes('Files')) {
-      setIsDragging(true)
-    }
-  }, [])
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    // Only set to false if leaving the container
-    const rect = e.currentTarget.getBoundingClientRect()
-    if (
-      e.clientX < rect.left ||
-      e.clientX > rect.right ||
-      e.clientY < rect.top ||
-      e.clientY > rect.bottom
-    ) {
-      setIsDragging(false)
-    }
-  }, [])
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
-
-    if (!note || note.note_type === 'list') return
-
-    const files = e.dataTransfer.files
-    if (files.length > 0) {
-      handleImageUpload(files)
-    }
-  }, [note, handleImageUpload])
-
   if (!note) {
     return null
   }
@@ -355,37 +304,30 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
                 <MoreVertical className="w-5 h-5" />
               </button>
 
-              {showMenu && (
-                <>
-                  <div className="fixed inset-0" onClick={() => setShowMenu(false)} />
-                  <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10">
-                    <button
-                      onClick={() => {
-                        setShowMenu(false)
-                        setShowShareModal(true)
-                      }}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 w-full"
-                    >
-                      <Share2 className="w-4 h-4" />
-                      Share
-                    </button>
-                    <button
-                      onClick={handleToggleArchive}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 w-full"
-                    >
-                      <Archive className="w-4 h-4" />
-                      {note.is_archived ? 'Unarchive' : 'Archive'}
-                    </button>
-                    <button
-                      onClick={handleDelete}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 w-full"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Delete
-                    </button>
-                  </div>
-                </>
-              )}
+              <DropdownMenu open={showMenu} onClose={() => setShowMenu(false)}>
+                <DropdownMenuItem
+                  icon={<Share2 className="w-4 h-4" />}
+                  onClick={() => {
+                    setShowMenu(false)
+                    setShowShareModal(true)
+                  }}
+                >
+                  Share
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  icon={<Archive className="w-4 h-4" />}
+                  onClick={handleToggleArchive}
+                >
+                  {note.is_archived ? 'Unarchive' : 'Archive'}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  icon={<Trash2 className="w-4 h-4" />}
+                  onClick={handleDelete}
+                  variant="danger"
+                >
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenu>
             </div>
           </div>
         </div>

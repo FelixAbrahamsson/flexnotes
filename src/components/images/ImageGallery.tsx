@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { useImageStore } from '@/stores/imageStore'
+import { useEscapeKey } from '@/hooks/useEscapeKey'
 import type { NoteImage } from '@/types'
 
 interface ImageGalleryProps {
@@ -70,6 +71,8 @@ interface ImageViewerProps {
 }
 
 export function ImageViewer({ url, onClose }: ImageViewerProps) {
+  useEscapeKey(onClose)
+
   return (
     <div
       className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center"
