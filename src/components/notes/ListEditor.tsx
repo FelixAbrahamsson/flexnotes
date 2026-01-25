@@ -26,7 +26,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null)
   const [swipeState, setSwipeState] = useState<{ id: string; offset: number } | null>(null)
 
-  const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map())
+  const inputRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map())
   const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -172,7 +172,8 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     const item = items.find(i => i.id === id)
     if (!item) return
 
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      // Enter without shift creates a new item
       e.preventDefault()
       addItem(id)
     } else if (e.key === 'Backspace' && item.text === '') {
@@ -502,7 +503,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
 interface ListItemRowProps {
   item: ListItem
   rowRef: (el: HTMLDivElement | null) => void
-  inputRef: (el: HTMLInputElement | null) => void
+  inputRef: (el: HTMLTextAreaElement | null) => void
   onToggle: () => void
   onTextChange: (text: string) => void
   onKeyDown: (e: React.KeyboardEvent) => void
@@ -531,7 +532,7 @@ function ListItemRow({
   return (
     <div
       ref={rowRef}
-      className={`flex items-center gap-2 group rounded-lg transition-all ${
+      className={`flex items-start gap-2 group rounded-lg transition-all ${
         isDragging ? 'opacity-40 bg-gray-100 dark:bg-gray-800 scale-95' : ''
       }`}
       style={{
@@ -542,7 +543,7 @@ function ListItemRow({
       {/* Grip handle for dragging (vertical) and swiping (horizontal) */}
       <div
         data-grip
-        className="w-6 h-8 flex items-center justify-center text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none select-none"
+        className="w-6 h-6 mt-0.5 flex items-center justify-center text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none select-none"
         onMouseDown={onGripMouseDown}
         onTouchStart={onGripTouchStart}
       >
@@ -552,7 +553,7 @@ function ListItemRow({
       {/* Custom checkbox */}
       <button
         onClick={onToggle}
-        className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+        className={`w-5 h-5 mt-0.5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
           item.checked
             ? 'bg-primary-600 border-primary-600 text-white'
             : 'border-gray-300 dark:border-gray-500 bg-transparent hover:border-gray-400 dark:hover:border-gray-400'
@@ -562,14 +563,26 @@ function ListItemRow({
         {item.checked && <Check className="w-3 h-3" strokeWidth={3} />}
       </button>
 
-      <input
-        ref={inputRef}
-        type="text"
+      <textarea
+        ref={(el) => {
+          inputRef(el)
+          // Auto-resize on mount and when content changes
+          if (el) {
+            el.style.height = 'auto'
+            el.style.height = `${el.scrollHeight}px`
+          }
+        }}
         value={item.text}
-        onChange={e => onTextChange(e.target.value)}
+        onChange={e => {
+          onTextChange(e.target.value)
+          // Auto-resize on change
+          e.target.style.height = 'auto'
+          e.target.style.height = `${e.target.scrollHeight}px`
+        }}
         onKeyDown={onKeyDown}
         placeholder="List item"
-        className={`flex-1 bg-transparent border-0 focus:outline-none focus:ring-0 p-1 text-sm ${
+        rows={1}
+        className={`flex-1 bg-transparent border-0 focus:outline-none focus:ring-0 p-1 text-sm resize-none overflow-hidden ${
           item.checked
             ? 'text-gray-400 dark:text-gray-500 line-through'
             : 'text-gray-900 dark:text-gray-100'
@@ -578,7 +591,7 @@ function ListItemRow({
 
       <button
         onClick={onDelete}
-        className="p-1 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+        className="p-1 mt-0.5 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
         type="button"
       >
         <X className="w-4 h-4" />
