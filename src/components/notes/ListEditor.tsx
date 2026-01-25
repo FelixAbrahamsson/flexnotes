@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Plus, GripVertical, X, Check } from 'lucide-react'
+import { Plus, GripVertical, X, Check, CornerDownLeft } from 'lucide-react'
 import type { ListItem, ListContent } from '@/types'
 
 interface ListEditorProps {
@@ -172,37 +172,86 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     const item = items.find(i => i.id === id)
     if (!item) return
 
+    // Enter key - create new item (Shift+Enter for newline on desktop)
     if (e.key === 'Enter' && !e.shiftKey) {
-      // Enter without shift creates a new item
       e.preventDefault()
+      e.stopPropagation()
       addItem(id)
-    } else if (e.key === 'Backspace' && item.text === '') {
+      return
+    }
+
+    // Backspace on empty item - delete it
+    if (e.key === 'Backspace' && item.text.trim() === '') {
       e.preventDefault()
-      if ((item.indent ?? 0) > 0) {
-        indentItem(id, -1)
-      } else {
-        deleteItem(id)
-      }
-    } else if (e.key === 'Tab') {
+      deleteItem(id)
+      return
+    }
+
+    // Tab for indentation
+    if (e.key === 'Tab') {
       e.preventDefault()
       if (e.shiftKey) {
         indentItem(id, -1)
       } else {
         indentItem(id, 1)
       }
-    } else if (e.key === 'ArrowDown') {
+      return
+    }
+
+    // Arrow keys for navigation
+    if (e.key === 'ArrowDown') {
       e.preventDefault()
       const index = items.findIndex(i => i.id === id)
       if (index < items.length - 1) {
         setFocusedId(items[index + 1]?.id ?? null)
       }
-    } else if (e.key === 'ArrowUp') {
+      return
+    }
+
+    if (e.key === 'ArrowUp') {
       e.preventDefault()
       const index = items.findIndex(i => i.id === id)
       if (index > 0) {
         setFocusedId(items[index - 1]?.id ?? null)
       }
     }
+  }
+
+  // Handle text changes - also catches mobile Enter key as fallback
+  const handleTextChange = (id: string, newText: string, oldText: string) => {
+    // Check if a newline was just typed (mobile fallback for Enter key)
+    // Count newlines in old vs new text
+    const oldNewlines = (oldText.match(/\n/g) || []).length
+    const newNewlines = (newText.match(/\n/g) || []).length
+
+    if (newNewlines > oldNewlines) {
+      // A newline was typed - on mobile this means Enter was pressed
+      // Remove the newline and create a new item instead
+      const cleanedText = newText.replace(/\n$/, '') // Remove trailing newline
+      updateItem(id, { text: cleanedText })
+      addItem(id)
+      return
+    }
+
+    updateItem(id, { text: newText })
+  }
+
+  // Insert a newline at cursor position (for mobile)
+  const insertNewline = (id: string, cursorPos: number) => {
+    const item = items.find(i => i.id === id)
+    if (!item) return
+
+    const newText = item.text.slice(0, cursorPos) + '\n' + item.text.slice(cursorPos)
+    updateItem(id, { text: newText })
+
+    // Set cursor position after the newline
+    setTimeout(() => {
+      const textarea = inputRefs.current.get(id)
+      if (textarea) {
+        textarea.selectionStart = cursorPos + 1
+        textarea.selectionEnd = cursorPos + 1
+      }
+    }, 0)
   }
 
   // Calculate drop target based on Y position
@@ -434,10 +483,11 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
                 else inputRefs.current.delete(item.id)
               }}
               onToggle={() => updateItem(item.id, { checked: !item.checked })}
-              onTextChange={text => updateItem(item.id, { text })}
+              onTextChange={(text, oldText) => handleTextChange(item.id, text, oldText)}
               onKeyDown={e => handleKeyDown(e, item.id)}
               onDelete={() => deleteItem(item.id)}
-                            isDragging={isBeingDragged}
+              onInsertNewline={cursorPos => insertNewline(item.id, cursorPos)}
+              isDragging={isBeingDragged}
               swipeOffset={swipeState?.id === item.id ? swipeState.offset : 0}
               onGripMouseDown={e => handleGripMouseDown(e, item.id)}
               onGripTouchStart={e => handleGripTouchStart(e, item.id)}
@@ -484,10 +534,11 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
                   else inputRefs.current.delete(item.id)
                 }}
                 onToggle={() => updateItem(item.id, { checked: !item.checked })}
-                onTextChange={text => updateItem(item.id, { text })}
+                onTextChange={(text, oldText) => handleTextChange(item.id, text, oldText)}
                 onKeyDown={e => handleKeyDown(e, item.id)}
                 onDelete={() => deleteItem(item.id)}
-                                isDragging={isBeingDragged}
+                onInsertNewline={cursorPos => insertNewline(item.id, cursorPos)}
+                isDragging={isBeingDragged}
                 swipeOffset={swipeState?.id === item.id ? swipeState.offset : 0}
                 onGripMouseDown={e => handleGripMouseDown(e, item.id)}
                 onGripTouchStart={e => handleGripTouchStart(e, item.id)}
@@ -505,9 +556,10 @@ interface ListItemRowProps {
   rowRef: (el: HTMLDivElement | null) => void
   inputRef: (el: HTMLTextAreaElement | null) => void
   onToggle: () => void
-  onTextChange: (text: string) => void
+  onTextChange: (text: string, oldText: string) => void
   onKeyDown: (e: React.KeyboardEvent) => void
   onDelete: () => void
+  onInsertNewline: (cursorPos: number) => void
   isDragging: boolean
   swipeOffset: number
   onGripMouseDown: (e: React.MouseEvent) => void
@@ -522,12 +574,14 @@ function ListItemRow({
   onTextChange,
   onKeyDown,
   onDelete,
+  onInsertNewline,
   isDragging,
   swipeOffset,
   onGripMouseDown,
   onGripTouchStart,
 }: ListItemRowProps) {
   const indent = item.indent ?? 0
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   return (
     <div
@@ -565,6 +619,7 @@ function ListItemRow({
 
       <textarea
         ref={(el) => {
+          textareaRef.current = el
           inputRef(el)
           // Auto-resize on mount and when content changes
           if (el) {
@@ -574,7 +629,7 @@ function ListItemRow({
         }}
         value={item.text}
         onChange={e => {
-          onTextChange(e.target.value)
+          onTextChange(e.target.value, item.text)
           // Auto-resize on change
           e.target.style.height = 'auto'
           e.target.style.height = `${e.target.scrollHeight}px`
@@ -588,6 +643,27 @@ function ListItemRow({
             : 'text-gray-900 dark:text-gray-100'
         } placeholder-gray-400 dark:placeholder-gray-500`}
       />
+
+      {/* Newline button - visible on mobile/touch, hover on desktop */}
+      <button
+        onClick={() => {
+          const cursorPos = textareaRef.current?.selectionStart ?? item.text.length
+          onInsertNewline(cursorPos)
+          // Refocus and resize after inserting
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.focus()
+              textareaRef.current.style.height = 'auto'
+              textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+            }
+          }, 0)
+        }}
+        className="p-1 mt-0.5 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex-shrink-0"
+        type="button"
+        title="Insert line break"
+      >
+        <CornerDownLeft className="w-4 h-4" />
+      </button>
 
       <button
         onClick={onDelete}
