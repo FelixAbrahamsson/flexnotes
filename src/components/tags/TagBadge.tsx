@@ -63,4 +63,4 @@ export function TagBadge({ tag, onRemove, onClick, selected, size = 'sm' }: TagB
   )
 }
 
-export { DEFAULT_COLORS }
+export { DEFAULT_COLORS, getTagColor }

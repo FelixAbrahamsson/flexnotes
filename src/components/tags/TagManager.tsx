@@ -18,7 +18,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useTagStore } from '@/stores/tagStore'
-import { DEFAULT_COLORS } from './TagBadge'
+import { DEFAULT_COLORS, getTagColor } from './TagBadge'
 import type { Tag } from '@/types'
 
 export function TagManager() {
@@ -176,7 +176,7 @@ function SortableTagRow({
             <button
               onClick={onToggleColorPicker}
               className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 flex-shrink-0 hover:scale-110 transition-transform"
-              style={{ backgroundColor: editColor || '#6366f1' }}
+              style={{ backgroundColor: editColor || getTagColor(tag) }}
               title="Change color"
             />
             <input
@@ -229,7 +229,7 @@ function SortableTagRow({
               >
                 <input
                   type="color"
-                  value={editColor || '#6366f1'}
+                  value={editColor || getTagColor(tag)}
                   onChange={e => onEditColorChange(e.target.value)}
                   className="sr-only"
                 />
@@ -249,7 +249,7 @@ function SortableTagRow({
           </div>
           <div
             className="w-3 h-3 rounded-full flex-shrink-0"
-            style={{ backgroundColor: tag.color || '#6366f1' }}
+            style={{ backgroundColor: getTagColor(tag) }}
           />
           <span className="flex-1 text-sm text-gray-900 dark:text-gray-100">
             {tag.name}
