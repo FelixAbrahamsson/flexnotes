@@ -17,6 +17,7 @@ interface TagState {
   createTag: (name: string, color?: string) => Promise<Tag | null>
   updateTag: (id: string, updates: Partial<Tag>) => Promise<void>
   deleteTag: (id: string) => Promise<void>
+  reorderTags: (activeId: string, overId: string) => Promise<void>
   addTagToNote: (noteId: string, tagId: string) => Promise<void>
   removeTagFromNote: (noteId: string, tagId: string) => Promise<void>
   getTagsForNote: (noteId: string) => Tag[]
@@ -43,8 +44,16 @@ export const useTagStore = create<TagState>((set, get) => ({
         .equals(user.id)
         .toArray()
 
-      const tags: Tag[] = localTags.map(({ _syncStatus, _localUpdatedAt, ...tag }) => tag)
-      tags.sort((a, b) => a.name.localeCompare(b.name))
+      const tags: Tag[] = localTags.map(({ _syncStatus, _localUpdatedAt, ...tag }) => ({
+        ...tag,
+        sort_order: tag.sort_order ?? 0
+      }))
+      // Sort by sort_order, then by name for stable ordering
+      tags.sort((a, b) => {
+        const orderDiff = a.sort_order - b.sort_order
+        if (orderDiff !== 0) return orderDiff
+        return a.name.localeCompare(b.name)
+      })
 
       const localNoteTags = await db.noteTags.toArray()
       const noteTags: NoteTag[] = localNoteTags
@@ -85,8 +94,10 @@ export const useTagStore = create<TagState>((set, get) => ({
           const localTag = await db.tags.get(serverTag.id)
           if (localTag && localTag._syncStatus === 'pending') continue
 
+          // Preserve local sort_order (it's a local-only field)
           const tagData: LocalTag = {
             ...serverTag,
+            sort_order: localTag?.sort_order ?? serverTag.sort_order ?? 0,
             _syncStatus: 'synced',
             _localUpdatedAt: serverTag.created_at,
           }
@@ -149,11 +160,19 @@ export const useTagStore = create<TagState>((set, get) => ({
     const id = generateLocalId()
     const now = getCurrentTimestamp()
 
+    // New tags go at the end
+    const existingTags = get().tags
+    const maxSortOrder = existingTags.length > 0
+      ? Math.max(...existingTags.map(t => t.sort_order))
+      : -1
+    const sortOrder = maxSortOrder + 1
+
     const newTag: LocalTag = {
       id,
       owner_id: user.id,
       name: name.trim(),
       color: color || null,
+      sort_order: sortOrder,
       created_at: now,
       _syncStatus: 'pending',
       _localUpdatedAt: now,
@@ -168,11 +187,12 @@ export const useTagStore = create<TagState>((set, get) => ({
         owner_id: user.id,
         name: name.trim(),
         color: color || null,
+        sort_order: sortOrder,
         created_at: now,
       }
 
       set(state => ({
-        tags: [...state.tags, uiTag].sort((a, b) => a.name.localeCompare(b.name))
+        tags: [...state.tags, uiTag].sort((a, b) => a.sort_order - b.sort_order)
       }))
 
       triggerSyncIfOnline()
@@ -222,6 +242,41 @@ export const useTagStore = create<TagState>((set, get) => ({
       triggerSyncIfOnline()
     } catch (error) {
       set({ tags: previousTags, noteTags: previousNoteTags, error: (error as Error).message })
+    }
+  },
+
+  reorderTags: async (activeId: string, overId: string) => {
+    const tags = get().tags
+    const oldIndex = tags.findIndex(t => t.id === activeId)
+    const newIndex = tags.findIndex(t => t.id === overId)
+
+    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
+
+    // Reorder the array
+    const newTags = [...tags]
+    const [removed] = newTags.splice(oldIndex, 1)
+    newTags.splice(newIndex, 0, removed)
+
+    // Update sort_order for all affected tags
+    const updatedTags = newTags.map((tag, index) => ({
+      ...tag,
+      sort_order: index
+    }))
+
+    set({ tags: updatedTags })
+
+    // Persist to local DB (sort_order is local-only, no need to sync)
+    try {
+      await db.transaction('rw', db.tags, async () => {
+        for (const tag of updatedTags) {
+          await db.tags.update(tag.id, {
+            sort_order: tag.sort_order,
+          })
+        }
+      })
+    } catch (error) {
+      await get().loadFromLocal()
+      set({ error: (error as Error).message })
     }
   },
 

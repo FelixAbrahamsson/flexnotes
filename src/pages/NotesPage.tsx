@@ -158,7 +158,7 @@ export function NotesPage() {
     reorderNotes,
   } = useNoteStore()
 
-  const { tags, fetchTags, fetchNoteTags, getTagsForNote } = useTagStore()
+  const { tags, fetchTags, fetchNoteTags, getTagsForNote, addTagToNote } = useTagStore()
   const { subscribeToChanges, refreshPendingCount, sync } = useSyncStore()
   const { notesPerRow } = usePreferencesStore()
 
@@ -331,9 +331,13 @@ export function NotesPage() {
     hapticLight()
     const note = await createNote()
     if (note) {
+      // Add currently filtered tags to the new note
+      for (const tagId of selectedTagIds) {
+        await addTagToNote(note.id, tagId)
+      }
       openModal('note')
     }
-  }, [createNote, openModal])
+  }, [createNote, openModal, selectedTagIds, addTagToNote])
 
   const handleCloseEditor = useCallback(async () => {
     if (activeNoteId) {

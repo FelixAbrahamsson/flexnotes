@@ -89,6 +89,23 @@ class NotesDatabase extends Dexie {
         note.sort_order = note.sort_order ?? -new Date(note.updated_at).getTime()
       })
     })
+
+    // Version 4: Add sort_order for manual tag ordering
+    this.version(4).stores({
+      notes: 'id, owner_id, is_archived, is_pinned, is_deleted, deleted_at, sort_order, _syncStatus',
+      tags: 'id, owner_id, name, sort_order, _syncStatus',
+      noteTags: '[note_id+tag_id], note_id, tag_id, _syncStatus',
+      images: 'id, note_id, _syncStatus',
+      pendingChanges: 'id, entityType, entityId, timestamp',
+      syncMeta: 'key',
+    }).upgrade(async tx => {
+      // Add sort_order to existing tags based on alphabetical order
+      const tags = await tx.table('tags').toArray()
+      tags.sort((a, b) => a.name.localeCompare(b.name))
+      for (let i = 0; i < tags.length; i++) {
+        await tx.table('tags').update(tags[i].id, { sort_order: i })
+      }
+    })
   }
 }
 
