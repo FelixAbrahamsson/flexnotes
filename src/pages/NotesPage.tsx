@@ -8,7 +8,9 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
+  useDroppable,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -97,6 +99,36 @@ function SortableNoteCard({
   )
 }
 
+// Drop zone for archive/trash actions during drag
+interface ActionDropZoneProps {
+  id: string
+  icon: React.ReactNode
+  label: string
+  variant: 'archive' | 'trash'
+}
+
+function ActionDropZone({ id, icon, label, variant }: ActionDropZoneProps) {
+  const { isOver, setNodeRef } = useDroppable({ id })
+
+  const baseClasses = 'flex flex-col items-center justify-center gap-2 py-4 px-6 rounded-xl transition-all duration-200'
+  const variantClasses = variant === 'trash'
+    ? isOver
+      ? 'bg-red-500 text-white scale-110'
+      : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+    : isOver
+      ? 'bg-amber-500 text-white scale-110'
+      : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+
+  return (
+    <div ref={setNodeRef} className={`${baseClasses} ${variantClasses}`}>
+      <div className={`transition-transform ${isOver ? 'scale-125' : ''}`}>
+        {icon}
+      </div>
+      <span className="text-sm font-medium">{label}</span>
+    </div>
+  )
+}
+
 type ModalType = 'note' | 'settings'
 
 export function NotesPage() {
@@ -133,6 +165,7 @@ export function NotesPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [shareNoteId, setShareNoteId] = useState<string | null>(null)
   const [reorderMode, setReorderMode] = useState(false)
+  const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null)
 
   // Pull-to-refresh
   const handleRefresh = useCallback(async () => {
@@ -248,20 +281,51 @@ export function NotesPage() {
     }
   }, [showArchived, showTrash])
 
-  // Handle drag start - give haptic feedback to indicate drag mode activated
-  const handleDragStart = useCallback(() => {
+  // Handle drag start - give haptic feedback and track dragging state
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    // Check if dragging is disabled
+    const isDragDisabled = showTrash || searchQuery.length > 0 || selectedTagIds.length > 0
+    if (isDragDisabled) return
+
+    // On mobile (below sm breakpoint), only allow dragging in reorder mode
+    const isMobile = window.matchMedia('(max-width: 639px)').matches
+    if (isMobile && !reorderMode) return
+
     hapticLight()
-  }, [])
+    setDraggingNoteId(event.active.id as string)
+  }, [showTrash, searchQuery, selectedTagIds, reorderMode])
 
   // Handle drag end
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
+    const noteId = active.id as string
 
-    if (over && active.id !== over.id) {
+    setDraggingNoteId(null)
+
+    if (!over) return
+
+    // Handle drop on action zones
+    if (over.id === 'drop-archive') {
       hapticLight()
-      reorderNotes(active.id as string, over.id as string)
+      const note = getPaginatedNotes().find(n => n.id === noteId)
+      if (note) {
+        updateNote(noteId, { is_archived: !note.is_archived })
+      }
+      return
     }
-  }, [reorderNotes])
+
+    if (over.id === 'drop-trash') {
+      hapticLight()
+      trashNote(noteId)
+      return
+    }
+
+    // Handle reordering
+    if (active.id !== over.id) {
+      hapticLight()
+      reorderNotes(noteId, over.id as string)
+    }
+  }, [reorderNotes, getPaginatedNotes, updateNote, trashNote])
 
   const handleCreateNote = useCallback(async () => {
     hapticLight()
@@ -595,6 +659,24 @@ export function NotesPage() {
                 </div>
               )}
             </div>
+
+            {/* Drop zones for archive/trash - shown when dragging */}
+            {draggingNoteId && !showTrash && (
+              <div className="fixed bottom-6 left-0 right-0 flex justify-center gap-12 px-4 z-50 pointer-events-auto">
+                <ActionDropZone
+                  id="drop-archive"
+                  icon={<Archive className="w-6 h-6" />}
+                  label={showArchived ? 'Unarchive' : 'Archive'}
+                  variant="archive"
+                />
+                <ActionDropZone
+                  id="drop-trash"
+                  icon={<Trash2 className="w-6 h-6" />}
+                  label="Trash"
+                  variant="trash"
+                />
+              </div>
+            )}
           </DndContext>
         )}
       </main>
