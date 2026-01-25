@@ -202,6 +202,16 @@ if (typeof window !== 'undefined') {
   window.addEventListener('offline', () => {
     useSyncStore.getState().setOnline(false)
   })
+
+  // Sync when app becomes visible (user returns from another tab/app)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && navigator.onLine) {
+      // Small delay to let the app fully resume
+      setTimeout(() => {
+        useSyncStore.getState().sync()
+      }, 500)
+    }
+  })
 }
 
 // Helper to trigger sync if online - use this instead of repeating the pattern

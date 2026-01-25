@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState, useRef } from 'react'
-import { Plus, Search, Archive, Trash2, Settings, Trash, ArrowUpDown } from 'lucide-react'
+import { Plus, Search, Archive, Trash2, Settings, Trash, ArrowUpDown, RefreshCw } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -18,6 +18,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { hapticLight } from '@/hooks/useCapacitor'
+import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { useNoteStore } from '@/stores/noteStore'
 import { useTagStore } from '@/stores/tagStore'
 import { useSyncStore } from '@/stores/syncStore'
@@ -126,12 +127,22 @@ export function NotesPage() {
   } = useNoteStore()
 
   const { tags, fetchTags, fetchNoteTags, getTagsForNote } = useTagStore()
-  const { subscribeToChanges, refreshPendingCount } = useSyncStore()
+  const { subscribeToChanges, refreshPendingCount, sync } = useSyncStore()
   const { notesPerRow } = usePreferencesStore()
 
   const [showSettings, setShowSettings] = useState(false)
   const [shareNoteId, setShareNoteId] = useState<string | null>(null)
   const [reorderMode, setReorderMode] = useState(false)
+
+  // Pull-to-refresh
+  const handleRefresh = useCallback(async () => {
+    await sync()
+    await fetchNotes()
+  }, [sync, fetchNotes])
+
+  const { pullDistance, isRefreshing, handlers: pullHandlers } = usePullToRefresh({
+    onRefresh: handleRefresh,
+  })
 
   // Track modal stack for back button handling
   const modalStackRef = useRef<ModalType[]>([])
@@ -330,7 +341,29 @@ export function NotesPage() {
   }[notesPerRow]
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div
+      className="min-h-screen bg-gray-50 dark:bg-gray-900"
+      onTouchStart={pullHandlers.onTouchStart}
+      onTouchMove={pullHandlers.onTouchMove}
+      onTouchEnd={pullHandlers.onTouchEnd}
+    >
+      {/* Pull-to-refresh indicator */}
+      {(pullDistance > 0 || isRefreshing) && (
+        <div
+          className="fixed top-0 left-0 right-0 flex justify-center z-50 pointer-events-none"
+          style={{ transform: `translateY(${Math.min(pullDistance, 80) - 40}px)` }}
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-full p-2 shadow-lg">
+            <RefreshCw
+              className={`w-5 h-5 text-primary-600 dark:text-primary-400 ${isRefreshing ? 'animate-spin' : ''}`}
+              style={{
+                transform: isRefreshing ? undefined : `rotate(${pullDistance * 3}deg)`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
         {/* Top row: Title and actions */}
