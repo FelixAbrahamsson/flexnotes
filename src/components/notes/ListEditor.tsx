@@ -132,6 +132,27 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     saveItems(newItems)
   }
 
+  // Toggle checked state - when checking, also check all children
+  const toggleChecked = (id: string) => {
+    const item = items.find(i => i.id === id)
+    if (!item) return
+
+    const newChecked = !item.checked
+
+    if (newChecked) {
+      // Checking - also check all children
+      const idsToCheck = getItemWithChildren(id, items)
+      const newItems = items.map(i =>
+        idsToCheck.includes(i.id) ? { ...i, checked: true } : i
+      )
+      setItems(newItems)
+      saveItems(newItems)
+    } else {
+      // Unchecking - only uncheck this item
+      updateItem(id, { checked: false })
+    }
+  }
+
   const deleteItem = (id: string) => {
     const index = items.findIndex(item => item.id === id)
     const newItems = items.filter(item => item.id !== id)
@@ -482,7 +503,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
                 if (el) inputRefs.current.set(item.id, el)
                 else inputRefs.current.delete(item.id)
               }}
-              onToggle={() => updateItem(item.id, { checked: !item.checked })}
+              onToggle={() => toggleChecked(item.id)}
               onTextChange={(text, oldText) => handleTextChange(item.id, text, oldText)}
               onKeyDown={e => handleKeyDown(e, item.id)}
               onDelete={() => deleteItem(item.id)}
@@ -533,7 +554,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
                   if (el) inputRefs.current.set(item.id, el)
                   else inputRefs.current.delete(item.id)
                 }}
-                onToggle={() => updateItem(item.id, { checked: !item.checked })}
+                onToggle={() => toggleChecked(item.id)}
                 onTextChange={(text, oldText) => handleTextChange(item.id, text, oldText)}
                 onKeyDown={e => handleKeyDown(e, item.id)}
                 onDelete={() => deleteItem(item.id)}
