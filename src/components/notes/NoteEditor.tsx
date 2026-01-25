@@ -11,6 +11,8 @@ import {
   Tag,
   ImagePlus,
   Share2,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react'
 import { useNoteStore } from '@/stores/noteStore'
 import { useTagStore } from '@/stores/tagStore'
@@ -44,6 +46,7 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
   const [showTagPicker, setShowTagPicker] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
   const [viewingImage, setViewingImage] = useState<string | null>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   const markdownEditorRef = useRef<MarkdownEditorHandle>(null)
 
@@ -203,7 +206,11 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
       onDrop={handleDrop}
     >
       <div
-        className="absolute inset-x-0 bottom-0 top-0 sm:inset-4 sm:top-12 sm:bottom-auto sm:left-1/2 sm:-translate-x-1/2 sm:max-w-2xl sm:rounded-xl bg-white dark:bg-gray-800 shadow-xl flex flex-col max-h-full sm:max-h-[calc(100vh-6rem)]"
+        className={`absolute bg-white dark:bg-gray-800 shadow-xl flex flex-col ${
+          isFullscreen
+            ? 'inset-0 sm:inset-0 max-h-full'
+            : 'inset-x-0 bottom-0 top-0 sm:inset-4 sm:top-12 sm:bottom-auto sm:left-1/2 sm:-translate-x-1/2 sm:max-w-2xl sm:rounded-xl max-h-full sm:max-h-[calc(100vh-6rem)]'
+        }`}
         onClick={e => e.stopPropagation()}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
@@ -293,6 +300,19 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
               title={note.is_pinned ? 'Unpin' : 'Pin'}
             >
               <Pin className={`w-5 h-5 ${note.is_pinned ? 'fill-current' : ''}`} />
+            </button>
+
+            {/* Fullscreen toggle - desktop only */}
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="btn btn-ghost p-2 hidden sm:block"
+              title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="w-5 h-5" />
+              ) : (
+                <Maximize2 className="w-5 h-5" />
+              )}
             </button>
 
             {/* More menu */}
