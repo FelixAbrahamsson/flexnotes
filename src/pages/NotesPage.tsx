@@ -25,6 +25,7 @@ import { useNoteStore } from '@/stores/noteStore'
 import { useTagStore } from '@/stores/tagStore'
 import { useSyncStore } from '@/stores/syncStore'
 import { usePreferencesStore } from '@/stores/preferencesStore'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { NoteCard } from '@/components/notes/NoteCard'
 import { NoteEditor } from '@/components/notes/NoteEditor'
 import { TagFilter } from '@/components/tags/TagFilter'
@@ -161,6 +162,7 @@ export function NotesPage() {
   const { tags, fetchTags, fetchNoteTags, getTagsForNote, addTagToNote } = useTagStore()
   const { subscribeToChanges, refreshPendingCount, sync } = useSyncStore()
   const { notesPerRow } = usePreferencesStore()
+  const confirm = useConfirm()
 
   const [showSettings, setShowSettings] = useState(false)
   const [shareNoteId, setShareNoteId] = useState<string | null>(null)
@@ -363,19 +365,31 @@ export function NotesPage() {
     restoreNote(noteId)
   }, [restoreNote])
 
-  const handlePermanentDelete = useCallback((noteId: string) => {
-    if (window.confirm('Permanently delete this note? This cannot be undone.')) {
+  const handlePermanentDelete = useCallback(async (noteId: string) => {
+    const confirmed = await confirm({
+      title: 'Delete permanently',
+      message: 'Permanently delete this note? This cannot be undone.',
+      confirmText: 'Delete',
+      variant: 'danger',
+    })
+    if (confirmed) {
       hapticLight()
       permanentlyDeleteNote(noteId)
     }
-  }, [permanentlyDeleteNote])
+  }, [permanentlyDeleteNote, confirm])
 
-  const handleEmptyTrash = useCallback(() => {
-    if (window.confirm(`Permanently delete all ${trashCount} notes in trash? This cannot be undone.`)) {
+  const handleEmptyTrash = useCallback(async () => {
+    const confirmed = await confirm({
+      title: 'Empty trash',
+      message: `Permanently delete all ${trashCount} notes in trash? This cannot be undone.`,
+      confirmText: 'Empty trash',
+      variant: 'danger',
+    })
+    if (confirmed) {
       hapticLight()
       emptyTrash()
     }
-  }, [emptyTrash, trashCount])
+  }, [emptyTrash, trashCount, confirm])
 
   const handleOpenNote = useCallback((noteId: string) => {
     setActiveNote(noteId)

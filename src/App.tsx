@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { useCapacitorInit } from '@/hooks/useCapacitor'
+import { ConfirmProvider } from '@/components/ui/ConfirmDialog'
 import { LoginPage } from '@/pages/LoginPage'
 import { SignupPage } from '@/pages/SignupPage'
 import { NotesPage } from '@/pages/NotesPage'
@@ -54,32 +55,34 @@ export default function App() {
   }, [initialize])
 
   return (
-    <Routes>
-      <Route
-        path="/login"
-        element={
-          <PublicRoute>
-            <LoginPage />
-          </PublicRoute>
-        }
-      />
-      <Route
-        path="/signup"
-        element={
-          <PublicRoute>
-            <SignupPage />
-          </PublicRoute>
-        }
-      />
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <NotesPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="/shared/:token" element={<SharedNotePage />} />
-    </Routes>
+    <ConfirmProvider>
+      <Routes>
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <LoginPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            <PublicRoute>
+              <SignupPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <NotesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/shared/:token" element={<SharedNotePage />} />
+      </Routes>
+    </ConfirmProvider>
   )
 }

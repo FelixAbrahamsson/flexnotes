@@ -18,11 +18,13 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useTagStore } from '@/stores/tagStore'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { DEFAULT_COLORS, getTagColor } from './TagBadge'
 import type { Tag } from '@/types'
 
 export function TagManager() {
   const { tags, updateTag, deleteTag, reorderTags } = useTagStore()
+  const confirm = useConfirm()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editColor, setEditColor] = useState<string | null>(null)
@@ -53,7 +55,13 @@ export function TagManager() {
   }
 
   const handleDelete = async (tag: Tag) => {
-    if (window.confirm(`Delete tag "${tag.name}"? It will be removed from all notes.`)) {
+    const confirmed = await confirm({
+      title: 'Delete tag',
+      message: `Delete "${tag.name}"? It will be removed from all notes.`,
+      confirmText: 'Delete',
+      variant: 'danger',
+    })
+    if (confirmed) {
       await deleteTag(tag.id)
     }
   }

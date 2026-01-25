@@ -18,6 +18,7 @@ import { useNoteStore } from '@/stores/noteStore'
 import { useTagStore } from '@/stores/tagStore'
 import { useImageStore } from '@/stores/imageStore'
 import { useImageUpload } from '@/hooks/useImageUpload'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { TextEditor } from './TextEditor'
 import { ListEditor } from './ListEditor'
 import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor'
@@ -37,6 +38,7 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
   const { getActiveNote, updateNote, deleteNote } = useNoteStore()
   const { getTagsForNote, removeTagFromNote } = useTagStore()
   const { fetchImagesForNote } = useImageStore()
+  const confirm = useConfirm()
   const note = getActiveNote()
 
   const [title, setTitle] = useState('')
@@ -147,9 +149,15 @@ export function NoteEditor({ noteId: _noteId, onClose }: NoteEditorProps) {
     onClose()
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!note) return
-    if (window.confirm('Delete this note? This cannot be undone.')) {
+    const confirmed = await confirm({
+      title: 'Delete note',
+      message: 'Delete this note? This cannot be undone.',
+      confirmText: 'Delete',
+      variant: 'danger',
+    })
+    if (confirmed) {
       deleteNote(note.id)
       onClose()
     }
