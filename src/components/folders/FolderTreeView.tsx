@@ -33,11 +33,16 @@ interface TreeItemProps {
   selectedNoteId: string | null
   expandedFolders: Set<string>
   reorderMode: boolean
+  creatingInFolder: string | null | false
+  newFolderName: string
+  onNewFolderNameChange: (name: string) => void
   onToggleExpand: (folderId: string) => void
   onSelectNote: (noteId: string) => void
   onDeleteFolder: (folder: Folder) => void
   onCreateNote: (folderId: string | null) => void
   onCreateSubfolder: (parentFolderId: string) => void
+  onCreateFolderSubmit: () => void
+  onCreateFolderCancel: () => void
   onMoveNote: (noteId: string) => void
   onShareNote: (noteId: string) => void
   onArchiveNote: (noteId: string) => void
@@ -190,11 +195,16 @@ function FolderTreeItem({
   selectedNoteId,
   expandedFolders,
   reorderMode,
+  creatingInFolder,
+  newFolderName,
+  onNewFolderNameChange,
   onToggleExpand,
   onSelectNote,
   onDeleteFolder,
   onCreateNote,
   onCreateSubfolder,
+  onCreateFolderSubmit,
+  onCreateFolderCancel,
   onMoveNote,
   onShareNote,
   onArchiveNote,
@@ -203,6 +213,7 @@ function FolderTreeItem({
   const [menuOpen, setMenuOpen] = useState(false)
   const isExpanded = expandedFolders.has(folder.id)
   const color = getFolderColor(folder)
+  const isCreatingHere = creatingInFolder === folder.id
 
   // Droppable for notes
   const { isOver, setNodeRef: setDropRef } = useDroppable({
@@ -215,7 +226,7 @@ function FolderTreeItem({
 
   // Get subfolders
   const childFolders = allFolders.filter(f => f.parent_folder_id === folder.id)
-  const hasChildren = childFolders.length > 0 || folderNotes.length > 0
+  const hasChildren = childFolders.length > 0 || folderNotes.length > 0 || isCreatingHere
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -323,9 +334,38 @@ function FolderTreeItem({
       </div>
 
       {/* Children (subfolders + notes) */}
-      {isExpanded && (
+      {(isExpanded || isCreatingHere) && (
         <div>
-          {/* Subfolders first */}
+          {/* New subfolder input */}
+          {isCreatingHere && (
+            <div
+              className="flex items-center gap-2 px-2 py-1"
+              style={{ paddingLeft: `${(level + 1) * 16 + 8}px` }}
+            >
+              <FolderIcon className="w-4 h-4 flex-shrink-0 text-gray-400" />
+              <input
+                type="text"
+                value={newFolderName}
+                onChange={e => onNewFolderNameChange(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') onCreateFolderSubmit()
+                  if (e.key === 'Escape') onCreateFolderCancel()
+                }}
+                placeholder="Folder name"
+                className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                autoFocus
+              />
+              <button
+                onClick={onCreateFolderSubmit}
+                disabled={!newFolderName.trim()}
+                className="px-2 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+          )}
+
+          {/* Subfolders */}
           {childFolders.map(childFolder => (
             <FolderTreeItem
               key={childFolder.id}
@@ -336,11 +376,16 @@ function FolderTreeItem({
               selectedNoteId={selectedNoteId}
               expandedFolders={expandedFolders}
               reorderMode={reorderMode}
+              creatingInFolder={creatingInFolder}
+              newFolderName={newFolderName}
+              onNewFolderNameChange={onNewFolderNameChange}
               onToggleExpand={onToggleExpand}
               onSelectNote={onSelectNote}
               onDeleteFolder={onDeleteFolder}
               onCreateNote={onCreateNote}
               onCreateSubfolder={onCreateSubfolder}
+              onCreateFolderSubmit={onCreateFolderSubmit}
+              onCreateFolderCancel={onCreateFolderCancel}
               onMoveNote={onMoveNote}
               onShareNote={onShareNote}
               onArchiveNote={onArchiveNote}
@@ -440,9 +485,9 @@ export function FolderTreeView({
     }
   }, [selectedNoteId, notes, getParentFolderIds])
 
-  // Track new folder creation
+  // Track new folder creation - parentId is null for root, or the parent folder's ID
   const [newFolderName, setNewFolderName] = useState('')
-  const [isCreating, setIsCreating] = useState(false)
+  const [creatingInFolder, setCreatingInFolder] = useState<string | null | false>(false) // false = not creating
 
   // Get root folders
   const rootFolders = folders.filter(f => f.parent_folder_id === null)
@@ -484,25 +529,27 @@ export function FolderTreeView({
   }
 
   const handleCreateFolder = async () => {
-    if (!newFolderName.trim()) return
+    if (!newFolderName.trim() || creatingInFolder === false) return
 
     hapticLight()
-    await createFolder(newFolderName.trim())
+    const parentId = creatingInFolder === null ? undefined : creatingInFolder
+    const newFolder = await createFolder(newFolderName.trim(), parentId)
+
+    // Auto-expand the parent folder to show the new subfolder
+    if (newFolder && creatingInFolder) {
+      setExpandedFolders(prev => new Set([...prev, creatingInFolder]))
+    }
+
     setNewFolderName('')
-    setIsCreating(false)
+    setCreatingInFolder(false)
   }
 
-  const handleCreateSubfolder = useCallback(async (parentFolderId: string) => {
-    const folderName = prompt('Enter folder name:')
-    if (!folderName?.trim()) return
-
-    hapticLight()
-    const newFolder = await createFolder(folderName.trim(), parentFolderId)
-    // Auto-expand the parent folder to show the new subfolder
-    if (newFolder) {
-      setExpandedFolders(prev => new Set([...prev, parentFolderId]))
-    }
-  }, [createFolder])
+  const handleCreateSubfolder = useCallback((parentFolderId: string) => {
+    // Expand the parent folder and show the input
+    setExpandedFolders(prev => new Set([...prev, parentFolderId]))
+    setCreatingInFolder(parentFolderId)
+    setNewFolderName('')
+  }, [])
 
   return (
     <div className="flex flex-col h-full">
@@ -518,7 +565,7 @@ export function FolderTreeView({
             <Plus className="w-4 h-4" />
           </button>
           <button
-            onClick={() => setIsCreating(true)}
+            onClick={() => setCreatingInFolder(null)}
             className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
             title="New folder"
           >
@@ -527,8 +574,8 @@ export function FolderTreeView({
         </div>
       </div>
 
-      {/* New folder input */}
-      {isCreating && (
+      {/* New root folder input */}
+      {creatingInFolder === null && (
         <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <input
@@ -539,7 +586,7 @@ export function FolderTreeView({
                 if (e.key === 'Enter') handleCreateFolder()
                 if (e.key === 'Escape') {
                   setNewFolderName('')
-                  setIsCreating(false)
+                  setCreatingInFolder(false)
                 }
               }}
               placeholder="Folder name"
@@ -570,11 +617,16 @@ export function FolderTreeView({
             selectedNoteId={selectedNoteId}
             expandedFolders={expandedFolders}
             reorderMode={reorderMode}
+            creatingInFolder={creatingInFolder}
+            newFolderName={newFolderName}
+            onNewFolderNameChange={setNewFolderName}
             onToggleExpand={handleToggleExpand}
             onSelectNote={onSelectNote}
             onDeleteFolder={handleDeleteFolder}
             onCreateNote={onCreateNote}
             onCreateSubfolder={handleCreateSubfolder}
+            onCreateFolderSubmit={handleCreateFolder}
+            onCreateFolderCancel={() => setCreatingInFolder(false)}
             onMoveNote={onMoveNote}
             onShareNote={onShareNote}
             onArchiveNote={onArchiveNote}
