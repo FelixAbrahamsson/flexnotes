@@ -14,6 +14,8 @@ import {
   Archive,
   Pin,
   PinOff,
+  Pencil,
+  Palette,
 } from 'lucide-react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { hapticLight } from '@/hooks/useCapacitor'
@@ -23,7 +25,7 @@ import { DropdownMenu, DropdownMenuItem } from '@/components/ui/DropdownMenu'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { getContentPreview } from '@/utils/formatters'
 import type { Folder, Note } from '@/types'
-import { getFolderColor } from './FolderBadge'
+import { getFolderColor, DEFAULT_COLORS } from './FolderBadge'
 
 interface TreeItemProps {
   folder: Folder
@@ -35,6 +37,9 @@ interface TreeItemProps {
   reorderMode: boolean
   creatingInFolder: string | null | false
   newFolderName: string
+  renamingFolderId: string | null
+  renameFolderValue: string
+  colorPickerFolderId: string | null
   onNewFolderNameChange: (name: string) => void
   onToggleExpand: (folderId: string) => void
   onSelectNote: (noteId: string) => void
@@ -43,6 +48,13 @@ interface TreeItemProps {
   onCreateSubfolder: (parentFolderId: string) => void
   onCreateFolderSubmit: () => void
   onCreateFolderCancel: () => void
+  onRenameFolder: (folderId: string, currentName: string) => void
+  onRenameFolderChange: (name: string) => void
+  onRenameFolderSubmit: () => void
+  onRenameFolderCancel: () => void
+  onOpenColorPicker: (folderId: string) => void
+  onCloseColorPicker: () => void
+  onChangeColor: (folderId: string, color: string | null) => void
   onMoveNote: (noteId: string) => void
   onShareNote: (noteId: string) => void
   onArchiveNote: (noteId: string) => void
@@ -197,6 +209,9 @@ function FolderTreeItem({
   reorderMode,
   creatingInFolder,
   newFolderName,
+  renamingFolderId,
+  renameFolderValue,
+  colorPickerFolderId,
   onNewFolderNameChange,
   onToggleExpand,
   onSelectNote,
@@ -205,6 +220,13 @@ function FolderTreeItem({
   onCreateSubfolder,
   onCreateFolderSubmit,
   onCreateFolderCancel,
+  onRenameFolder,
+  onRenameFolderChange,
+  onRenameFolderSubmit,
+  onRenameFolderCancel,
+  onOpenColorPicker,
+  onCloseColorPicker,
+  onChangeColor,
   onMoveNote,
   onShareNote,
   onArchiveNote,
@@ -214,6 +236,8 @@ function FolderTreeItem({
   const isExpanded = expandedFolders.has(folder.id)
   const color = getFolderColor(folder)
   const isCreatingHere = creatingInFolder === folder.id
+  const isRenamingHere = renamingFolderId === folder.id
+  const isColorPickerHere = colorPickerFolderId === folder.id
 
   // Droppable for notes
   const { isOver, setNodeRef: setDropRef } = useDroppable({
@@ -273,13 +297,29 @@ function FolderTreeItem({
           <FolderIcon className="w-4 h-4 flex-shrink-0" style={{ color }} />
         )}
 
-        {/* Folder name */}
-        <span className="flex-1 text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
-          {folder.name}
-        </span>
+        {/* Folder name - inline rename input or text */}
+        {isRenamingHere ? (
+          <input
+            type="text"
+            value={renameFolderValue}
+            onChange={e => onRenameFolderChange(e.target.value)}
+            onKeyDown={e => {
+              e.stopPropagation()
+              if (e.key === 'Enter') onRenameFolderSubmit()
+              if (e.key === 'Escape') onRenameFolderCancel()
+            }}
+            onClick={e => e.stopPropagation()}
+            className="flex-1 min-w-0 px-1 py-0 text-sm font-medium border border-primary-500 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            autoFocus
+          />
+        ) : (
+          <span className="flex-1 text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+            {folder.name}
+          </span>
+        )}
 
         {/* Item count */}
-        {folderNotes.length > 0 && (
+        {folderNotes.length > 0 && !isRenamingHere && (
           <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">
             {folderNotes.length}
           </span>
@@ -298,6 +338,26 @@ function FolderTreeItem({
           </button>
 
           <DropdownMenu open={menuOpen} onClose={() => setMenuOpen(false)}>
+            <DropdownMenuItem
+              icon={<Pencil className="w-4 h-4" />}
+              onClick={e => {
+                e.stopPropagation()
+                setMenuOpen(false)
+                onRenameFolder(folder.id, folder.name)
+              }}
+            >
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              icon={<Palette className="w-4 h-4" />}
+              onClick={e => {
+                e.stopPropagation()
+                setMenuOpen(false)
+                onOpenColorPicker(folder.id)
+              }}
+            >
+              Change color
+            </DropdownMenuItem>
             <DropdownMenuItem
               icon={<Plus className="w-4 h-4" />}
               onClick={e => {
@@ -332,6 +392,41 @@ function FolderTreeItem({
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Color picker */}
+      {isColorPickerHere && (
+        <div
+          className="flex items-center gap-2 px-2 py-2 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700"
+          style={{ paddingLeft: `${level * 16 + 32}px` }}
+          onClick={e => e.stopPropagation()}
+        >
+          <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Color:</span>
+          {DEFAULT_COLORS.map(c => (
+            <button
+              key={c}
+              onClick={() => onChangeColor(folder.id, c)}
+              className={`w-5 h-5 rounded-full border-2 transition-transform hover:scale-110 ${
+                folder.color === c ? 'border-gray-900 dark:border-white scale-110' : 'border-transparent'
+              }`}
+              style={{ backgroundColor: c }}
+              title={c}
+            />
+          ))}
+          <button
+            onClick={() => onChangeColor(folder.id, null)}
+            className={`w-5 h-5 rounded-full border-2 transition-transform hover:scale-110 bg-gradient-to-br from-gray-300 to-gray-500 dark:from-gray-500 dark:to-gray-700 ${
+              !folder.color ? 'border-gray-900 dark:border-white scale-110' : 'border-transparent'
+            }`}
+            title="Auto"
+          />
+          <button
+            onClick={onCloseColorPicker}
+            className="ml-2 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+          >
+            Done
+          </button>
+        </div>
+      )}
 
       {/* Children (subfolders + notes) */}
       {(isExpanded || isCreatingHere) && (
@@ -378,6 +473,9 @@ function FolderTreeItem({
               reorderMode={reorderMode}
               creatingInFolder={creatingInFolder}
               newFolderName={newFolderName}
+              renamingFolderId={renamingFolderId}
+              renameFolderValue={renameFolderValue}
+              colorPickerFolderId={colorPickerFolderId}
               onNewFolderNameChange={onNewFolderNameChange}
               onToggleExpand={onToggleExpand}
               onSelectNote={onSelectNote}
@@ -386,6 +484,13 @@ function FolderTreeItem({
               onCreateSubfolder={onCreateSubfolder}
               onCreateFolderSubmit={onCreateFolderSubmit}
               onCreateFolderCancel={onCreateFolderCancel}
+              onRenameFolder={onRenameFolder}
+              onRenameFolderChange={onRenameFolderChange}
+              onRenameFolderSubmit={onRenameFolderSubmit}
+              onRenameFolderCancel={onRenameFolderCancel}
+              onOpenColorPicker={onOpenColorPicker}
+              onCloseColorPicker={onCloseColorPicker}
+              onChangeColor={onChangeColor}
               onMoveNote={onMoveNote}
               onShareNote={onShareNote}
               onArchiveNote={onArchiveNote}
@@ -489,6 +594,16 @@ export function FolderTreeView({
   const [newFolderName, setNewFolderName] = useState('')
   const [creatingInFolder, setCreatingInFolder] = useState<string | null | false>(false) // false = not creating
 
+  // Track folder renaming
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null)
+  const [renameFolderValue, setRenameFolderValue] = useState('')
+
+  // Track color picker
+  const [colorPickerFolderId, setColorPickerFolderId] = useState<string | null>(null)
+
+  // Get updateFolder from store
+  const { updateFolder } = useFolderStore()
+
   // Get root folders
   const rootFolders = folders.filter(f => f.parent_folder_id === null)
 
@@ -550,6 +665,40 @@ export function FolderTreeView({
     setCreatingInFolder(parentFolderId)
     setNewFolderName('')
   }, [])
+
+  // Rename handlers
+  const handleRenameFolder = useCallback((folderId: string, currentName: string) => {
+    setRenamingFolderId(folderId)
+    setRenameFolderValue(currentName)
+  }, [])
+
+  const handleRenameFolderSubmit = useCallback(async () => {
+    if (!renamingFolderId || !renameFolderValue.trim()) return
+    hapticLight()
+    await updateFolder(renamingFolderId, { name: renameFolderValue.trim() })
+    setRenamingFolderId(null)
+    setRenameFolderValue('')
+  }, [renamingFolderId, renameFolderValue, updateFolder])
+
+  const handleRenameFolderCancel = useCallback(() => {
+    setRenamingFolderId(null)
+    setRenameFolderValue('')
+  }, [])
+
+  // Color picker handlers
+  const handleOpenColorPicker = useCallback((folderId: string) => {
+    setColorPickerFolderId(folderId)
+  }, [])
+
+  const handleCloseColorPicker = useCallback(() => {
+    setColorPickerFolderId(null)
+  }, [])
+
+  const handleChangeColor = useCallback(async (folderId: string, color: string | null) => {
+    hapticLight()
+    await updateFolder(folderId, { color })
+    setColorPickerFolderId(null)
+  }, [updateFolder])
 
   return (
     <div className="flex flex-col h-full">
@@ -619,6 +768,9 @@ export function FolderTreeView({
             reorderMode={reorderMode}
             creatingInFolder={creatingInFolder}
             newFolderName={newFolderName}
+            renamingFolderId={renamingFolderId}
+            renameFolderValue={renameFolderValue}
+            colorPickerFolderId={colorPickerFolderId}
             onNewFolderNameChange={setNewFolderName}
             onToggleExpand={handleToggleExpand}
             onSelectNote={onSelectNote}
@@ -627,6 +779,13 @@ export function FolderTreeView({
             onCreateSubfolder={handleCreateSubfolder}
             onCreateFolderSubmit={handleCreateFolder}
             onCreateFolderCancel={() => setCreatingInFolder(false)}
+            onRenameFolder={handleRenameFolder}
+            onRenameFolderChange={setRenameFolderValue}
+            onRenameFolderSubmit={handleRenameFolderSubmit}
+            onRenameFolderCancel={handleRenameFolderCancel}
+            onOpenColorPicker={handleOpenColorPicker}
+            onCloseColorPicker={handleCloseColorPicker}
+            onChangeColor={handleChangeColor}
             onMoveNote={onMoveNote}
             onShareNote={onShareNote}
             onArchiveNote={onArchiveNote}
