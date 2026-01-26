@@ -61,19 +61,30 @@
 }
 
 .tiptap ul[data-type="taskList"] {
-  @apply list-none p-0;
+  @apply list-none p-0 my-2;
 }
 
 .tiptap ul[data-type="taskList"] li {
-  @apply flex items-start gap-2;
+  @apply flex gap-2 my-1;
 }
 
 .tiptap ul[data-type="taskList"] li > label {
-  @apply flex-shrink-0 mt-0.5;
+  @apply flex-shrink-0;
+  padding-top: 0.125em; /* Fine-tune vertical alignment with text */
+}
+
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"] {
+  @apply w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer;
+  @apply dark:border-gray-500 dark:bg-gray-700;
+  margin: 0; /* Remove default checkbox margins */
 }
 
 .tiptap ul[data-type="taskList"] li > div {
-  @apply flex-1;
+  @apply flex-1 min-w-0;
+}
+
+.tiptap ul[data-type="taskList"] li > div p {
+  @apply my-0; /* Remove paragraph margins inside task items */
 }
 
 .tiptap ul[data-type="taskList"] li[data-checked="true"] > div {
