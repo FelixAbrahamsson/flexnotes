@@ -94,9 +94,9 @@ async function processChange(change: PendingChange, userId: string): Promise<voi
   }
 }
 
-// Helper to strip local-only fields from note data before syncing to server
-function stripLocalOnlyFields(noteData: Record<string, unknown>): Record<string, unknown> {
-  const { is_deleted, deleted_at, ...cleanData } = noteData
+// Helper to strip sync metadata fields from note data before syncing to server
+function stripSyncMetadataFields(noteData: Record<string, unknown>): Record<string, unknown> {
+  const { _syncStatus, _localUpdatedAt, _serverUpdatedAt, _pendingSync, ...cleanData } = noteData
   return cleanData
 }
 
@@ -108,15 +108,7 @@ async function processNoteChange(change: PendingChange, userId: string): Promise
       const localNote = await db.notes.get(entityId)
       if (!localNote) return
 
-      // Don't sync notes that are already in trash
-      if (localNote.is_deleted) {
-        // Just mark as synced locally - it will be deleted later
-        await db.notes.update(entityId, { _syncStatus: 'synced' })
-        return
-      }
-
-      const { _syncStatus, _localUpdatedAt, _serverUpdatedAt, ...noteData } = localNote
-      const cleanData = stripLocalOnlyFields(noteData)
+      const cleanData = stripSyncMetadataFields(localNote as unknown as Record<string, unknown>)
 
       const { error } = await supabase.from('notes').insert({
         ...cleanData,
@@ -136,14 +128,6 @@ async function processNoteChange(change: PendingChange, userId: string): Promise
       const localNote = await db.notes.get(entityId)
       if (!localNote) return
 
-      // If note is in trash, delete from server instead of updating
-      if (localNote.is_deleted) {
-        const { error } = await supabase.from('notes').delete().eq('id', entityId)
-        if (error && !error.message.includes('not found')) throw error
-        await db.notes.update(entityId, { _syncStatus: 'synced' })
-        return
-      }
-
       // Check if note exists on server
       const { data: serverNote, error: fetchError } = await supabase
         .from('notes')
@@ -154,8 +138,7 @@ async function processNoteChange(change: PendingChange, userId: string): Promise
       // If note doesn't exist on server, create it instead
       if (fetchError && fetchError.code === 'PGRST116') {
         console.log('Note not found on server, creating instead:', entityId)
-        const { _syncStatus, _localUpdatedAt, _serverUpdatedAt, ...noteData } = localNote
-        const cleanData = stripLocalOnlyFields(noteData)
+        const cleanData = stripSyncMetadataFields(localNote as unknown as Record<string, unknown>)
 
         const { error } = await supabase.from('notes').insert({
           ...cleanData,
@@ -179,9 +162,8 @@ async function processNoteChange(change: PendingChange, userId: string): Promise
         throw new Error('Conflict detected - server has newer version')
       }
 
-      // Strip local-only fields from update data
-      const { _syncStatus, _localUpdatedAt, _serverUpdatedAt, ...noteData } = localNote
-      const cleanData = stripLocalOnlyFields(noteData)
+      // Strip sync metadata fields from update data
+      const cleanData = stripSyncMetadataFields(localNote as unknown as Record<string, unknown>)
 
       const { error } = await supabase
         .from('notes')
@@ -321,9 +303,9 @@ export async function fullSync(userId: string): Promise<void> {
 
       const localNoteData: LocalNote = {
         ...note,
-        // Add default values for local-only fields
-        is_deleted: false,
-        deleted_at: null,
+        // Use server values for trash status (syncs across devices)
+        is_deleted: note.is_deleted ?? false,
+        deleted_at: note.deleted_at ?? null,
         // Use server sort_order if available, otherwise preserve local or use timestamp
         sort_order: note.sort_order ?? localNote?.sort_order ?? -new Date(note.updated_at).getTime(),
         _syncStatus: 'synced',
@@ -394,9 +376,9 @@ export async function incrementalSync(userId: string): Promise<void> {
 
     const localNoteData: LocalNote = {
       ...note,
-      // Add default values for local-only fields
-      is_deleted: false,
-      deleted_at: null,
+      // Use server values for trash status (syncs across devices)
+      is_deleted: note.is_deleted ?? false,
+      deleted_at: note.deleted_at ?? null,
       // Use server sort_order if available, otherwise preserve local or use timestamp
       sort_order: note.sort_order ?? localNote?.sort_order ?? -new Date(note.updated_at).getTime(),
       _syncStatus: 'synced',
