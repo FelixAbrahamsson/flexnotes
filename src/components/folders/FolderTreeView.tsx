@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import {
   FolderOpen,
   Folder as FolderIcon,
@@ -410,6 +410,35 @@ export function FolderTreeView({
 
   // Track expanded folders
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+
+  // Helper to get all parent folder IDs for a given folder
+  const getParentFolderIds = useCallback((folderId: string | null): string[] => {
+    if (!folderId) return []
+    const parentIds: string[] = []
+    let currentFolderId: string | null = folderId
+    while (currentFolderId) {
+      parentIds.push(currentFolderId)
+      const folder = folders.find(f => f.id === currentFolderId)
+      currentFolderId = folder?.parent_folder_id ?? null
+    }
+    return parentIds
+  }, [folders])
+
+  // Auto-expand parent folders when a note is selected (e.g., on page load from URL)
+  useEffect(() => {
+    if (!selectedNoteId) return
+    const note = notes.find(n => n.id === selectedNoteId)
+    if (!note?.folder_id) return
+
+    const parentIds = getParentFolderIds(note.folder_id)
+    if (parentIds.length > 0) {
+      setExpandedFolders(prev => {
+        const next = new Set(prev)
+        parentIds.forEach(id => next.add(id))
+        return next
+      })
+    }
+  }, [selectedNoteId, notes, getParentFolderIds])
 
   // Track new folder creation
   const [newFolderName, setNewFolderName] = useState('')
