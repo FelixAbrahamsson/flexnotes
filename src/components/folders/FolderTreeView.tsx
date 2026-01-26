@@ -110,7 +110,7 @@ function NoteTreeItem({
       ref={setDragRef}
       {...attributes}
       {...listeners}
-      className={`group flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${
+      className={`group flex items-center gap-1 px-2 py-1.5 rounded cursor-pointer transition-colors ${
         isSelected
           ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300'
           : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'
@@ -122,6 +122,8 @@ function NoteTreeItem({
       onClick={onSelect}
       onContextMenu={handleContextMenu}
     >
+      {/* Spacer to align with folder chevron */}
+      <div className="w-5 h-5 flex-shrink-0" />
       {note.note_type === 'list' ? (
         <ListChecks className={`w-4 h-4 flex-shrink-0 ${note.is_pinned ? 'text-amber-500' : 'text-gray-400'}`} />
       ) : note.note_type === 'markdown' ? (
