@@ -250,22 +250,42 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
       return;
     }
 
-    // Arrow keys for navigation
+    // Arrow keys for navigation between items (only at text boundaries)
     if (e.key === "ArrowDown") {
-      e.preventDefault();
-      const index = items.findIndex((i) => i.id === id);
-      if (index < items.length - 1) {
-        setFocusedId(items[index + 1]?.id ?? null);
+      const textarea = e.target as HTMLTextAreaElement;
+      const { selectionStart, value } = textarea;
+
+      // Check if cursor is on the last line
+      const textAfterCursor = value.substring(selectionStart);
+      const isOnLastLine = !textAfterCursor.includes('\n');
+
+      if (isOnLastLine) {
+        const index = items.findIndex((i) => i.id === id);
+        if (index < items.length - 1) {
+          e.preventDefault();
+          setFocusedId(items[index + 1]?.id ?? null);
+        }
       }
+      // Otherwise, let the textarea handle normal cursor movement
       return;
     }
 
     if (e.key === "ArrowUp") {
-      e.preventDefault();
-      const index = items.findIndex((i) => i.id === id);
-      if (index > 0) {
-        setFocusedId(items[index - 1]?.id ?? null);
+      const textarea = e.target as HTMLTextAreaElement;
+      const { selectionStart, value } = textarea;
+
+      // Check if cursor is on the first line
+      const textBeforeCursor = value.substring(0, selectionStart);
+      const isOnFirstLine = !textBeforeCursor.includes('\n');
+
+      if (isOnFirstLine) {
+        const index = items.findIndex((i) => i.id === id);
+        if (index > 0) {
+          e.preventDefault();
+          setFocusedId(items[index - 1]?.id ?? null);
+        }
       }
+      // Otherwise, let the textarea handle normal cursor movement
     }
   };
 
