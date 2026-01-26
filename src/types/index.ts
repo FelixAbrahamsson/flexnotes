@@ -10,6 +10,7 @@ export interface Note {
   is_archived: boolean
   is_deleted: boolean
   deleted_at: string | null
+  folder_id: string | null
   created_at: string
   updated_at: string
   version: number
@@ -17,6 +18,17 @@ export interface Note {
   // Local-only fields
   _pendingSync?: boolean
   _localUpdatedAt?: string
+}
+
+export interface Folder {
+  id: string
+  owner_id: string
+  name: string
+  color: string | null
+  parent_folder_id: string | null  // null = root level
+  sort_order: number
+  created_at: string
+  updated_at: string
 }
 
 export interface Tag {
@@ -75,4 +87,5 @@ export interface NewNote {
   title?: string
   content?: string
   note_type?: NoteType
+  folder_id?: string | null
 }

@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Note, Tag, NoteTag, NoteImage } from '@/types'
+import type { Note, Tag, NoteTag, NoteImage, Folder } from '@/types'
 
 // Extended types for local storage
 export interface LocalNote extends Note {
@@ -23,9 +23,14 @@ export interface LocalNoteImage extends NoteImage {
   _localBlob?: Blob
 }
 
+export interface LocalFolder extends Folder {
+  _syncStatus: 'synced' | 'pending'
+  _localUpdatedAt: string
+}
+
 export interface PendingChange {
   id: string
-  entityType: 'note' | 'tag' | 'noteTag' | 'image'
+  entityType: 'note' | 'tag' | 'noteTag' | 'image' | 'folder'
   entityId: string
   operation: 'create' | 'update' | 'delete'
   data?: Record<string, unknown>
@@ -43,6 +48,7 @@ class NotesDatabase extends Dexie {
   tags!: EntityTable<LocalTag, 'id'>
   noteTags!: EntityTable<LocalNoteTag, 'note_id'>
   images!: EntityTable<LocalNoteImage, 'id'>
+  folders!: EntityTable<LocalFolder, 'id'>
   pendingChanges!: EntityTable<PendingChange, 'id'>
   syncMeta!: EntityTable<SyncMeta, 'key'>
 
@@ -106,6 +112,22 @@ class NotesDatabase extends Dexie {
         await tx.table('tags').update(tags[i].id, { sort_order: i })
       }
     })
+
+    // Version 5: Add folders table and folder_id to notes
+    this.version(5).stores({
+      notes: 'id, owner_id, is_archived, is_pinned, is_deleted, deleted_at, folder_id, sort_order, _syncStatus',
+      tags: 'id, owner_id, name, sort_order, _syncStatus',
+      noteTags: '[note_id+tag_id], note_id, tag_id, _syncStatus',
+      images: 'id, note_id, _syncStatus',
+      folders: 'id, owner_id, parent_folder_id, sort_order, _syncStatus',
+      pendingChanges: 'id, entityType, entityId, timestamp',
+      syncMeta: 'key',
+    }).upgrade(tx => {
+      // Add folder_id to existing notes
+      return tx.table('notes').toCollection().modify(note => {
+        note.folder_id = note.folder_id ?? null
+      })
+    })
   }
 }
 
@@ -137,6 +159,7 @@ export async function clearLocalData(): Promise<void> {
   await db.tags.clear()
   await db.noteTags.clear()
   await db.images.clear()
+  await db.folders.clear()
   await db.pendingChanges.clear()
   await db.syncMeta.clear()
 }

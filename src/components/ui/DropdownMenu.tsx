@@ -1,4 +1,5 @@
-import type { ReactNode, MouseEvent } from 'react'
+import { type ReactNode, type MouseEvent, useRef, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 interface DropdownMenuProps {
   open: boolean
@@ -9,6 +10,7 @@ interface DropdownMenuProps {
 
 /**
  * A dropdown menu container with backdrop and consistent styling.
+ * Uses a portal to render outside scroll containers.
  * Use with DropdownMenuItem for menu items.
  *
  * @example
@@ -21,6 +23,35 @@ interface DropdownMenuProps {
  * </div>
  */
 export function DropdownMenu({ open, onClose, children, className = '' }: DropdownMenuProps) {
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [position, setPosition] = useState<{ top: number; left: number; openUp: boolean }>({ top: 0, left: 0, openUp: false })
+
+  useEffect(() => {
+    if (!open || !menuRef.current) return
+
+    // Find the trigger button (parent element's button)
+    const parent = menuRef.current.parentElement
+    if (!parent) return
+
+    const triggerButton = parent.querySelector('button')
+    if (!triggerButton) return
+
+    const rect = triggerButton.getBoundingClientRect()
+    const menuHeight = 100 // Approximate menu height
+    const viewportHeight = window.innerHeight
+    const spaceBelow = viewportHeight - rect.bottom
+    const spaceAbove = rect.top
+
+    // Decide whether to open up or down
+    const openUp = spaceBelow < menuHeight && spaceAbove > spaceBelow
+
+    setPosition({
+      top: openUp ? rect.top - 8 : rect.bottom + 4,
+      left: rect.right - 140, // Menu width is min 140px, align to right edge
+      openUp,
+    })
+  }, [open])
+
   if (!open) return null
 
   const handleBackdropClick = (e: MouseEvent) => {
@@ -28,14 +59,26 @@ export function DropdownMenu({ open, onClose, children, className = '' }: Dropdo
     onClose()
   }
 
+  // Render a placeholder div to get parent context, then portal the actual menu
   return (
     <>
-      <div className="fixed inset-0 z-10" onClick={handleBackdropClick} />
-      <div
-        className={`absolute right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-20 min-w-[140px] ${className}`}
-      >
-        {children}
-      </div>
+      <div ref={menuRef} className="hidden" />
+      {createPortal(
+        <>
+          <div className="fixed inset-0 z-50" onClick={handleBackdropClick} />
+          <div
+            className={`fixed bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50 min-w-[140px] ${className}`}
+            style={{
+              top: position.openUp ? 'auto' : position.top,
+              bottom: position.openUp ? `${window.innerHeight - position.top}px` : 'auto',
+              left: Math.max(8, position.left), // Ensure doesn't go off left edge
+            }}
+          >
+            {children}
+          </div>
+        </>,
+        document.body
+      )}
     </>
   )
 }

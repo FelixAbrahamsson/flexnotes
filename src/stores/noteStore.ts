@@ -41,6 +41,10 @@ interface NoteState {
   deleteNoteIfEmpty: (id: string) => Promise<boolean>
   reorderNotes: (activeId: string, overId: string) => Promise<void>
 
+  // Folder actions
+  moveNoteToFolder: (noteId: string, folderId: string | null) => Promise<void>
+  getNotesInFolder: (folderId: string | null) => Note[]
+
   // Filter actions
   setShowArchived: (show: boolean) => void
   setShowTrash: (show: boolean) => void
@@ -118,6 +122,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
         ...note,
         is_deleted: note.is_deleted ?? false,
         deleted_at: note.deleted_at ?? null,
+        folder_id: note.folder_id ?? null,
         sort_order: note.sort_order ?? -new Date(note.updated_at).getTime(),
         _pendingSync: _syncStatus === 'pending',
       }))
@@ -161,6 +166,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
             ...serverNote,
             is_deleted: serverNote.is_deleted ?? false,
             deleted_at: serverNote.deleted_at ?? null,
+            folder_id: serverNote.folder_id ?? null,
             // Use server sort_order if available, otherwise preserve local or use timestamp
             sort_order: serverNote.sort_order ?? localNote?.sort_order ?? -new Date(serverNote.updated_at).getTime(),
             _syncStatus: 'synced',
@@ -232,6 +238,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       is_archived: false,
       is_deleted: false,
       deleted_at: null,
+      folder_id: note?.folder_id ?? null,
       created_at: now,
       updated_at: now,
       version: 1,
@@ -598,6 +605,56 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       await get().loadFromLocal()
       set({ error: (error as Error).message })
     }
+  },
+
+  moveNoteToFolder: async (noteId: string, folderId: string | null) => {
+    const now = getCurrentTimestamp()
+
+    // Optimistic UI update
+    set(state => ({
+      notes: state.notes.map(n =>
+        n.id === noteId
+          ? { ...n, folder_id: folderId, updated_at: now, _pendingSync: true }
+          : n
+      )
+    }))
+
+    try {
+      const existingNote = await db.notes.get(noteId)
+      if (!existingNote) return
+
+      await db.notes.update(noteId, {
+        folder_id: folderId,
+        updated_at: now,
+        version: existingNote.version + 1,
+        _syncStatus: 'pending',
+        _localUpdatedAt: now,
+      })
+
+      await queueChange('note', noteId, 'update', {
+        folder_id: folderId,
+        version: existingNote.version + 1,
+      })
+
+      await useSyncStore.getState().refreshPendingCount()
+      triggerSyncIfOnline()
+    } catch (error) {
+      await get().loadFromLocal()
+      set({ error: (error as Error).message })
+    }
+  },
+
+  getNotesInFolder: (folderId: string | null) => {
+    const { notes, showArchived } = get()
+
+    return notes.filter(note => {
+      // Exclude trash
+      if (note.is_deleted) return false
+      // Exclude archived (unless showing archived)
+      if (note.is_archived !== showArchived) return false
+      // Filter by folder
+      return note.folder_id === folderId
+    })
   },
 
   setShowArchived: (show: boolean) => {

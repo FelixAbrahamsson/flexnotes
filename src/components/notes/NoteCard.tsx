@@ -1,22 +1,26 @@
 import { useState } from 'react'
-import { Pin, Archive, Trash2, MoreVertical, RotateCcw, Share2 } from 'lucide-react'
-import type { Note, Tag } from '@/types'
+import { Pin, Archive, Trash2, MoreVertical, RotateCcw, Share2, FolderOpen } from 'lucide-react'
+import type { Note, Tag, Folder } from '@/types'
 import { TagBadge } from '@/components/tags/TagBadge'
+import { FolderBadge } from '@/components/folders/FolderBadge'
 import { DropdownMenu, DropdownMenuItem } from '@/components/ui/DropdownMenu'
 import { formatRelativeDate, getContentPreview } from '@/utils/formatters'
 
 interface NoteCardProps {
   note: Note
   tags: Tag[]
+  folder?: Folder | null
   onClick: () => void
   onArchive?: () => void
   onDelete?: () => void
   onRestore?: () => void
   onShare?: () => void
+  onMoveToFolder?: () => void
   showRestore?: boolean
+  showFolder?: boolean  // Show folder badge on the card
 }
 
-export function NoteCard({ note, tags, onClick, onArchive, onDelete, onRestore, onShare, showRestore }: NoteCardProps) {
+export function NoteCard({ note, tags, folder, onClick, onArchive, onDelete, onRestore, onShare, onMoveToFolder, showRestore, showFolder }: NoteCardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const displayTitle = note.title || 'Untitled'
   const preview = getContentPreview(note.content, note.note_type)
@@ -50,6 +54,12 @@ export function NoteCard({ note, tags, onClick, onArchive, onDelete, onRestore, 
     onShare?.()
   }
 
+  const handleMoveToFolder = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setShowMenu(false)
+    onMoveToFolder?.()
+  }
+
   return (
     <div className="relative group">
       <div
@@ -70,6 +80,13 @@ export function NoteCard({ note, tags, onClick, onArchive, onDelete, onRestore, 
 
         {preview && (
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-3 whitespace-pre-line">{preview}</p>
+        )}
+
+        {/* Folder badge */}
+        {showFolder && folder && (
+          <div className="mt-2">
+            <FolderBadge folder={folder} size="sm" />
+          </div>
         )}
 
         {/* Tags */}
@@ -100,7 +117,7 @@ export function NoteCard({ note, tags, onClick, onArchive, onDelete, onRestore, 
       </div>
 
       {/* Quick actions menu - always visible on mobile, hover on desktop */}
-      {(onArchive || onDelete || onRestore || onShare) && (
+      {(onArchive || onDelete || onRestore || onShare || onMoveToFolder) && (
         <div className="absolute top-2 right-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           <button
             onClick={handleMenuClick}
@@ -118,6 +135,11 @@ export function NoteCard({ note, tags, onClick, onArchive, onDelete, onRestore, 
             {onShare && !showRestore && (
               <DropdownMenuItem icon={<Share2 className="w-4 h-4" />} onClick={handleShare}>
                 Share
+              </DropdownMenuItem>
+            )}
+            {onMoveToFolder && !showRestore && (
+              <DropdownMenuItem icon={<FolderOpen className="w-4 h-4" />} onClick={handleMoveToFolder}>
+                Move to folder
               </DropdownMenuItem>
             )}
             {onArchive && !showRestore && (

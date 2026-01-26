@@ -8,9 +8,10 @@ import {
   type LocalNote,
   type LocalTag,
   type LocalNoteTag,
+  type LocalFolder,
   type PendingChange,
 } from './db'
-import type { Tag } from '@/types'
+import type { Tag, Folder } from '@/types'
 
 // Sync status for UI
 export interface SyncState {
@@ -89,6 +90,9 @@ async function processChange(change: PendingChange, userId: string): Promise<voi
     case 'noteTag':
       await processNoteTagChange(change)
       break
+    case 'folder':
+      await processFolderChange(change, userId)
+      break
     default:
       throw new Error(`Unknown entity type: ${change.entityType}`)
   }
@@ -99,6 +103,9 @@ function stripSyncMetadataFields(noteData: Record<string, unknown>): Record<stri
   const { _syncStatus, _localUpdatedAt, _serverUpdatedAt, _pendingSync, ...cleanData } = noteData
   return cleanData
 }
+
+// Alias for backwards compatibility
+const stripLocalOnlyFields = stripSyncMetadataFields
 
 async function processNoteChange(change: PendingChange, userId: string): Promise<void> {
   const { entityId, operation } = change
@@ -264,6 +271,46 @@ async function processNoteTagChange(change: PendingChange): Promise<void> {
   }
 }
 
+async function processFolderChange(change: PendingChange, userId: string): Promise<void> {
+  const { entityId, operation, data } = change
+
+  switch (operation) {
+    case 'create': {
+      const localFolder = await db.folders.get(entityId)
+      if (!localFolder) return
+
+      const { _syncStatus, _localUpdatedAt, ...folderData } = localFolder
+      const { error } = await supabase.from('folders').insert({
+        ...folderData,
+        owner_id: userId,
+      })
+
+      if (error) throw error
+
+      await db.folders.update(entityId, { _syncStatus: 'synced' })
+      break
+    }
+
+    case 'update': {
+      const { error } = await supabase
+        .from('folders')
+        .update(data as Partial<Folder>)
+        .eq('id', entityId)
+
+      if (error) throw error
+
+      await db.folders.update(entityId, { _syncStatus: 'synced' })
+      break
+    }
+
+    case 'delete': {
+      const { error } = await supabase.from('folders').delete().eq('id', entityId)
+      if (error && !error.message.includes('not found')) throw error
+      break
+    }
+  }
+}
+
 // Full sync - pull all data from server
 export async function fullSync(userId: string): Promise<void> {
   // Fetch notes
@@ -290,8 +337,16 @@ export async function fullSync(userId: string): Promise<void> {
 
   if (noteTagsError) throw noteTagsError
 
+  // Fetch folders
+  const { data: folders, error: foldersError } = await supabase
+    .from('folders')
+    .select('*')
+    .eq('owner_id', userId)
+
+  if (foldersError) throw foldersError
+
   // Update local database
-  await db.transaction('rw', [db.notes, db.tags, db.noteTags], async () => {
+  await db.transaction('rw', [db.notes, db.tags, db.noteTags, db.folders], async () => {
     // Sync notes - merge with local changes
     for (const note of notes || []) {
       const localNote = await db.notes.get(note.id)
@@ -339,6 +394,32 @@ export async function fullSync(userId: string): Promise<void> {
         _syncStatus: 'synced',
       }
       await db.noteTags.put(localNT)
+    }
+
+    // Sync folders
+    for (const folder of folders || []) {
+      const localFolder = await db.folders.get(folder.id)
+
+      if (localFolder && localFolder._syncStatus === 'pending') {
+        continue
+      }
+
+      const localFolderData: LocalFolder = {
+        ...folder,
+        _syncStatus: 'synced',
+        _localUpdatedAt: folder.updated_at,
+      }
+      await db.folders.put(localFolderData)
+    }
+
+    // Remove deleted folders (deleted on server)
+    const localFolders = await db.folders.where('owner_id').equals(userId).toArray()
+    const serverFolderIds = new Set((folders || []).map(f => f.id))
+
+    for (const localFolder of localFolders) {
+      if (!serverFolderIds.has(localFolder.id) && localFolder._syncStatus === 'synced') {
+        await db.folders.delete(localFolder.id)
+      }
     }
   })
 

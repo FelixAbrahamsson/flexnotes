@@ -12,6 +12,7 @@ import { clearLocalData, type LocalNote } from '@/services/db'
 import { supabase } from '@/services/supabase'
 import { useNoteStore } from './noteStore'
 import { useTagStore } from './tagStore'
+import { useFolderStore } from './folderStore'
 
 interface SyncState {
   isSyncing: boolean
@@ -79,9 +80,10 @@ export const useSyncStore = create<SyncState>((set, get) => ({
         lastSyncTime: new Date().toISOString(),
       })
 
-      // Refresh note and tag stores to update UI with new sync status
+      // Refresh note, tag, and folder stores to update UI with new sync status
       await useNoteStore.getState().loadFromLocal()
       await useTagStore.getState().loadFromLocal()
+      await useFolderStore.getState().loadFromLocal()
     } catch (error) {
       set({ error: (error as Error).message })
     } finally {
@@ -107,9 +109,10 @@ export const useSyncStore = create<SyncState>((set, get) => ({
         lastSyncTime: new Date().toISOString(),
       })
 
-      // Refresh note and tag stores to update UI with new sync status
+      // Refresh note, tag, and folder stores to update UI with new sync status
       await useNoteStore.getState().loadFromLocal()
       await useTagStore.getState().loadFromLocal()
+      await useFolderStore.getState().loadFromLocal()
     } catch (error) {
       set({ error: (error as Error).message })
     } finally {
@@ -185,10 +188,28 @@ export const useSyncStore = create<SyncState>((set, get) => ({
       )
       .subscribe()
 
+    // Subscribe to folders changes
+    const foldersChannel = supabase
+      .channel('folders-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'folders',
+          filter: `owner_id=eq.${user.id}`,
+        },
+        () => {
+          get().sync()
+        }
+      )
+      .subscribe()
+
     // Cleanup function
     return () => {
       supabase.removeChannel(notesChannel)
       supabase.removeChannel(tagsChannel)
+      supabase.removeChannel(foldersChannel)
     }
   },
 }))

@@ -1,5 +1,5 @@
-import { useEffect, useCallback, useState, useRef } from 'react'
-import { Plus, Search, Archive, Trash2, Settings, Trash, ArrowUpDown, RefreshCw, X } from 'lucide-react'
+import { useEffect, useCallback, useState, useRef, useMemo } from 'react'
+import { Plus, Search, Settings, Trash, ArrowUpDown, RefreshCw, X, Archive, Trash2, FolderOpen } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -25,25 +25,34 @@ import { useNoteStore } from '@/stores/noteStore'
 import { useTagStore } from '@/stores/tagStore'
 import { useSyncStore } from '@/stores/syncStore'
 import { usePreferencesStore } from '@/stores/preferencesStore'
+import { useFolderStore } from '@/stores/folderStore'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { NoteCard } from '@/components/notes/NoteCard'
 import { NoteEditor } from '@/components/notes/NoteEditor'
+import { NoteEditorPane } from '@/components/notes/NoteEditorPane'
 import { TagFilter } from '@/components/tags/TagFilter'
 import { SyncStatus } from '@/components/SyncStatus'
 import { SettingsModal } from '@/components/SettingsModal'
 import { ShareModal } from '@/components/sharing/ShareModal'
-import type { Note, Tag } from '@/types'
+import { ViewSwitcher } from '@/components/ui/ViewSwitcher'
+import { FolderTreeView } from '@/components/folders/FolderTreeView'
+import { FolderPicker } from '@/components/folders/FolderPicker'
+import { FolderManager } from '@/components/folders/FolderManager'
+import type { Note, Tag, Folder } from '@/types'
 
 // Sortable wrapper for NoteCard
 interface SortableNoteCardProps {
   note: Note
   tags: Tag[]
+  folder?: Folder | null
   onClick: () => void
   onArchive?: () => void
   onDelete: () => void
   onRestore?: () => void
   onShare?: () => void
+  onMoveToFolder?: () => void
   showRestore?: boolean
+  showFolder?: boolean
   isDragDisabled?: boolean
   reorderMode?: boolean
 }
@@ -51,12 +60,15 @@ interface SortableNoteCardProps {
 function SortableNoteCard({
   note,
   tags,
+  folder,
   onClick,
   onArchive,
   onDelete,
   onRestore,
   onShare,
+  onMoveToFolder,
   showRestore,
+  showFolder,
   isDragDisabled,
   reorderMode,
 }: SortableNoteCardProps) {
@@ -89,12 +101,15 @@ function SortableNoteCard({
       <NoteCard
         note={note}
         tags={tags}
+        folder={folder}
         onClick={onClick}
         onArchive={onArchive}
         onDelete={onDelete}
         onRestore={onRestore}
         onShare={onShare}
+        onMoveToFolder={onMoveToFolder}
         showRestore={showRestore}
+        showFolder={showFolder}
       />
     </div>
   )
@@ -134,6 +149,7 @@ type ModalType = 'note' | 'settings'
 
 export function NotesPage() {
   const {
+    notes,  // Subscribe to notes array for reactivity
     loading,
     activeNoteId,
     showArchived,
@@ -157,17 +173,73 @@ export function NotesPage() {
     loadMoreNotes,
     hasMoreNotes,
     reorderNotes,
+    getNotesInFolder,  // Get reactively from hook
   } = useNoteStore()
 
   const { tags, fetchTags, fetchNoteTags, getTagsForNote, addTagToNote } = useTagStore()
   const { subscribeToChanges, refreshPendingCount, sync } = useSyncStore()
-  const { notesPerRow } = usePreferencesStore()
+  const { notesPerRow, viewMode, setViewMode } = usePreferencesStore()
+  const { selectedFolderId, fetchFolders, getFolderById } = useFolderStore()
   const confirm = useConfirm()
 
   const [showSettings, setShowSettings] = useState(false)
   const [shareNoteId, setShareNoteId] = useState<string | null>(null)
   const [reorderMode, setReorderMode] = useState(false)
   const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null)
+  const [folderPickerNoteId, setFolderPickerNoteId] = useState<string | null>(null)
+  const [showFolderManager, setShowFolderManager] = useState(false)
+  const [folderViewSelectedNoteId, setFolderViewSelectedNoteId] = useState<string | null>(null)
+
+  // Track if we're on mobile for folder view behavior
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  // Resizable sidebar state
+  const [sidebarWidth, setSidebarWidth] = useState(320) // Default 320px (w-80)
+  const isResizing = useRef(false)
+  const startX = useRef(0)
+  const startWidth = useRef(0)
+
+  const handleResizeStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    isResizing.current = true
+    startX.current = 'touches' in e ? e.touches[0].clientX : e.clientX
+    startWidth.current = sidebarWidth
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [sidebarWidth])
+
+  useEffect(() => {
+    const handleResizeMove = (e: MouseEvent | TouchEvent) => {
+      if (!isResizing.current) return
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+      const delta = clientX - startX.current
+      const newWidth = Math.min(Math.max(startWidth.current + delta, 200), 600) // Min 200px, max 600px
+      setSidebarWidth(newWidth)
+    }
+
+    const handleResizeEnd = () => {
+      isResizing.current = false
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+
+    document.addEventListener('mousemove', handleResizeMove)
+    document.addEventListener('mouseup', handleResizeEnd)
+    document.addEventListener('touchmove', handleResizeMove)
+    document.addEventListener('touchend', handleResizeEnd)
+
+    return () => {
+      document.removeEventListener('mousemove', handleResizeMove)
+      document.removeEventListener('mouseup', handleResizeEnd)
+      document.removeEventListener('touchmove', handleResizeMove)
+      document.removeEventListener('touchend', handleResizeEnd)
+    }
+  }, [])
 
   // Pull-to-refresh
   const handleRefresh = useCallback(async () => {
@@ -221,6 +293,7 @@ export function NotesPage() {
     fetchNotes()
     fetchTags()
     fetchNoteTags()
+    fetchFolders()
     refreshPendingCount()
 
     // Subscribe to realtime changes
@@ -229,13 +302,22 @@ export function NotesPage() {
     return () => {
       unsubscribe()
     }
-  }, [fetchNotes, fetchTags, fetchNoteTags, subscribeToChanges, refreshPendingCount])
+  }, [fetchNotes, fetchTags, fetchNoteTags, fetchFolders, subscribeToChanges, refreshPendingCount])
 
-  const paginatedNotes = getPaginatedNotes()
-  const pinnedNotes = paginatedNotes.filter(n => n.is_pinned && !showTrash)
-  const unpinnedNotes = paginatedNotes.filter(n => !n.is_pinned || showTrash)
+  // Get displayed notes based on view mode
+  const displayedNotes = useMemo(() => {
+    if (viewMode === 'folder' && !showArchived && !showTrash) {
+      // In folder view, show notes in the selected folder
+      return getNotesInFolder(selectedFolderId)
+    }
+    // In list view or special views, use standard paginated notes
+    return getPaginatedNotes()
+  }, [viewMode, showArchived, showTrash, selectedFolderId, getPaginatedNotes, getNotesInFolder, notes])
+
+  const pinnedNotes = displayedNotes.filter(n => n.is_pinned && !showTrash)
+  const unpinnedNotes = displayedNotes.filter(n => !n.is_pinned || showTrash)
   const trashCount = getTrashCount()
-  const canLoadMore = hasMoreNotes()
+  const canLoadMore = viewMode === 'list' && hasMoreNotes()  // Only paginate in list view
 
   // Ref for infinite scroll sentinel
   const loadMoreRef = useRef<HTMLDivElement>(null)
@@ -331,15 +413,19 @@ export function NotesPage() {
 
   const handleCreateNote = useCallback(async () => {
     hapticLight()
-    const note = await createNote()
+    // In folder view, create note in selected folder
+    const folderId = viewMode === 'folder' ? selectedFolderId : null
+    const note = await createNote({ folder_id: folderId })
     if (note) {
-      // Add currently filtered tags to the new note
-      for (const tagId of selectedTagIds) {
-        await addTagToNote(note.id, tagId)
+      // Add currently filtered tags to the new note (only in list view)
+      if (viewMode === 'list') {
+        for (const tagId of selectedTagIds) {
+          await addTagToNote(note.id, tagId)
+        }
       }
       openModal('note')
     }
-  }, [createNote, openModal, selectedTagIds, addTagToNote])
+  }, [createNote, openModal, selectedTagIds, addTagToNote, viewMode, selectedFolderId])
 
   const handleCloseEditor = useCallback(async () => {
     if (activeNoteId) {
@@ -415,6 +501,19 @@ export function NotesPage() {
     setShareNoteId(null)
   }, [])
 
+  const handleMoveToFolder = useCallback((noteId: string) => {
+    hapticLight()
+    setFolderPickerNoteId(noteId)
+  }, [])
+
+  const handleFolderSelected = useCallback(async (folderId: string | null) => {
+    if (folderPickerNoteId) {
+      const { moveNoteToFolder } = useNoteStore.getState()
+      await moveNoteToFolder(folderPickerNoteId, folderId)
+      setFolderPickerNoteId(null)
+    }
+  }, [folderPickerNoteId])
+
   // Grid classes based on notesPerRow setting (respects setting on all screen sizes)
   const gridClasses = {
     1: 'grid-cols-1',
@@ -451,8 +550,19 @@ export function NotesPage() {
         {/* Top row: Title and actions */}
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              {showTrash ? 'Trash' : showArchived ? 'Archive' : 'Notes'}
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              {showTrash ? (
+                'Trash'
+              ) : showArchived ? (
+                'Archive'
+              ) : viewMode === 'folder' ? (
+                <>
+                  <FolderOpen className="w-5 h-5" />
+                  Files
+                </>
+              ) : (
+                'Notes'
+              )}
             </h1>
             <SyncStatus />
           </div>
@@ -473,36 +583,16 @@ export function NotesPage() {
               </button>
             )}
 
-            {/* Archive toggle */}
-            <button
-              onClick={() => setShowArchived(!showArchived)}
-              className={`btn p-2 ${
-                showArchived
-                  ? 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100'
-                  : 'btn-ghost'
-              }`}
-              title={showArchived ? 'Show active notes' : 'Show archived notes'}
-            >
-              <Archive className="w-5 h-5" />
-            </button>
-
-            {/* Trash toggle */}
-            <button
-              onClick={() => setShowTrash(!showTrash)}
-              className={`btn p-2 relative ${
-                showTrash
-                  ? 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100'
-                  : 'btn-ghost'
-              }`}
-              title={showTrash ? 'Show active notes' : 'Show trash'}
-            >
-              <Trash2 className="w-5 h-5" />
-              {trashCount > 0 && !showTrash && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                  {trashCount > 9 ? '9+' : trashCount}
-                </span>
-              )}
-            </button>
+            {/* View switcher (includes view mode, archive, trash) */}
+            <ViewSwitcher
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              showArchived={showArchived}
+              showTrash={showTrash}
+              onShowArchived={setShowArchived}
+              onShowTrash={setShowTrash}
+              trashCount={trashCount}
+            />
 
             {/* Settings */}
             <button
@@ -537,8 +627,8 @@ export function NotesPage() {
           </div>
         </div>
 
-        {/* Tag filter */}
-        {tags.length > 0 && !showTrash && (
+        {/* Tag filter - hidden in folder view */}
+        {tags.length > 0 && !showTrash && viewMode === 'list' && (
           <div className="max-w-4xl mx-auto px-4 pb-3">
             <TagFilter />
           </div>
@@ -546,7 +636,98 @@ export function NotesPage() {
       </header>
 
       {/* Main content */}
+      {/* Folder View - Split Pane Layout */}
+      {viewMode === 'folder' && !showArchived && !showTrash ? (
+        <main className="flex h-[calc(100vh-120px)]">
+          {/* Tree Panel */}
+          <div
+            className="flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden"
+            style={{ width: isMobile ? '100%' : sidebarWidth }}
+          >
+            <DndContext
+              sensors={sensors}
+              onDragEnd={(event) => {
+                const { active, over } = event
+                if (!over) return
+
+                // Handle dropping note onto folder
+                const dragData = active.data.current
+                if (dragData?.type === 'note' && over.id.toString().startsWith('folder-')) {
+                  const folderId = over.id.toString().replace('folder-', '')
+                  const noteId = dragData.note.id
+                  hapticLight()
+                  useNoteStore.getState().moveNoteToFolder(noteId, folderId === 'root' ? null : folderId)
+                }
+              }}
+            >
+              <FolderTreeView
+                selectedNoteId={isMobile ? null : folderViewSelectedNoteId}
+                searchQuery={searchQuery}
+                onSelectNote={(noteId) => {
+                  hapticLight()
+                  if (isMobile) {
+                    // On mobile, open in modal
+                    setActiveNote(noteId)
+                    openModal('note')
+                  } else {
+                    // On desktop, show in pane
+                    setFolderViewSelectedNoteId(noteId)
+                  }
+                }}
+                onCreateNote={async (folderId) => {
+                  hapticLight()
+                  const note = await createNote({ folder_id: folderId })
+                  if (note) {
+                    if (isMobile) {
+                      openModal('note')
+                    } else {
+                      setFolderViewSelectedNoteId(note.id)
+                    }
+                  }
+                }}
+                onMoveNote={(noteId) => {
+                  hapticLight()
+                  setFolderPickerNoteId(noteId)
+                }}
+                onShareNote={(noteId) => {
+                  hapticLight()
+                  setShareNoteId(noteId)
+                }}
+                onArchiveNote={(noteId) => {
+                  hapticLight()
+                  updateNote(noteId, { is_archived: !notes.find(n => n.id === noteId)?.is_archived })
+                }}
+              />
+            </DndContext>
+          </div>
+
+          {/* Resize Handle - Desktop only */}
+          {!isMobile && (
+            <div
+              className="w-1 bg-gray-200 dark:bg-gray-700 hover:bg-primary-400 dark:hover:bg-primary-600 cursor-col-resize flex-shrink-0 transition-colors"
+              onMouseDown={handleResizeStart}
+              onTouchStart={handleResizeStart}
+            />
+          )}
+
+          {/* Editor Panel - Desktop only */}
+          {!isMobile && (
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <NoteEditorPane
+                noteId={folderViewSelectedNoteId || ''}
+                onMoveToFolder={() => {
+                  if (folderViewSelectedNoteId) {
+                    setFolderPickerNoteId(folderViewSelectedNoteId)
+                  }
+                }}
+              />
+            </div>
+          )}
+        </main>
+      ) : (
+      /* List View and Archive/Trash */
       <main className="max-w-4xl mx-auto px-4 py-6">
+        <div className="flex-1 min-w-0">
         {/* Reorder mode banner */}
         {reorderMode && (
           <div className="flex items-center justify-between mb-4 p-3 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg">
@@ -577,11 +758,11 @@ export function NotesPage() {
           </div>
         )}
 
-        {loading && paginatedNotes.length === 0 ? (
+        {loading && displayedNotes.length === 0 ? (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
           </div>
-        ) : paginatedNotes.length === 0 ? (
+        ) : displayedNotes.length === 0 ? (
           <div className="text-center py-12">
             <div className="mb-4">
               {showTrash ? (
@@ -597,11 +778,15 @@ export function NotesPage() {
                     ? 'No notes match your search'
                     : selectedTagIds.length > 0
                       ? 'No notes with selected tags'
-                      : 'No notes yet'}
+                      : viewMode === 'folder'
+                        ? selectedFolderId
+                          ? 'No notes in this folder'
+                          : 'No notes without a folder'
+                        : 'No notes yet'}
             </p>
             {!showArchived && !showTrash && !searchQuery && selectedTagIds.length === 0 && (
               <button onClick={handleCreateNote} className="btn btn-primary">
-                Create your first note
+                {viewMode === 'folder' && selectedFolderId ? 'Create note in this folder' : 'Create your first note'}
               </button>
             )}
           </div>
@@ -628,11 +813,14 @@ export function NotesPage() {
                         <SortableNoteCard
                           key={note.id}
                           note={note}
-                          tags={getTagsForNote(note.id)}
+                          tags={viewMode === 'list' ? getTagsForNote(note.id) : []}
+                          folder={note.folder_id ? getFolderById(note.folder_id) : null}
                           onClick={() => handleOpenNote(note.id)}
                           onArchive={() => handleArchive(note.id, note.is_archived)}
                           onDelete={() => handleDelete(note.id)}
                           onShare={() => handleShare(note.id)}
+                          onMoveToFolder={() => handleMoveToFolder(note.id)}
+                          showFolder={false}
                           isDragDisabled={searchQuery.length > 0 || selectedTagIds.length > 0}
                           reorderMode={reorderMode}
                         />
@@ -659,13 +847,16 @@ export function NotesPage() {
                         <SortableNoteCard
                           key={note.id}
                           note={note}
-                          tags={getTagsForNote(note.id)}
+                          tags={viewMode === 'list' && !showTrash ? getTagsForNote(note.id) : []}
+                          folder={note.folder_id ? getFolderById(note.folder_id) : null}
                           onClick={() => !showTrash && handleOpenNote(note.id)}
                           onArchive={!showTrash ? () => handleArchive(note.id, note.is_archived) : undefined}
                           onDelete={showTrash ? () => handlePermanentDelete(note.id) : () => handleDelete(note.id)}
                           onRestore={showTrash ? () => handleRestore(note.id) : undefined}
                           onShare={!showTrash ? () => handleShare(note.id) : undefined}
+                          onMoveToFolder={!showTrash ? () => handleMoveToFolder(note.id) : undefined}
                           showRestore={showTrash}
+                          showFolder={false}
                           isDragDisabled={showTrash || searchQuery.length > 0 || selectedTagIds.length > 0}
                           reorderMode={reorderMode}
                         />
@@ -705,10 +896,12 @@ export function NotesPage() {
             )}
           </DndContext>
         )}
+        </div>
       </main>
+      )}
 
-      {/* Floating action button */}
-      {!showArchived && !showTrash && (
+      {/* Floating action button - hide in folder view on desktop (tree has create buttons) */}
+      {!showArchived && !showTrash && (viewMode === 'list' || isMobile) && (
         <button
           onClick={handleCreateNote}
           className="fixed right-6 w-14 h-14 bg-primary-600 text-white rounded-full shadow-lg hover:bg-primary-700 active:bg-primary-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:focus:ring-offset-gray-900 flex items-center justify-center transition-transform active:scale-95 native-fab bottom-6"
@@ -732,10 +925,27 @@ export function NotesPage() {
       {shareNoteId && (
         <ShareModal
           noteId={shareNoteId}
-          noteTitle={paginatedNotes.find(n => n.id === shareNoteId)?.title || null}
+          noteTitle={displayedNotes.find(n => n.id === shareNoteId)?.title || null}
           onClose={handleCloseShare}
         />
       )}
+
+      {/* Folder picker modal */}
+      {folderPickerNoteId && (
+        <FolderPicker
+          open={true}
+          onClose={() => setFolderPickerNoteId(null)}
+          onSelect={handleFolderSelected}
+          currentFolderId={displayedNotes.find(n => n.id === folderPickerNoteId)?.folder_id}
+          title="Move to folder"
+        />
+      )}
+
+      {/* Folder manager modal */}
+      <FolderManager
+        open={showFolderManager}
+        onClose={() => setShowFolderManager(false)}
+      />
     </div>
   )
 }

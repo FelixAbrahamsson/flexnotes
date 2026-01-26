@@ -3,13 +3,16 @@ import { persist } from 'zustand/middleware'
 
 type Theme = 'light' | 'dark' | 'system'
 type NotesPerRow = 1 | 2 | 3
+type ViewMode = 'list' | 'folder'
 
 interface PreferencesState {
   theme: Theme
   notesPerRow: NotesPerRow
+  viewMode: ViewMode
 
   setTheme: (theme: Theme) => void
   setNotesPerRow: (count: NotesPerRow) => void
+  setViewMode: (mode: ViewMode) => void
   getEffectiveTheme: () => 'light' | 'dark'
 }
 
@@ -18,6 +21,7 @@ export const usePreferencesStore = create<PreferencesState>()(
     (set, get) => ({
       theme: 'system',
       notesPerRow: 2,
+      viewMode: 'list',
 
       setTheme: (theme: Theme) => {
         set({ theme })
@@ -26,6 +30,10 @@ export const usePreferencesStore = create<PreferencesState>()(
 
       setNotesPerRow: (notesPerRow: NotesPerRow) => {
         set({ notesPerRow })
+      },
+
+      setViewMode: (viewMode: ViewMode) => {
+        set({ viewMode })
       },
 
       getEffectiveTheme: () => {

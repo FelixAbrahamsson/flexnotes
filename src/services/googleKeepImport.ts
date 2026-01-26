@@ -319,6 +319,7 @@ export function convertImportedNote(imported: ImportedNote, ownerId: string): Om
     is_archived: imported.isArchived,
     is_deleted: false,
     deleted_at: null,
+    folder_id: null,
     version: 1,
     created_at: imported.createdAt,
     updated_at: imported.updatedAt,

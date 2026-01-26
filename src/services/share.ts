@@ -112,6 +112,7 @@ export async function getSharedNote(
     is_archived: data.is_archived,
     is_deleted: false,
     deleted_at: null,
+    folder_id: data.folder_id ?? null,
     created_at: data.created_at,
     updated_at: data.updated_at,
     version: data.version,
