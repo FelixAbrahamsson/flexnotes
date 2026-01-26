@@ -94,10 +94,10 @@ export const useTagStore = create<TagState>((set, get) => ({
           const localTag = await db.tags.get(serverTag.id)
           if (localTag && localTag._syncStatus === 'pending') continue
 
-          // Preserve local sort_order (it's a local-only field)
+          // Use server sort_order (synced across devices)
           const tagData: LocalTag = {
             ...serverTag,
-            sort_order: localTag?.sort_order ?? serverTag.sort_order ?? 0,
+            sort_order: serverTag.sort_order ?? localTag?.sort_order ?? 0,
             _syncStatus: 'synced',
             _localUpdatedAt: serverTag.created_at,
           }
@@ -160,12 +160,12 @@ export const useTagStore = create<TagState>((set, get) => ({
     const id = generateLocalId()
     const now = getCurrentTimestamp()
 
-    // New tags go at the end
+    // New tags go at the top (lower sort_order = appears first)
     const existingTags = get().tags
-    const maxSortOrder = existingTags.length > 0
-      ? Math.max(...existingTags.map(t => t.sort_order))
-      : -1
-    const sortOrder = maxSortOrder + 1
+    const minSortOrder = existingTags.length > 0
+      ? Math.min(...existingTags.map(t => t.sort_order))
+      : 1
+    const sortOrder = minSortOrder - 1
 
     const newTag: LocalTag = {
       id,
@@ -265,15 +265,24 @@ export const useTagStore = create<TagState>((set, get) => ({
 
     set({ tags: updatedTags })
 
-    // Persist to local DB (sort_order is local-only, no need to sync)
+    // Persist to local DB and sync to server
     try {
       await db.transaction('rw', db.tags, async () => {
         for (const tag of updatedTags) {
           await db.tags.update(tag.id, {
             sort_order: tag.sort_order,
+            _syncStatus: 'pending',
+            _localUpdatedAt: getCurrentTimestamp(),
           })
         }
       })
+
+      // Queue changes for all reordered tags
+      for (const tag of updatedTags) {
+        await queueChange('tag', tag.id, 'update', { sort_order: tag.sort_order })
+      }
+
+      triggerSyncIfOnline()
     } catch (error) {
       await get().loadFromLocal()
       set({ error: (error as Error).message })

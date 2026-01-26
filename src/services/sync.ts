@@ -205,6 +205,7 @@ async function processTagChange(change: PendingChange, userId: string): Promise<
       const localTag = await db.tags.get(entityId)
       if (!localTag) return
 
+      // Strip sync metadata fields only
       const { _syncStatus, _localUpdatedAt, ...tagData } = localTag
       const { error } = await supabase.from('tags').insert({
         ...tagData,
