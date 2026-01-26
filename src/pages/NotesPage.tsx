@@ -58,6 +58,7 @@ interface SortableNoteCardProps {
   tags: Tag[];
   folder?: Folder | null;
   onClick: () => void;
+  onPin?: () => void;
   onArchive?: () => void;
   onDelete: () => void;
   onRestore?: () => void;
@@ -74,6 +75,7 @@ function SortableNoteCard({
   tags,
   folder,
   onClick,
+  onPin,
   onArchive,
   onDelete,
   onRestore,
@@ -115,6 +117,7 @@ function SortableNoteCard({
         tags={tags}
         folder={folder}
         onClick={onClick}
+        onPin={onPin}
         onArchive={onArchive}
         onDelete={onDelete}
         onRestore={onRestore}
@@ -525,6 +528,14 @@ export function NotesPage() {
     [updateNote],
   );
 
+  const handlePin = useCallback(
+    (noteId: string, isPinned: boolean) => {
+      hapticLight();
+      updateNote(noteId, { is_pinned: !isPinned });
+    },
+    [updateNote],
+  );
+
   const handleDelete = useCallback(
     (noteId: string) => {
       hapticLight();
@@ -801,6 +812,12 @@ export function NotesPage() {
                       ?.is_archived,
                   });
                 }}
+                onPinNote={(noteId) => {
+                  hapticLight();
+                  updateNote(noteId, {
+                    is_pinned: !notes.find((n) => n.id === noteId)?.is_pinned,
+                  });
+                }}
               />
             </DndContext>
           </div>
@@ -937,6 +954,7 @@ export function NotesPage() {
                                   : null
                               }
                               onClick={() => handleOpenNote(note.id)}
+                              onPin={() => handlePin(note.id, note.is_pinned)}
                               onArchive={() =>
                                 handleArchive(note.id, note.is_archived)
                               }
@@ -985,6 +1003,11 @@ export function NotesPage() {
                               }
                               onClick={() =>
                                 !showTrash && handleOpenNote(note.id)
+                              }
+                              onPin={
+                                !showTrash
+                                  ? () => handlePin(note.id, note.is_pinned)
+                                  : undefined
                               }
                               onArchive={
                                 !showTrash

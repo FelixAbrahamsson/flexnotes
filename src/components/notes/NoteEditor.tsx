@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   X,
-  Pin,
   Archive,
   Trash2,
   MoreVertical,
@@ -142,11 +141,6 @@ export function NoteEditor({ noteId: _noteId, onClose, hideTags = false }: NoteE
     const timer = setTimeout(handleSave, 500)
     return () => clearTimeout(timer)
   }, [handleSave])
-
-  const handleTogglePin = () => {
-    if (!note) return
-    updateNote(note.id, { is_pinned: !note.is_pinned })
-  }
 
   const handleToggleArchive = () => {
     if (!note) return
@@ -351,14 +345,6 @@ export function NoteEditor({ noteId: _noteId, onClose, hideTags = false }: NoteE
                 </>
               )}
             </div>
-
-            <button
-              onClick={handleTogglePin}
-              className={`btn btn-ghost p-2 ${note.is_pinned ? 'text-primary-600' : ''}`}
-              title={note.is_pinned ? 'Unpin' : 'Pin'}
-            >
-              <Pin className={`w-5 h-5 ${note.is_pinned ? 'fill-current' : ''}`} />
-            </button>
 
             {/* Fullscreen toggle - desktop only */}
             <button

@@ -12,6 +12,8 @@ import {
   Plus,
   Share2,
   Archive,
+  Pin,
+  PinOff,
 } from 'lucide-react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { hapticLight } from '@/hooks/useCapacitor'
@@ -38,6 +40,7 @@ interface TreeItemProps {
   onMoveNote: (noteId: string) => void
   onShareNote: (noteId: string) => void
   onArchiveNote: (noteId: string) => void
+  onPinNote: (noteId: string) => void
 }
 
 // Draggable note item in the tree
@@ -51,6 +54,7 @@ function NoteTreeItem({
   onDelete,
   onShare,
   onArchive,
+  onPin,
 }: {
   note: Note
   isSelected: boolean
@@ -61,6 +65,7 @@ function NoteTreeItem({
   onDelete: () => void
   onShare: () => void
   onArchive: () => void
+  onPin: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -133,6 +138,16 @@ function NoteTreeItem({
 
         <DropdownMenu open={menuOpen} onClose={() => setMenuOpen(false)}>
           <DropdownMenuItem
+            icon={note.is_pinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+            onClick={e => {
+              e.stopPropagation()
+              setMenuOpen(false)
+              onPin()
+            }}
+          >
+            {note.is_pinned ? 'Unpin' : 'Pin'}
+          </DropdownMenuItem>
+          <DropdownMenuItem
             icon={<Share2 className="w-4 h-4" />}
             onClick={e => {
               e.stopPropagation()
@@ -196,6 +211,7 @@ function FolderTreeItem({
   onMoveNote,
   onShareNote,
   onArchiveNote,
+  onPinNote,
 }: TreeItemProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const isExpanded = expandedFolders.has(folder.id)
@@ -341,6 +357,7 @@ function FolderTreeItem({
               onMoveNote={onMoveNote}
               onShareNote={onShareNote}
               onArchiveNote={onArchiveNote}
+              onPinNote={onPinNote}
             />
           ))}
 
@@ -357,6 +374,7 @@ function FolderTreeItem({
               onDelete={() => useNoteStore.getState().trashNote(note.id)}
               onShare={() => onShareNote(note.id)}
               onArchive={() => onArchiveNote(note.id)}
+              onPin={() => onPinNote(note.id)}
             />
           ))}
         </div>
@@ -374,6 +392,7 @@ interface FolderTreeViewProps {
   onMoveNote: (noteId: string) => void
   onShareNote: (noteId: string) => void
   onArchiveNote: (noteId: string) => void
+  onPinNote: (noteId: string) => void
 }
 
 export function FolderTreeView({
@@ -385,6 +404,7 @@ export function FolderTreeView({
   onMoveNote,
   onShareNote,
   onArchiveNote,
+  onPinNote,
 }: FolderTreeViewProps) {
   const { folders, createFolder, deleteFolder } = useFolderStore()
   const { notes: allNotes } = useNoteStore()
@@ -542,6 +562,7 @@ export function FolderTreeView({
             onMoveNote={onMoveNote}
             onShareNote={onShareNote}
             onArchiveNote={onArchiveNote}
+            onPinNote={onPinNote}
           />
         ))}
 
@@ -568,6 +589,7 @@ export function FolderTreeView({
                 onDelete={() => useNoteStore.getState().trashNote(note.id)}
                 onShare={() => onShareNote(note.id)}
                 onArchive={() => onArchiveNote(note.id)}
+                onPin={() => onPinNote(note.id)}
               />
             ))}
           </div>

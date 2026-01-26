@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  Pin,
   Archive,
   Trash2,
   MoreVertical,
@@ -129,11 +128,6 @@ export function NoteEditorPane({ noteId, onMoveToFolder, hideTags = false }: Not
     const timer = setTimeout(handleSave, 500)
     return () => clearTimeout(timer)
   }, [handleSave])
-
-  const handleTogglePin = () => {
-    if (!note) return
-    updateNote(note.id, { is_pinned: !note.is_pinned })
-  }
 
   const handleToggleArchive = () => {
     if (!note) return
@@ -325,14 +319,6 @@ export function NoteEditorPane({ noteId, onMoveToFolder, hideTags = false }: Not
         </div>
 
         <div className="flex items-center gap-1">
-          <button
-            onClick={handleTogglePin}
-            className={`btn btn-ghost p-2 ${note.is_pinned ? 'text-primary-600' : ''}`}
-            title={note.is_pinned ? 'Unpin' : 'Pin'}
-          >
-            <Pin className={`w-4 h-4 ${note.is_pinned ? 'fill-current' : ''}`} />
-          </button>
-
           {/* More menu */}
           <div className="relative">
             <button
