@@ -65,7 +65,7 @@
 }
 
 .tiptap ul[data-type="taskList"] li {
-  @apply flex gap-2 my-1;
+  @apply flex flex-wrap gap-2 my-1;
 }
 
 .tiptap ul[data-type="taskList"] li > label {
@@ -85,6 +85,11 @@
 
 .tiptap ul[data-type="taskList"] li > div p {
   @apply my-0; /* Remove paragraph margins inside task items */
+}
+
+/* Nested task lists */
+.tiptap ul[data-type="taskList"] li > ul[data-type="taskList"] {
+  @apply w-full mt-1 ml-6;
 }
 
 .tiptap ul[data-type="taskList"] li[data-checked="true"] > div {
