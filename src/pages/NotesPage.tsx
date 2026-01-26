@@ -13,6 +13,7 @@ import {
 import {
   DndContext,
   closestCenter,
+  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
@@ -21,6 +22,7 @@ import {
   useDroppable,
   type DragEndEvent,
   type DragStartEvent,
+  type CollisionDetection,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -156,6 +158,29 @@ function ActionDropZone({ id, icon, label, variant }: ActionDropZoneProps) {
     </div>
   );
 }
+
+// Custom collision detection: requires pointer to be directly over action drop zones,
+// but uses closestCenter for sortable items (notes reordering)
+const customCollisionDetection: CollisionDetection = (args) => {
+  // First check if pointer is directly over an action drop zone
+  const pointerCollisions = pointerWithin(args);
+  const actionZoneCollision = pointerCollisions.find(
+    (collision) =>
+      collision.id === "drop-archive" || collision.id === "drop-trash"
+  );
+
+  // If pointer is over an action zone, only return that collision
+  if (actionZoneCollision) {
+    return [actionZoneCollision];
+  }
+
+  // Otherwise, use closestCenter for sortable items (exclude action zones)
+  const centerCollisions = closestCenter(args);
+  return centerCollisions.filter(
+    (collision) =>
+      collision.id !== "drop-archive" && collision.id !== "drop-trash"
+  );
+};
 
 type ModalType = "note" | "settings";
 
@@ -879,7 +904,7 @@ export function NotesPage() {
             ) : (
               <DndContext
                 sensors={sensors}
-                collisionDetection={closestCenter}
+                collisionDetection={customCollisionDetection}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
               >
