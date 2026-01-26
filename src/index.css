@@ -75,8 +75,14 @@
 
 .tiptap ul[data-type="taskList"] li > label input[type="checkbox"] {
   @apply w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer;
-  @apply dark:border-gray-500 dark:bg-gray-700;
+  @apply dark:border-gray-500;
   margin: 0; /* Remove default checkbox margins */
+  accent-color: theme('colors.primary.600');
+}
+
+/* Dark mode checkbox background */
+.dark .tiptap ul[data-type="taskList"] li > label input[type="checkbox"] {
+  color-scheme: dark;
 }
 
 .tiptap ul[data-type="taskList"] li > div {
