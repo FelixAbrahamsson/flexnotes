@@ -17,12 +17,14 @@ interface FolderState {
   createFolder: (name: string, parentId?: string | null, color?: string) => Promise<Folder | null>
   updateFolder: (id: string, updates: Partial<Folder>) => Promise<void>
   deleteFolder: (id: string) => Promise<void>
+  moveFolder: (folderId: string, newParentId: string | null) => Promise<boolean>
 
   // Navigation
   setSelectedFolder: (id: string | null) => void
   getFolderPath: (id: string | null) => Folder[]  // Breadcrumb path from root to folder
   getChildFolders: (parentId: string | null) => Folder[]
   getFolderById: (id: string) => Folder | undefined
+  isDescendantOf: (folderId: string, potentialAncestorId: string) => boolean
 
   // Reordering
   reorderFolders: (activeId: string, overId: string) => Promise<void>
@@ -283,6 +285,76 @@ export const useFolderStore = create<FolderState>((set, get) => ({
 
   getFolderById: (id: string) => {
     return get().folders.find(f => f.id === id)
+  },
+
+  isDescendantOf: (folderId: string, potentialAncestorId: string) => {
+    const { folders } = get()
+    let currentId: string | null = folderId
+
+    while (currentId) {
+      if (currentId === potentialAncestorId) return true
+      const folder = folders.find(f => f.id === currentId)
+      currentId = folder?.parent_folder_id ?? null
+    }
+
+    return false
+  },
+
+  moveFolder: async (folderId: string, newParentId: string | null) => {
+    const { folders, isDescendantOf } = get()
+    const folderToMove = folders.find(f => f.id === folderId)
+
+    if (!folderToMove) return false
+
+    // Can't move a folder into itself
+    if (folderId === newParentId) return false
+
+    // Can't move a folder into one of its descendants (would create a cycle)
+    if (newParentId && isDescendantOf(newParentId, folderId)) return false
+
+    // If already in the target folder, do nothing
+    if (folderToMove.parent_folder_id === newParentId) return false
+
+    const now = getCurrentTimestamp()
+
+    // Get new sort_order (add at end of new parent's children)
+    const newSiblings = folders.filter(f => f.parent_folder_id === newParentId)
+    const maxSortOrder = newSiblings.length > 0
+      ? Math.max(...newSiblings.map(f => f.sort_order))
+      : -1
+    const newSortOrder = maxSortOrder + 1
+
+    // Update UI state
+    set(state => ({
+      folders: state.folders.map(f =>
+        f.id === folderId
+          ? { ...f, parent_folder_id: newParentId, sort_order: newSortOrder, updated_at: now }
+          : f
+      ).sort((a, b) => a.sort_order - b.sort_order)
+    }))
+
+    try {
+      await db.folders.update(folderId, {
+        parent_folder_id: newParentId,
+        sort_order: newSortOrder,
+        updated_at: now,
+        _syncStatus: 'pending',
+        _localUpdatedAt: now,
+      })
+
+      await queueChange('folder', folderId, 'update', {
+        parent_folder_id: newParentId,
+        sort_order: newSortOrder,
+        updated_at: now,
+      })
+
+      triggerSyncIfOnline()
+      return true
+    } catch (error) {
+      await get().loadFromLocal()
+      set({ error: (error as Error).message })
+      return false
+    }
   },
 
   reorderFolders: async (activeId: string, overId: string) => {

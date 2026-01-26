@@ -248,11 +248,23 @@ function FolderTreeItem({
   const isRenamingHere = renamingFolderId === folder.id
   const isColorPickerHere = colorPickerFolderId === folder.id
 
-  // Droppable for notes
+  // Draggable for moving folders
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
+    id: `folder-drag-${folder.id}`,
+    data: { type: 'folder', folder },
+  })
+
+  // Droppable for notes and folders
   const { isOver, setNodeRef: setDropRef } = useDroppable({
     id: `folder-${folder.id}`,
     data: { type: 'folder', folder },
   })
+
+  // Merge refs for drag and drop on the same element
+  const setNodeRef = useCallback((node: HTMLDivElement | null) => {
+    setDragRef(node)
+    setDropRef(node)
+  }, [setDragRef, setDropRef])
 
   // Get notes in this folder
   const folderNotes = notes.filter(n => n.folder_id === folder.id && !n.is_deleted && !n.is_archived)
@@ -268,10 +280,12 @@ function FolderTreeItem({
   }
 
   return (
-    <div>
+    <div style={{ opacity: isDragging ? 0.5 : 1 }}>
       <div
-        ref={setDropRef}
-        className={`group flex items-center gap-1 px-2 py-1.5 rounded cursor-pointer transition-colors ${
+        ref={setNodeRef}
+        {...attributes}
+        {...listeners}
+        className={`group flex items-center gap-1 px-2 py-1.5 rounded cursor-pointer transition-colors touch-manipulation ${
           isOver
             ? 'bg-primary-100 dark:bg-primary-900/40 ring-2 ring-primary-500'
             : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'

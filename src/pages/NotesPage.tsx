@@ -636,13 +636,15 @@ export function NotesPage() {
                 const { active, over } = event;
                 if (!over) return;
 
-                // Handle dropping note onto folder
                 const dragData = active.data.current;
+                const overId = over.id.toString();
+
+                // Handle dropping note onto folder
                 if (
                   dragData?.type === "note" &&
-                  over.id.toString().startsWith("folder-")
+                  overId.startsWith("folder-")
                 ) {
-                  const folderId = over.id.toString().replace("folder-", "");
+                  const folderId = overId.replace("folder-", "");
                   const noteId = dragData.note.id;
                   hapticLight();
                   useNoteStore
@@ -650,6 +652,26 @@ export function NotesPage() {
                     .moveNoteToFolder(
                       noteId,
                       folderId === "root" ? null : folderId,
+                    );
+                }
+
+                // Handle dropping folder onto another folder
+                if (
+                  dragData?.type === "folder" &&
+                  overId.startsWith("folder-")
+                ) {
+                  const targetFolderId = overId.replace("folder-", "");
+                  const sourceFolderId = dragData.folder.id;
+
+                  // Don't drop onto self
+                  if (targetFolderId === sourceFolderId) return;
+
+                  hapticLight();
+                  useFolderStore
+                    .getState()
+                    .moveFolder(
+                      sourceFolderId,
+                      targetFolderId === "root" ? null : targetFolderId,
                     );
                 }
               }}
