@@ -32,6 +32,7 @@ import { hapticLight } from "@/hooks/useCapacitor";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useResizableSidebar } from "@/hooks/useResizableSidebar";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useNoteFromUrl } from "@/hooks/useNoteFromUrl";
 import { useNoteStore } from "@/stores/noteStore";
 import { useTagStore } from "@/stores/tagStore";
 import { useSyncStore } from "@/stores/syncStore";
@@ -74,7 +75,7 @@ const customCollisionDetection: CollisionDetection = (args) => {
   );
 };
 
-type ModalType = "note" | "settings";
+type ModalType = "settings";
 
 export function NotesPage() {
   const {
@@ -108,15 +109,7 @@ export function NotesPage() {
   const { tags, fetchTags, fetchNoteTags, getTagsForNote, addTagToNote } =
     useTagStore();
   const { subscribeToChanges, refreshPendingCount, sync } = useSyncStore();
-  const {
-    notesPerRow,
-    viewMode,
-    setViewMode,
-    lastOpenedNoteId,
-    lastFolderViewNoteId,
-    setLastOpenedNoteId,
-    setLastFolderViewNoteId,
-  } = usePreferencesStore();
+  const { notesPerRow, viewMode, setViewMode } = usePreferencesStore();
   const { selectedFolderId, fetchFolders, getFolderById } = useFolderStore();
   const confirm = useConfirm();
 
@@ -127,6 +120,28 @@ export function NotesPage() {
     return note?.title || null;
   }, [activeNoteId, notes]);
   useDocumentTitle(activeNoteTitle);
+
+  // Track modal stack for back button handling
+  const modalStackRef = useRef<ModalType[]>([]);
+
+  // Sync open note with URL (allows each tab to remember its own note)
+  const { setNoteInUrl, clearNoteFromUrl } = useNoteFromUrl({
+    onNoteIdChange: useCallback((noteId: string | null) => {
+      if (noteId) {
+        // In folder view desktop, show in pane; otherwise show in modal
+        if (viewMode === "folder" && !isMobileRef.current) {
+          setFolderViewSelectedNoteId(noteId);
+        } else {
+          setActiveNote(noteId);
+        }
+      }
+    }, [setActiveNote, viewMode]),
+    validateNoteExists: useCallback((noteId: string) => {
+      return notes.some((n) => n.id === noteId && !n.is_deleted);
+    }, [notes]),
+    isLoading: loading,
+    hasNotes: notes.length > 0,
+  });
 
   const [showSettings, setShowSettings] = useState(false);
   const [shareNoteId, setShareNoteId] = useState<string | null>(null);
@@ -141,9 +156,15 @@ export function NotesPage() {
   >(null);
 
   // Track if we're on mobile for folder view behavior
+  // Use ref to avoid stale closure in useNoteFromUrl callback
+  const isMobileRef = useRef(false);
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      isMobileRef.current = mobile;
+      setIsMobile(mobile);
+    };
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
@@ -171,10 +192,7 @@ export function NotesPage() {
     disabled: reorderMode,
   });
 
-  // Track modal stack for back button handling
-  const modalStackRef = useRef<ModalType[]>([]);
-
-  // Push modal to history stack
+  // Push modal to history stack (for non-note modals like settings)
   const openModal = useCallback((modalType: ModalType) => {
     modalStackRef.current.push(modalType);
     window.history.pushState({ modal: modalType }, "");
@@ -189,28 +207,18 @@ export function NotesPage() {
     }
   }, []);
 
-  // Handle back button / swipe back
+  // Handle back button / swipe back for settings modal
   useEffect(() => {
     const handlePopState = () => {
       const topModal = modalStackRef.current.pop();
-      if (topModal === "note") {
-        // Close note editor
-        if (activeNoteId) {
-          deleteNoteIfEmpty(activeNoteId);
-        }
-        setActiveNote(null);
-        setLastOpenedNoteId(null);
-      } else if (topModal === "settings") {
+      if (topModal === "settings") {
         setShowSettings(false);
       }
     };
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [activeNoteId, deleteNoteIfEmpty, setActiveNote, setLastOpenedNoteId]);
-
-  // Track if we've restored the last opened note
-  const hasRestoredRef = useRef(false);
+  }, []);
 
   // Initialize data and subscriptions
   useEffect(() => {
@@ -235,36 +243,8 @@ export function NotesPage() {
     refreshPendingCount,
   ]);
 
-  // Restore the last opened note after data loads
-  useEffect(() => {
-    if (hasRestoredRef.current || loading || notes.length === 0) return;
-    hasRestoredRef.current = true;
-
-    // Restore folder view pane selection (desktop only)
-    if (lastFolderViewNoteId && viewMode === "folder" && !isMobile) {
-      const noteExists = notes.some((n) => n.id === lastFolderViewNoteId && !n.is_deleted);
-      if (noteExists) {
-        setFolderViewSelectedNoteId(lastFolderViewNoteId);
-      }
-    }
-
-    // Restore modal note
-    if (lastOpenedNoteId) {
-      const noteExists = notes.some((n) => n.id === lastOpenedNoteId && !n.is_deleted);
-      if (noteExists) {
-        setActiveNote(lastOpenedNoteId);
-        openModal("note");
-      }
-    }
-  }, [loading, notes, lastOpenedNoteId, lastFolderViewNoteId, viewMode, isMobile, setActiveNote, openModal]);
-
-  // Save folder view selection changes
-  useEffect(() => {
-    // Only save after initial restore is complete
-    if (hasRestoredRef.current) {
-      setLastFolderViewNoteId(folderViewSelectedNoteId);
-    }
-  }, [folderViewSelectedNoteId, setLastFolderViewNoteId]);
+  // Note: Note restoration is now handled by useNoteFromUrl via URL query param
+  // for both list view modals and folder view pane selection
 
   // Get displayed notes based on view mode
   const displayedNotes = useMemo(() => {
@@ -402,17 +382,17 @@ export function NotesPage() {
           await addTagToNote(note.id, tagId);
         }
       }
-      setLastOpenedNoteId(note.id);
-      openModal("note");
+      setActiveNote(note.id);
+      setNoteInUrl(note.id);
     }
   }, [
     createNote,
-    openModal,
+    setActiveNote,
     selectedTagIds,
     addTagToNote,
     viewMode,
     selectedFolderId,
-    setLastOpenedNoteId,
+    setNoteInUrl,
   ]);
 
   const handleCloseEditor = useCallback(async () => {
@@ -421,9 +401,8 @@ export function NotesPage() {
       await deleteNoteIfEmpty(activeNoteId);
     }
     setActiveNote(null);
-    setLastOpenedNoteId(null);
-    closeModalNormally("note");
-  }, [activeNoteId, deleteNoteIfEmpty, setActiveNote, setLastOpenedNoteId, closeModalNormally]);
+    clearNoteFromUrl();
+  }, [activeNoteId, deleteNoteIfEmpty, setActiveNote, clearNoteFromUrl]);
 
   const handleArchive = useCallback(
     (noteId: string, isArchived: boolean) => {
@@ -489,10 +468,9 @@ export function NotesPage() {
   const handleOpenNote = useCallback(
     (noteId: string) => {
       setActiveNote(noteId);
-      setLastOpenedNoteId(noteId);
-      openModal("note");
+      setNoteInUrl(noteId);
     },
-    [setActiveNote, setLastOpenedNoteId, openModal],
+    [setActiveNote, setNoteInUrl],
   );
 
   const handleOpenSettings = useCallback(() => {
@@ -684,23 +662,22 @@ export function NotesPage() {
                   if (isMobile) {
                     // On mobile, open in modal
                     setActiveNote(noteId);
-                    setLastOpenedNoteId(noteId);
-                    openModal("note");
                   } else {
                     // On desktop, show in pane
                     setFolderViewSelectedNoteId(noteId);
                   }
+                  setNoteInUrl(noteId);
                 }}
                 onCreateNote={async (folderId) => {
                   hapticLight();
                   const note = await createNote({ folder_id: folderId });
                   if (note) {
                     if (isMobile) {
-                      setLastOpenedNoteId(note.id);
-                      openModal("note");
+                      setActiveNote(note.id);
                     } else {
                       setFolderViewSelectedNoteId(note.id);
                     }
+                    setNoteInUrl(note.id);
                   }
                 }}
                 onMoveNote={(noteId) => {
