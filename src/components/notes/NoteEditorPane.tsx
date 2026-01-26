@@ -171,7 +171,7 @@ export function NoteEditorPane({ noteId, onMoveToFolder, hideTags = false }: Not
 
   if (!note) {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
+      <div className="flex-1 flex items-start justify-center pt-32 text-gray-500 dark:text-gray-400">
         <div className="text-center">
           <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
           <p>Select a note to view</p>

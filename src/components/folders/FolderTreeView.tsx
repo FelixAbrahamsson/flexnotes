@@ -29,6 +29,7 @@ interface TreeItemProps {
   level: number
   selectedNoteId: string | null
   expandedFolders: Set<string>
+  reorderMode: boolean
   onToggleExpand: (folderId: string) => void
   onSelectNote: (noteId: string) => void
   onDeleteFolder: (folder: Folder) => void
@@ -44,6 +45,7 @@ function NoteTreeItem({
   note,
   isSelected,
   level,
+  reorderMode,
   onSelect,
   onMove,
   onDelete,
@@ -53,6 +55,7 @@ function NoteTreeItem({
   note: Note
   isSelected: boolean
   level: number
+  reorderMode: boolean
   onSelect: () => void
   onMove: () => void
   onDelete: () => void
@@ -85,6 +88,12 @@ function NoteTreeItem({
       .slice(0, 50)
   }, [note.content, note.note_type])
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMenuOpen(true)
+  }
+
   return (
     <div
       ref={setDragRef}
@@ -95,8 +104,12 @@ function NoteTreeItem({
           ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300'
           : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'
       } ${isDragging ? 'opacity-50' : ''}`}
-      style={{ paddingLeft: `${level * 16 + 8}px` }}
+      style={{
+        paddingLeft: `${level * 16 + 8}px`,
+        touchAction: reorderMode ? 'none' : 'auto',
+      }}
       onClick={onSelect}
+      onContextMenu={handleContextMenu}
     >
       <FileText className={`w-4 h-4 flex-shrink-0 ${note.is_pinned ? 'text-amber-500' : 'text-gray-400'}`} />
       <div className="flex-1 min-w-0">
@@ -106,8 +119,8 @@ function NoteTreeItem({
         )}
       </div>
 
-      {/* Actions menu */}
-      <div className="relative flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Actions menu - always visible on mobile, hover on desktop */}
+      <div className="relative flex-shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         <button
           onClick={e => {
             e.stopPropagation()
@@ -174,6 +187,7 @@ function FolderTreeItem({
   level,
   selectedNoteId,
   expandedFolders,
+  reorderMode,
   onToggleExpand,
   onSelectNote,
   onDeleteFolder,
@@ -200,6 +214,12 @@ function FolderTreeItem({
   const childFolders = allFolders.filter(f => f.parent_folder_id === folder.id)
   const hasChildren = childFolders.length > 0 || folderNotes.length > 0
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMenuOpen(true)
+  }
+
   return (
     <div>
       <div
@@ -211,6 +231,7 @@ function FolderTreeItem({
         }`}
         style={{ paddingLeft: `${level * 16 + 8}px` }}
         onClick={() => onToggleExpand(folder.id)}
+        onContextMenu={handleContextMenu}
       >
         {/* Expand/collapse chevron */}
         <button
@@ -250,8 +271,8 @@ function FolderTreeItem({
           </span>
         )}
 
-        {/* Actions menu */}
-        <div className="relative flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Actions menu - always visible on mobile, hover on desktop */}
+        <div className="relative flex-shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           <button
             onClick={e => {
               e.stopPropagation()
@@ -311,6 +332,7 @@ function FolderTreeItem({
               level={level + 1}
               selectedNoteId={selectedNoteId}
               expandedFolders={expandedFolders}
+              reorderMode={reorderMode}
               onToggleExpand={onToggleExpand}
               onSelectNote={onSelectNote}
               onDeleteFolder={onDeleteFolder}
@@ -329,6 +351,7 @@ function FolderTreeItem({
               note={note}
               isSelected={note.id === selectedNoteId}
               level={level + 1}
+              reorderMode={reorderMode}
               onSelect={() => onSelectNote(note.id)}
               onMove={() => onMoveNote(note.id)}
               onDelete={() => useNoteStore.getState().trashNote(note.id)}
@@ -345,6 +368,7 @@ function FolderTreeItem({
 interface FolderTreeViewProps {
   selectedNoteId: string | null
   searchQuery: string
+  reorderMode?: boolean
   onSelectNote: (noteId: string) => void
   onCreateNote: (folderId: string | null) => void
   onMoveNote: (noteId: string) => void
@@ -355,6 +379,7 @@ interface FolderTreeViewProps {
 export function FolderTreeView({
   selectedNoteId,
   searchQuery,
+  reorderMode = false,
   onSelectNote,
   onCreateNote,
   onMoveNote,
@@ -508,6 +533,7 @@ export function FolderTreeView({
             level={0}
             selectedNoteId={selectedNoteId}
             expandedFolders={expandedFolders}
+            reorderMode={reorderMode}
             onToggleExpand={handleToggleExpand}
             onSelectNote={onSelectNote}
             onDeleteFolder={handleDeleteFolder}
@@ -536,6 +562,7 @@ export function FolderTreeView({
                 note={note}
                 isSelected={note.id === selectedNoteId}
                 level={0}
+                reorderMode={reorderMode}
                 onSelect={() => onSelectNote(note.id)}
                 onMove={() => onMoveNote(note.id)}
                 onDelete={() => useNoteStore.getState().trashNote(note.id)}

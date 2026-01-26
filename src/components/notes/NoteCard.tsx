@@ -30,6 +30,12 @@ export function NoteCard({ note, tags, folder, onClick, onArchive, onDelete, onR
     setShowMenu(!showMenu)
   }
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setShowMenu(true)
+  }
+
   const handleArchive = (e: React.MouseEvent) => {
     e.stopPropagation()
     setShowMenu(false)
@@ -67,6 +73,7 @@ export function NoteCard({ note, tags, folder, onClick, onArchive, onDelete, onR
         tabIndex={0}
         onClick={onClick}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
+        onContextMenu={handleContextMenu}
         className="w-full text-left p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer select-none"
       >
         <div className="flex items-start justify-between gap-2">
