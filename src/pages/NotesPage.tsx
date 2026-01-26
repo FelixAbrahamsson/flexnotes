@@ -31,6 +31,7 @@ import {
 import { hapticLight } from "@/hooks/useCapacitor";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useResizableSidebar } from "@/hooks/useResizableSidebar";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useNoteStore } from "@/stores/noteStore";
 import { useTagStore } from "@/stores/tagStore";
 import { useSyncStore } from "@/stores/syncStore";
@@ -118,6 +119,14 @@ export function NotesPage() {
   } = usePreferencesStore();
   const { selectedFolderId, fetchFolders, getFolderById } = useFolderStore();
   const confirm = useConfirm();
+
+  // Update browser tab title based on active note
+  const activeNoteTitle = useMemo(() => {
+    if (!activeNoteId) return null;
+    const note = notes.find((n) => n.id === activeNoteId);
+    return note?.title || null;
+  }, [activeNoteId, notes]);
+  useDocumentTitle(activeNoteTitle);
 
   const [showSettings, setShowSettings] = useState(false);
   const [shareNoteId, setShareNoteId] = useState<string | null>(null);
