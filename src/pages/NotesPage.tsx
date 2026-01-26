@@ -720,6 +720,7 @@ export function NotesPage() {
                     setFolderPickerNoteId(folderViewSelectedNoteId)
                   }
                 }}
+                hideTags
               />
             </div>
           )}
@@ -913,7 +914,7 @@ export function NotesPage() {
 
       {/* Note editor modal */}
       {activeNoteId && (
-        <NoteEditor noteId={activeNoteId} onClose={handleCloseEditor} />
+        <NoteEditor noteId={activeNoteId} onClose={handleCloseEditor} hideTags={viewMode === 'folder'} />
       )}
 
       {/* Settings modal */}

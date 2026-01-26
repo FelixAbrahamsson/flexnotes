@@ -33,6 +33,7 @@ interface TreeItemProps {
   onSelectNote: (noteId: string) => void
   onDeleteFolder: (folder: Folder) => void
   onCreateNote: (folderId: string | null) => void
+  onCreateSubfolder: (parentFolderId: string) => void
   onMoveNote: (noteId: string) => void
   onShareNote: (noteId: string) => void
   onArchiveNote: (noteId: string) => void
@@ -177,6 +178,7 @@ function FolderTreeItem({
   onSelectNote,
   onDeleteFolder,
   onCreateNote,
+  onCreateSubfolder,
   onMoveNote,
   onShareNote,
   onArchiveNote,
@@ -272,6 +274,16 @@ function FolderTreeItem({
               New note
             </DropdownMenuItem>
             <DropdownMenuItem
+              icon={<FolderPlus className="w-4 h-4" />}
+              onClick={e => {
+                e.stopPropagation()
+                setMenuOpen(false)
+                onCreateSubfolder(folder.id)
+              }}
+            >
+              New folder
+            </DropdownMenuItem>
+            <DropdownMenuItem
               icon={<Trash2 className="w-4 h-4" />}
               onClick={e => {
                 e.stopPropagation()
@@ -303,6 +315,7 @@ function FolderTreeItem({
               onSelectNote={onSelectNote}
               onDeleteFolder={onDeleteFolder}
               onCreateNote={onCreateNote}
+              onCreateSubfolder={onCreateSubfolder}
               onMoveNote={onMoveNote}
               onShareNote={onShareNote}
               onArchiveNote={onArchiveNote}
@@ -418,6 +431,18 @@ export function FolderTreeView({
     setIsCreating(false)
   }
 
+  const handleCreateSubfolder = useCallback(async (parentFolderId: string) => {
+    const folderName = prompt('Enter folder name:')
+    if (!folderName?.trim()) return
+
+    hapticLight()
+    const newFolder = await createFolder(folderName.trim(), parentFolderId)
+    // Auto-expand the parent folder to show the new subfolder
+    if (newFolder) {
+      setExpandedFolders(prev => new Set([...prev, parentFolderId]))
+    }
+  }, [createFolder])
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -487,6 +512,7 @@ export function FolderTreeView({
             onSelectNote={onSelectNote}
             onDeleteFolder={handleDeleteFolder}
             onCreateNote={onCreateNote}
+            onCreateSubfolder={handleCreateSubfolder}
             onMoveNote={onMoveNote}
             onShareNote={onShareNote}
             onArchiveNote={onArchiveNote}

@@ -30,13 +30,14 @@ import type { NoteType } from '@/types'
 interface NoteEditorPaneProps {
   noteId: string
   onMoveToFolder?: () => void
+  hideTags?: boolean
 }
 
 /**
  * Inline note editor pane for split-view layouts.
  * Similar to NoteEditor but without the modal wrapper.
  */
-export function NoteEditorPane({ noteId, onMoveToFolder }: NoteEditorPaneProps) {
+export function NoteEditorPane({ noteId, onMoveToFolder, hideTags = false }: NoteEditorPaneProps) {
   const { notes, updateNote, trashNote } = useNoteStore()
   const { getTagsForNote, removeTagFromNote } = useTagStore()
   const { fetchImagesForNote } = useImageStore()
@@ -344,36 +345,38 @@ export function NoteEditorPane({ noteId, onMoveToFolder }: NoteEditorPaneProps) 
           className="w-full text-xl font-semibold text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-transparent border-0 focus:outline-none focus:ring-0 p-0 mb-3"
         />
 
-        {/* Tags */}
-        <div className="relative mb-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            {noteTags.map(tag => (
-              <TagBadge
-                key={tag.id}
-                tag={tag}
-                onRemove={() => removeTagFromNote(note.id, tag.id)}
-              />
-            ))}
-            <button
-              onClick={() => setShowTagPicker(!showTagPicker)}
-              className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-            >
-              <Tag className="w-3 h-3" />
-              {noteTags.length === 0 ? 'Add tag' : 'Edit'}
-            </button>
-          </div>
+        {/* Tags - hidden in folder view */}
+        {!hideTags && (
+          <div className="relative mb-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              {noteTags.map(tag => (
+                <TagBadge
+                  key={tag.id}
+                  tag={tag}
+                  onRemove={() => removeTagFromNote(note.id, tag.id)}
+                />
+              ))}
+              <button
+                onClick={() => setShowTagPicker(!showTagPicker)}
+                className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+              >
+                <Tag className="w-3 h-3" />
+                {noteTags.length === 0 ? 'Add tag' : 'Edit'}
+              </button>
+            </div>
 
-          {showTagPicker && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowTagPicker(false)} />
-              <TagPicker
-                noteId={note.id}
-                selectedTags={noteTags}
-                onClose={() => setShowTagPicker(false)}
-              />
-            </>
-          )}
-        </div>
+            {showTagPicker && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowTagPicker(false)} />
+                <TagPicker
+                  noteId={note.id}
+                  selectedTags={noteTags}
+                  onClose={() => setShowTagPicker(false)}
+                />
+              </>
+            )}
+          </div>
+        )}
 
         {/* Editor */}
         {note.note_type === 'list' ? (
