@@ -82,13 +82,31 @@ export function NoteEditorPane({ noteId, onMoveToFolder, hideTags = false }: Not
 
   // Sync from store when note changes
   const [lastNoteId, setLastNoteId] = useState<string | null>(null)
+  const lastNoteTypeRef = useRef<string | null>(null)
+  const lastContentRef = useRef<string>('')
+
   useEffect(() => {
     if (note && note.id !== lastNoteId) {
+      // Clean up orphaned images from previous markdown note before switching
+      if (lastNoteId && lastNoteTypeRef.current === 'markdown') {
+        useImageStore.getState().cleanupOrphanedImages(lastNoteId, lastContentRef.current)
+      }
+
       setTitle(note.title || '')
       setContent(note.content)
       setLastNoteId(note.id)
+      lastNoteTypeRef.current = note.note_type
+      lastContentRef.current = note.content
     }
   }, [note, lastNoteId])
+
+  // Keep refs updated with current content
+  useEffect(() => {
+    if (note) {
+      lastContentRef.current = content
+      lastNoteTypeRef.current = note.note_type
+    }
+  }, [content, note])
 
   const handleSave = useCallback(() => {
     if (!note) return
@@ -135,10 +153,45 @@ export function NoteEditorPane({ noteId, onMoveToFolder, hideTags = false }: Not
     }
   }
 
-  const handleChangeType = (newType: NoteType) => {
+  const handleChangeType = async (newType: NoteType) => {
     if (!note) return
 
+    const imageStore = useImageStore.getState()
+
+    // If converting FROM markdown, clean up any images that were removed from content first
+    if (note.note_type === 'markdown') {
+      await imageStore.cleanupOrphanedImages(note.id, content)
+    }
+
+    // Get images after cleanup
+    const images = imageStore.getImagesForNote(note.id)
+    const getImageUrl = imageStore.getImageUrl
+
+    // Get all valid image URLs
+    const validImageUrls = new Set(images.map(img => getImageUrl(img.storage_path)))
+
     let newContent = content
+
+    // Helper to remove img tags that reference deleted images
+    const removeOrphanedImgTags = (currentContent: string) => {
+      return currentContent.replace(/<img[^>]+src="([^"]+)"[^>]*>/g, (match, url) => {
+        return validImageUrls.has(url) ? match : ''
+      })
+    }
+
+    // Helper to append images that aren't already in the content
+    const appendMissingImages = (currentContent: string) => {
+      if (images.length === 0) return currentContent
+      const missingImages = images.filter(img => {
+        const url = getImageUrl(img.storage_path)
+        return !currentContent.includes(url)
+      })
+      if (missingImages.length === 0) return currentContent
+      const imageHtml = missingImages
+        .map(img => `<img src="${getImageUrl(img.storage_path)}">`)
+        .join('')
+      return currentContent + imageHtml
+    }
 
     // Convert content between types
     if (note.note_type === 'list' && newType !== 'list') {
@@ -152,6 +205,10 @@ export function NoteEditorPane({ noteId, onMoveToFolder, hideTags = false }: Not
       } catch {
         // Keep as-is
       }
+      // If converting to markdown, append any missing images
+      if (newType === 'markdown') {
+        newContent = appendMissingImages(newContent)
+      }
     } else if (note.note_type !== 'list' && newType === 'list') {
       const plainText = content.replace(/<[^>]*>/g, '\n')
       const lines = plainText.split('\n').filter(line => line.trim())
@@ -162,7 +219,12 @@ export function NoteEditorPane({ noteId, onMoveToFolder, hideTags = false }: Not
           checked: false,
         }))
       })
+    } else if (note.note_type === 'text' && newType === 'markdown') {
+      // Text to markdown - remove orphaned img tags, then append missing images
+      newContent = removeOrphanedImgTags(content)
+      newContent = appendMissingImages(newContent)
     }
+    // markdown to text: images are already in note_images, gallery will show them
 
     updateNote(note.id, { note_type: newType, content: newContent })
     setContent(newContent)
@@ -180,7 +242,8 @@ export function NoteEditorPane({ noteId, onMoveToFolder, hideTags = false }: Not
     )
   }
 
-  const showImageGallery = note.note_type !== 'list'
+  // Only show image gallery for text notes - markdown has inline images, list doesn't support images
+  const showImageGallery = note.note_type === 'text'
 
   return (
     <div

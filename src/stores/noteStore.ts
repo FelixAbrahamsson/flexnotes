@@ -6,6 +6,7 @@ import { queueChange } from '@/services/sync'
 import { useAuthStore } from './authStore'
 import { useTagStore } from './tagStore'
 import { useSyncStore, triggerSyncIfOnline } from './syncStore'
+import { useImageStore } from './imageStore'
 
 // Constants
 const TRASH_RETENTION_DAYS = 30
@@ -450,6 +451,35 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     }))
 
     try {
+      // Delete all images associated with this note from storage and database
+      // Query directly from supabase since images may not be loaded in store
+      const { data: images, error: queryError } = await supabase
+        .from('note_images')
+        .select('id, storage_path')
+        .eq('note_id', id)
+
+      if (queryError) {
+        console.error('Failed to query images for note:', queryError)
+      }
+
+      if (images && images.length > 0) {
+        // Delete from storage
+        const storagePaths = images.map(img => img.storage_path)
+        const { error: storageError } = await supabase.storage.from('note-images').remove(storagePaths)
+        if (storageError) {
+          console.error('Failed to delete images from storage:', storageError)
+        }
+
+        // Delete from database
+        const { error: dbError } = await supabase
+          .from('note_images')
+          .delete()
+          .eq('note_id', id)
+        if (dbError) {
+          console.error('Failed to delete image records:', dbError)
+        }
+      }
+
       await db.notes.delete(id)
       await queueChange('note', id, 'delete')
       await useSyncStore.getState().refreshPendingCount()
@@ -493,6 +523,10 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   deleteNoteIfEmpty: async (id: string) => {
     const note = get().notes.find(n => n.id === id)
     if (!note) return false
+
+    // Check if note has images - if so, don't delete even if text is empty
+    const images = useImageStore.getState().getImagesForNote(id)
+    if (images.length > 0) return false
 
     if (isNoteEmpty(note)) {
       // Permanently delete empty notes (don't put in trash)

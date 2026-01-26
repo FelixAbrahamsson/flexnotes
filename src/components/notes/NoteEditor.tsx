@@ -134,8 +134,12 @@ export function NoteEditor({ noteId: _noteId, onClose, hideTags = false }: NoteE
     return () => clearTimeout(timer)
   }, [handleSave])
 
-  const handleClose = () => {
+  const handleClose = async () => {
     handleSave()
+    // Clean up any images that were removed from markdown content
+    if (note && note.note_type === 'markdown') {
+      await useImageStore.getState().cleanupOrphanedImages(note.id, content)
+    }
     onClose()
   }
 
@@ -164,10 +168,45 @@ export function NoteEditor({ noteId: _noteId, onClose, hideTags = false }: NoteE
     }
   }
 
-  const handleChangeType = (newType: NoteType) => {
+  const handleChangeType = async (newType: NoteType) => {
     if (!note) return
 
+    const imageStore = useImageStore.getState()
+
+    // If converting FROM markdown, clean up any images that were removed from content first
+    if (note.note_type === 'markdown') {
+      await imageStore.cleanupOrphanedImages(note.id, content)
+    }
+
+    // Get images after cleanup
+    const images = imageStore.getImagesForNote(note.id)
+    const getImageUrl = imageStore.getImageUrl
+
+    // Get all valid image URLs
+    const validImageUrls = new Set(images.map(img => getImageUrl(img.storage_path)))
+
     let newContent = content
+
+    // Helper to remove img tags that reference deleted images
+    const removeOrphanedImgTags = (currentContent: string) => {
+      return currentContent.replace(/<img[^>]+src="([^"]+)"[^>]*>/g, (match, url) => {
+        return validImageUrls.has(url) ? match : ''
+      })
+    }
+
+    // Helper to append images that aren't already in the content
+    const appendMissingImages = (currentContent: string) => {
+      if (images.length === 0) return currentContent
+      const missingImages = images.filter(img => {
+        const url = getImageUrl(img.storage_path)
+        return !currentContent.includes(url)
+      })
+      if (missingImages.length === 0) return currentContent
+      const imageHtml = missingImages
+        .map(img => `<img src="${getImageUrl(img.storage_path)}">`)
+        .join('')
+      return currentContent + imageHtml
+    }
 
     // Convert content between types
     if (note.note_type === 'list' && newType !== 'list') {
@@ -182,6 +221,10 @@ export function NoteEditor({ noteId: _noteId, onClose, hideTags = false }: NoteE
       } catch {
         // Keep as-is
       }
+      // If converting to markdown, append any missing images
+      if (newType === 'markdown') {
+        newContent = appendMissingImages(newContent)
+      }
     } else if (note.note_type !== 'list' && newType === 'list') {
       // Convert text to list (strip HTML for markdown)
       const plainText = content.replace(/<[^>]*>/g, '\n')
@@ -193,7 +236,12 @@ export function NoteEditor({ noteId: _noteId, onClose, hideTags = false }: NoteE
           checked: false,
         }))
       })
+    } else if (note.note_type === 'text' && newType === 'markdown') {
+      // Text to markdown - remove orphaned img tags, then append missing images
+      newContent = removeOrphanedImgTags(content)
+      newContent = appendMissingImages(newContent)
     }
+    // markdown to text: images are already in note_images, gallery will show them
 
     updateNote(note.id, { note_type: newType, content: newContent })
     setContent(newContent)
@@ -204,7 +252,8 @@ export function NoteEditor({ noteId: _noteId, onClose, hideTags = false }: NoteE
     return null
   }
 
-  const showImageGallery = note.note_type !== 'list'
+  // Only show image gallery for text notes - markdown has inline images, list doesn't support images
+  const showImageGallery = note.note_type === 'text'
 
   return (
     <div

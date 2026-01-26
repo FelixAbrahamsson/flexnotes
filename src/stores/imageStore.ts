@@ -14,6 +14,7 @@ interface ImageState {
   deleteImage: (imageId: string) => Promise<void>
   getImagesForNote: (noteId: string) => NoteImage[]
   getImageUrl: (storagePath: string) => string
+  cleanupOrphanedImages: (noteId: string, content: string) => Promise<void>
 }
 
 export const useImageStore = create<ImageState>((set, get) => ({
@@ -144,5 +145,28 @@ export const useImageStore = create<ImageState>((set, get) => ({
       .getPublicUrl(storagePath)
 
     return data.publicUrl
+  },
+
+  // Clean up images that are no longer referenced in markdown content
+  cleanupOrphanedImages: async (noteId: string, content: string) => {
+    const images = get().getImagesForNote(noteId)
+    if (images.length === 0) return
+
+    // Extract all image URLs from the content
+    const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/g
+    const contentUrls = new Set<string>()
+    let match
+    while ((match = imgRegex.exec(content)) !== null) {
+      contentUrls.add(match[1])
+    }
+
+    // Find images that are in the database but not in the content
+    for (const image of images) {
+      const imageUrl = get().getImageUrl(image.storage_path)
+      if (!contentUrls.has(imageUrl)) {
+        // This image is no longer in the content, delete it
+        await get().deleteImage(image.id)
+      }
+    }
   },
 }))
