@@ -6,6 +6,8 @@ import {
   ChevronRight,
   ChevronDown,
   FileText,
+  FileCode,
+  ListChecks,
   MoreVertical,
   Trash2,
   FolderInput,
@@ -120,7 +122,13 @@ function NoteTreeItem({
       onClick={onSelect}
       onContextMenu={handleContextMenu}
     >
-      <FileText className={`w-4 h-4 flex-shrink-0 ${note.is_pinned ? 'text-amber-500' : 'text-gray-400'}`} />
+      {note.note_type === 'list' ? (
+        <ListChecks className={`w-4 h-4 flex-shrink-0 ${note.is_pinned ? 'text-amber-500' : 'text-gray-400'}`} />
+      ) : note.note_type === 'markdown' ? (
+        <FileCode className={`w-4 h-4 flex-shrink-0 ${note.is_pinned ? 'text-amber-500' : 'text-gray-400'}`} />
+      ) : (
+        <FileText className={`w-4 h-4 flex-shrink-0 ${note.is_pinned ? 'text-amber-500' : 'text-gray-400'}`} />
+      )}
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium truncate">{title}</div>
         {preview && !note.title && (
@@ -233,6 +241,7 @@ function FolderTreeItem({
   onPinNote,
 }: TreeItemProps) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
   const isExpanded = expandedFolders.has(folder.id)
   const color = getFolderColor(folder)
   const isCreatingHere = creatingInFolder === folder.id
@@ -325,6 +334,42 @@ function FolderTreeItem({
           </span>
         )}
 
+        {/* Add button - always visible on mobile, hover on desktop */}
+        <div className="relative flex-shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={e => {
+              e.stopPropagation()
+              setAddMenuOpen(!addMenuOpen)
+            }}
+            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+          >
+            <Plus className="w-3 h-3" />
+          </button>
+
+          <DropdownMenu open={addMenuOpen} onClose={() => setAddMenuOpen(false)}>
+            <DropdownMenuItem
+              icon={<Plus className="w-4 h-4" />}
+              onClick={e => {
+                e.stopPropagation()
+                setAddMenuOpen(false)
+                onCreateNote(folder.id)
+              }}
+            >
+              New note
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              icon={<FolderPlus className="w-4 h-4" />}
+              onClick={e => {
+                e.stopPropagation()
+                setAddMenuOpen(false)
+                onCreateSubfolder(folder.id)
+              }}
+            >
+              New folder
+            </DropdownMenuItem>
+          </DropdownMenu>
+        </div>
+
         {/* Actions menu - always visible on mobile, hover on desktop */}
         <div className="relative flex-shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           <button
@@ -357,26 +402,6 @@ function FolderTreeItem({
               }}
             >
               Change color
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              icon={<Plus className="w-4 h-4" />}
-              onClick={e => {
-                e.stopPropagation()
-                setMenuOpen(false)
-                onCreateNote(folder.id)
-              }}
-            >
-              New note
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              icon={<FolderPlus className="w-4 h-4" />}
-              onClick={e => {
-                e.stopPropagation()
-                setMenuOpen(false)
-                onCreateSubfolder(folder.id)
-              }}
-            >
-              New folder
             </DropdownMenuItem>
             <DropdownMenuItem
               icon={<Trash2 className="w-4 h-4" />}

@@ -5,6 +5,7 @@ interface TagBadgeProps {
   tag: Tag
   onRemove?: () => void
   onClick?: () => void
+  onContextMenu?: (e: React.MouseEvent) => void
   selected?: boolean
   size?: 'sm' | 'md'
 }
@@ -27,7 +28,7 @@ function getTagColor(tag: Tag): string {
   return DEFAULT_COLORS[hash % DEFAULT_COLORS.length] ?? DEFAULT_COLORS[0]
 }
 
-export function TagBadge({ tag, onRemove, onClick, selected, size = 'sm' }: TagBadgeProps) {
+export function TagBadge({ tag, onRemove, onClick, onContextMenu, selected, size = 'sm' }: TagBadgeProps) {
   const color = getTagColor(tag)
   const isClickable = !!onClick
 
@@ -46,6 +47,7 @@ export function TagBadge({ tag, onRemove, onClick, selected, size = 'sm' }: TagB
         ...(selected ? { ringColor: color } : {}),
       }}
       onClick={onClick}
+      onContextMenu={onContextMenu}
     >
       {tag.name}
       {onRemove && (

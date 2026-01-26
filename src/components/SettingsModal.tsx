@@ -1,11 +1,8 @@
 import { useState } from 'react'
-import { X, Sun, Moon, Monitor, Grid2X2, Grid3X3, LayoutList, LogOut, Key, FolderOpen, ChevronDown, ChevronRight } from 'lucide-react'
+import { X, Sun, Moon, Monitor, Grid2X2, Grid3X3, LayoutList, LogOut, Key } from 'lucide-react'
 import { usePreferencesStore } from '@/stores/preferencesStore'
 import { useAuthStore } from '@/stores/authStore'
-import { useFolderStore } from '@/stores/folderStore'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
-import { TagManager } from '@/components/tags/TagManager'
-import { FolderManager } from '@/components/folders/FolderManager'
 import { GoogleKeepImport } from '@/components/import/GoogleKeepImport'
 import { supabase } from '@/services/supabase'
 
@@ -16,15 +13,12 @@ interface SettingsModalProps {
 export function SettingsModal({ onClose }: SettingsModalProps) {
   const { theme, notesPerRow, setTheme, setNotesPerRow } = usePreferencesStore()
   const { user, signOut } = useAuthStore()
-  const { folders } = useFolderStore()
   const [showPasswordChange, setShowPasswordChange] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [passwordSuccess, setPasswordSuccess] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
-  const [showFolderManager, setShowFolderManager] = useState(false)
-  const [tagsExpanded, setTagsExpanded] = useState(false)
 
   const handleChangePassword = async () => {
     setPasswordError('')
@@ -177,39 +171,6 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
             </div>
           </div>
 
-          {/* Tag management - collapsible */}
-          <div>
-            <button
-              onClick={() => setTagsExpanded(!tagsExpanded)}
-              className="flex items-center gap-2 w-full text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-            >
-              {tagsExpanded ? (
-                <ChevronDown className="w-4 h-4" />
-              ) : (
-                <ChevronRight className="w-4 h-4" />
-              )}
-              Manage Tags
-            </button>
-            {tagsExpanded && <TagManager />}
-          </div>
-
-          {/* Folder management */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              Manage Folders
-            </label>
-            <button
-              onClick={() => setShowFolderManager(true)}
-              className="flex items-center gap-2 w-full px-4 py-3 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            >
-              <FolderOpen className="w-5 h-5" />
-              <span className="flex-1 text-left">
-                {folders.length} folder{folders.length !== 1 ? 's' : ''}
-              </span>
-              <span className="text-gray-400">Edit</span>
-            </button>
-          </div>
-
           {/* Import from Google Keep */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -293,11 +254,6 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
         </div>
       </div>
 
-      {/* Folder manager modal */}
-      <FolderManager
-        open={showFolderManager}
-        onClose={() => setShowFolderManager(false)}
-      />
     </div>
   )
 }

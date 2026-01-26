@@ -36,14 +36,14 @@ export function DropdownMenu({ open, onClose, children, className = '' }: Dropdo
 
     if (!menuRef.current) return
 
-    // Find the trigger button (parent element's button)
+    // Find the trigger element (button or parent element)
     const parent = menuRef.current.parentElement
     if (!parent) return
 
     const triggerButton = parent.querySelector('button')
-    if (!triggerButton) return
+    const triggerElement = triggerButton || parent
 
-    const rect = triggerButton.getBoundingClientRect()
+    const rect = triggerElement.getBoundingClientRect()
     const menuHeight = 100 // Approximate menu height
     const viewportHeight = window.innerHeight
     const spaceBelow = viewportHeight - rect.bottom

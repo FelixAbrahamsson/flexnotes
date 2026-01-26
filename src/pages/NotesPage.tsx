@@ -130,6 +130,7 @@ export function NotesPage() {
       if (noteId) {
         // In folder view desktop, show in pane; otherwise show in modal
         if (viewMode === "folder" && !isMobileRef.current) {
+          setActiveNote(null); // Close any modal
           setFolderViewSelectedNoteId(noteId);
         } else {
           setActiveNote(noteId);
@@ -663,7 +664,8 @@ export function NotesPage() {
                     // On mobile, open in modal
                     setActiveNote(noteId);
                   } else {
-                    // On desktop, show in pane
+                    // On desktop, show in pane (close any modal first)
+                    setActiveNote(null);
                     setFolderViewSelectedNoteId(noteId);
                   }
                   setNoteInUrl(noteId);
@@ -675,6 +677,8 @@ export function NotesPage() {
                     if (isMobile) {
                       setActiveNote(note.id);
                     } else {
+                      // On desktop, show in pane (close any modal first)
+                      setActiveNote(null);
                       setFolderViewSelectedNoteId(note.id);
                     }
                     setNoteInUrl(note.id);

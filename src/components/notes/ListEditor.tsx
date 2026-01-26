@@ -560,12 +560,17 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     [startDrag, moveDrag, endDrag],
   );
 
-  // Focus management
+  // Focus management - also scroll into view for mobile keyboards
   useEffect(() => {
     if (focusedId) {
       const input = inputRefs.current.get(focusedId);
       if (input) {
         input.focus();
+        // On mobile, scroll the input into view after a short delay
+        // to account for the keyboard appearing
+        setTimeout(() => {
+          input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 300);
       }
     }
   }, [focusedId]);

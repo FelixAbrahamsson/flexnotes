@@ -1,4 +1,21 @@
-import { useState } from 'react'
+import { useState, useCallback, useRef } from 'react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  horizontalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { useTagStore } from '@/stores/tagStore'
 import { useNoteStore } from '@/stores/noteStore'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
@@ -7,8 +24,98 @@ import { DropdownMenu, DropdownMenuItem } from '@/components/ui/DropdownMenu'
 import { Tag, X, Pencil, Trash2, Check } from 'lucide-react'
 import type { Tag as TagType } from '@/types'
 
+interface SortableTagProps {
+  tag: TagType
+  isSelected: boolean
+  menuOpen: boolean
+  onTagClick: () => void
+  onContextMenu: (e: React.MouseEvent) => void
+  onCloseMenu: () => void
+  onStartEdit: () => void
+  onDelete: () => void
+}
+
+function SortableTag({
+  tag,
+  isSelected,
+  menuOpen,
+  onTagClick,
+  onContextMenu,
+  onCloseMenu,
+  onStartEdit,
+  onDelete,
+}: SortableTagProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: tag.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1 : 0,
+  }
+
+  // Intercept pointer down to prevent dnd-kit from capturing right-clicks
+  const mergedListeners = {
+    ...listeners,
+    onPointerDown: (e: React.PointerEvent) => {
+      // Only let dnd-kit handle left-clicks
+      if (e.button === 0) {
+        listeners?.onPointerDown?.(e)
+      }
+    },
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...mergedListeners}
+      className="relative flex-shrink-0 touch-manipulation"
+      onContextMenu={onContextMenu}
+    >
+      <TagBadge
+        tag={tag}
+        selected={isSelected}
+        onClick={onTagClick}
+      />
+      <DropdownMenu
+        open={menuOpen}
+        onClose={onCloseMenu}
+      >
+        <DropdownMenuItem
+          icon={<Pencil className="w-4 h-4" />}
+          onClick={e => {
+            e.stopPropagation()
+            onStartEdit()
+          }}
+        >
+          Edit tag
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          icon={<Trash2 className="w-4 h-4" />}
+          onClick={e => {
+            e.stopPropagation()
+            onDelete()
+          }}
+          variant="danger"
+        >
+          Delete tag
+        </DropdownMenuItem>
+      </DropdownMenu>
+    </div>
+  )
+}
+
 export function TagFilter() {
-  const { tags, updateTag, deleteTag } = useTagStore()
+  const { tags, updateTag, deleteTag, reorderTags } = useTagStore()
   const { selectedTagIds, setSelectedTagIds } = useNoteStore()
   const confirm = useConfirm()
 
@@ -17,15 +124,38 @@ export function TagFilter() {
   const [editName, setEditName] = useState('')
   const [editColor, setEditColor] = useState<string | null>(null)
 
+  // Track double tap for mobile
+  const lastTapRef = useRef<{ tagId: string; time: number } | null>(null)
+
   const selectedSet = new Set(selectedTagIds)
 
-  const handleToggleTag = (tagId: string) => {
+  // Drag sensors for reordering (use MouseSensor to allow right-click context menu)
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 5 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    if (over && active.id !== over.id) {
+      reorderTags(active.id as string, over.id as string)
+    }
+  }, [reorderTags])
+
+  const handleToggleTag = useCallback((tagId: string) => {
     if (selectedSet.has(tagId)) {
       setSelectedTagIds(selectedTagIds.filter(id => id !== tagId))
     } else {
       setSelectedTagIds([...selectedTagIds, tagId])
     }
-  }
+  }, [selectedSet, selectedTagIds, setSelectedTagIds])
 
   const handleClearAll = () => {
     setSelectedTagIds([])
@@ -36,6 +166,23 @@ export function TagFilter() {
     e.stopPropagation()
     setMenuTagId(tagId)
   }
+
+  // Handle tap/click - detect double tap on mobile
+  const handleTagClick = useCallback((tagId: string) => {
+    const now = Date.now()
+    const lastTap = lastTapRef.current
+
+    // Check for double tap (within 300ms on same tag)
+    if (lastTap && lastTap.tagId === tagId && now - lastTap.time < 300) {
+      // Double tap - open menu
+      setMenuTagId(tagId)
+      lastTapRef.current = null
+    } else {
+      // Single tap - toggle selection
+      lastTapRef.current = { tagId, time: now }
+      handleToggleTag(tagId)
+    }
+  }, [handleToggleTag])
 
   const handleStartEdit = (tag: TagType) => {
     setMenuTagId(null)
@@ -74,58 +221,40 @@ export function TagFilter() {
   if (tags.length === 0) return null
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-      <Tag className="w-4 h-4 text-gray-400 flex-shrink-0" />
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        <Tag className="w-4 h-4 text-gray-400 flex-shrink-0" />
 
-      {tags.map(tag => (
-        <div key={tag.id} className="relative flex-shrink-0">
-          <button
-            onClick={() => handleToggleTag(tag.id)}
-            onContextMenu={e => handleContextMenu(e, tag.id)}
-          >
-            <TagBadge
+        <SortableContext items={tags.map(t => t.id)} strategy={horizontalListSortingStrategy}>
+          {tags.map(tag => (
+            <SortableTag
+              key={tag.id}
               tag={tag}
-              selected={selectedSet.has(tag.id)}
+              isSelected={selectedSet.has(tag.id)}
+              menuOpen={menuTagId === tag.id}
+              onTagClick={() => handleTagClick(tag.id)}
+              onContextMenu={e => handleContextMenu(e, tag.id)}
+              onCloseMenu={() => setMenuTagId(null)}
+              onStartEdit={() => handleStartEdit(tag)}
+              onDelete={() => handleDelete(tag)}
             />
-          </button>
+          ))}
+        </SortableContext>
 
-          {/* Context menu */}
-          <DropdownMenu
-            open={menuTagId === tag.id}
-            onClose={() => setMenuTagId(null)}
+        {selectedTagIds.length > 0 && (
+          <button
+            onClick={handleClearAll}
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex-shrink-0"
           >
-            <DropdownMenuItem
-              icon={<Pencil className="w-4 h-4" />}
-              onClick={e => {
-                e.stopPropagation()
-                handleStartEdit(tag)
-              }}
-            >
-              Edit tag
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              icon={<Trash2 className="w-4 h-4" />}
-              onClick={e => {
-                e.stopPropagation()
-                handleDelete(tag)
-              }}
-              variant="danger"
-            >
-              Delete tag
-            </DropdownMenuItem>
-          </DropdownMenu>
-        </div>
-      ))}
-
-      {selectedTagIds.length > 0 && (
-        <button
-          onClick={handleClearAll}
-          className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 flex-shrink-0"
-        >
-          <X className="w-3 h-3" />
-          Clear
-        </button>
-      )}
+            <X className="w-3 h-3" />
+            Clear
+          </button>
+        )}
+      </div>
 
       {/* Edit tag modal */}
       {editingTag && (
@@ -207,6 +336,6 @@ export function TagFilter() {
           </div>
         </div>
       )}
-    </div>
+    </DndContext>
   )
 }
