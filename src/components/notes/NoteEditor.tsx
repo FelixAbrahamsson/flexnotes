@@ -70,37 +70,6 @@ export function NoteEditor({ noteId: _noteId, onClose, hideTags = false }: NoteE
 
   const noteTags = note ? getTagsForNote(note.id) : []
 
-  // Fetch images when note opens
-  useEffect(() => {
-    if (note) {
-      fetchImagesForNote(note.id)
-    }
-  }, [note, fetchImagesForNote])
-
-  // Handle ESC key to close modal
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        // Close sub-modals first, then the main modal
-        if (viewingImage) {
-          setViewingImage(null)
-        } else if (showShareModal) {
-          setShowShareModal(false)
-        } else if (showTagPicker) {
-          setShowTagPicker(false)
-        } else if (showTypeMenu) {
-          setShowTypeMenu(false)
-        } else if (showMenu) {
-          setShowMenu(false)
-        } else {
-          onClose()
-        }
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [showMenu, showTypeMenu, showTagPicker, showShareModal, viewingImage, onClose])
-
   // Only sync from store when note ID changes (opening a different note)
   // Don't overwrite local edits when the store updates from sync
   const [lastNoteId, setLastNoteId] = useState<string | null>(null)
@@ -128,20 +97,51 @@ export function NoteEditor({ noteId: _noteId, onClose, hideTags = false }: NoteE
     }
   }, [note, title, content, updateNote])
 
-  // Auto-save on changes
-  useEffect(() => {
-    const timer = setTimeout(handleSave, 500)
-    return () => clearTimeout(timer)
-  }, [handleSave])
-
-  const handleClose = async () => {
+  const handleClose = useCallback(async () => {
     handleSave()
     // Clean up any images that were removed from markdown content
     if (note && note.note_type === 'markdown') {
       await useImageStore.getState().cleanupOrphanedImages(note.id, content)
     }
     onClose()
-  }
+  }, [handleSave, note, content, onClose])
+
+  // Fetch images when note opens
+  useEffect(() => {
+    if (note) {
+      fetchImagesForNote(note.id)
+    }
+  }, [note, fetchImagesForNote])
+
+  // Handle ESC key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // Close sub-modals first, then the main modal
+        if (viewingImage) {
+          setViewingImage(null)
+        } else if (showShareModal) {
+          setShowShareModal(false)
+        } else if (showTagPicker) {
+          setShowTagPicker(false)
+        } else if (showTypeMenu) {
+          setShowTypeMenu(false)
+        } else if (showMenu) {
+          setShowMenu(false)
+        } else {
+          handleClose()
+        }
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [showMenu, showTypeMenu, showTagPicker, showShareModal, viewingImage, handleClose])
+
+  // Auto-save on changes
+  useEffect(() => {
+    const timer = setTimeout(handleSave, 500)
+    return () => clearTimeout(timer)
+  }, [handleSave])
 
   const handleTogglePin = () => {
     if (!note) return
@@ -258,7 +258,7 @@ export function NoteEditor({ noteId: _noteId, onClose, hideTags = false }: NoteE
   return (
     <div
       className="fixed inset-0 z-50 bg-black/50"
-      onClick={handleClose}
+      onMouseDown={handleClose}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -269,7 +269,7 @@ export function NoteEditor({ noteId: _noteId, onClose, hideTags = false }: NoteE
             ? 'inset-0 sm:inset-0 max-h-full'
             : 'inset-x-0 bottom-0 top-0 sm:inset-4 sm:top-12 sm:bottom-auto sm:left-1/2 sm:-translate-x-1/2 sm:max-w-2xl sm:rounded-xl max-h-full sm:max-h-[calc(100vh-6rem)]'
         }`}
-        onClick={e => e.stopPropagation()}
+        onMouseDown={e => e.stopPropagation()}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >

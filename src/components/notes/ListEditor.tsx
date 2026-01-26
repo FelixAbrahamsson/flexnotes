@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Plus, GripVertical, X, Check, CornerDownLeft } from 'lucide-react'
+import { Plus, GripVertical, X, Check, CornerDownLeft, Trash2, RotateCcw } from 'lucide-react'
 import type { ListItem, ListContent } from '@/types'
 
 interface ListEditorProps {
@@ -507,6 +507,18 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
   const uncheckedItems = items.filter(item => !item.checked)
   const checkedItems = items.filter(item => item.checked)
 
+  const removeCompleted = () => {
+    const newItems = items.filter(item => !item.checked)
+    setItems(newItems)
+    saveItems(newItems)
+  }
+
+  const uncheckAll = () => {
+    const newItems = items.map(item => ({ ...item, checked: false }))
+    setItems(newItems)
+    saveItems(newItems)
+  }
+
   return (
     <div ref={containerRef} className="space-y-1">
       {/* Unchecked items */}
@@ -564,9 +576,29 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
       {/* Checked items */}
       {checkedItems.length > 0 && (
         <div className="pt-4 border-t border-gray-100 dark:border-gray-700 mt-4">
-          <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-            {checkedItems.length} completed
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              {checkedItems.length} completed
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={uncheckAll}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                title="Uncheck all"
+              >
+                <RotateCcw className="w-3 h-3" />
+                Uncheck
+              </button>
+              <button
+                onClick={removeCompleted}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                title="Remove completed"
+              >
+                <Trash2 className="w-3 h-3" />
+                Remove
+              </button>
+            </div>
+          </div>
           {checkedItems.map(item => {
             const isBeingDragged = draggedIds.includes(item.id)
 
