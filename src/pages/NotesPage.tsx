@@ -374,6 +374,8 @@ export function NotesPage() {
     showArchived,
     showTrash,
     selectedFolderId,
+    searchQuery,
+    selectedTagIds,
     getPaginatedNotes,
     getNotesInFolder,
     notes,
