@@ -6,18 +6,29 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 
 ### Note Management
 - **Multiple Note Types**: Plain text, checklists, and rich markdown with WYSIWYG editing and syntax-highlighted code blocks
+- **Dual Organization Systems**: Tags (list view) and folders (folder view) for flexible organization
 - **Tag Organization**: Create, edit, and reorder tags with custom colors (presets or color wheel)
 - **Smart Tag Filtering**: New notes automatically get the currently filtered tags applied
+- **Folder Organization**: Hierarchical folders with unlimited nesting, drag-drop notes into folders
 - **Image Support**: Attach images via button, drag & drop, or paste with automatic compression
 - **Pin & Archive**: Pin important notes and archive completed ones
 - **Trash Bin**: Deleted notes go to trash with 30-day retention before permanent deletion
-- **Quick Actions**: Archive, delete, or share notes directly from the note card menu
+- **Quick Actions**: Archive, delete, share, or move to folder directly from note menus
 - **Drag-to-Archive/Trash**: When dragging notes, drop zones appear to quickly archive or trash
 - **Auto-Cleanup**: Empty notes are automatically deleted when closed
-- **Search**: Full-text search with clear button to reset
+- **Search**: Full-text search works in both list and folder views
 - **Drag-to-Reorder**: Drag notes to reorder them (desktop: drag directly, mobile: tap reorder button first)
 - **Fullscreen Mode**: Expand notes to fullscreen on desktop for distraction-free editing
 - **Infinite Scroll**: Notes load progressively as you scroll for better performance
+
+### Folder View
+- **Tree-Based Browser**: File explorer-style navigation with folders and notes in a tree structure
+- **Split-Pane Layout**: Desktop shows tree on left, editor on right; mobile opens notes fullscreen
+- **Resizable Sidebar**: Drag to resize the folder tree panel width on desktop
+- **Hierarchical Folders**: Create nested folders with subfolders
+- **Drag-Drop Organization**: Drag notes onto folders to move them
+- **Context Menus**: Right-click (or hamburger menu) on folders/notes for quick actions
+- **Separate from Tags**: Folders and tags are independent - tags are hidden in folder view
 
 ### List Notes
 - **Touch-Friendly Reordering**: Drag items up/down to reorder on mobile and desktop
@@ -40,6 +51,7 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 - **Dark/Light Theme**: Toggle between dark, light, or system-based theme
 - **Themed Dialogs**: Custom confirmation dialogs that match the app theme
 - **Configurable Layout**: Choose 1, 2, or 3 notes per row in the grid view
+- **View Switcher**: Quick dropdown to switch between list/folder view and access archive/trash
 - **Keyboard Shortcuts**: Press ESC to close modals, click outside to dismiss
 - **Google Keep Import**: Import notes from Google Takeout export (supports both JSON and HTML formats)
 - **Authentication**: Email/password or Google SSO sign-in
@@ -117,11 +129,13 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 ```
 src/
 ├── components/          # React components
+│   ├── folders/        # Folder tree view, picker, badge, manager
 │   ├── images/         # Image gallery and viewer
 │   ├── import/         # Google Keep importer
-│   ├── notes/          # Note editors (text, list, markdown)
+│   ├── notes/          # Note editors (text, list, markdown, editor pane)
 │   ├── sharing/        # Share modal
-│   └── tags/           # Tag picker, filter, and manager
+│   ├── tags/           # Tag picker, filter, and manager
+│   └── ui/             # Reusable UI (dropdown menu, confirm dialog, view switcher)
 ├── hooks/              # Custom React hooks
 ├── pages/              # Page components
 ├── services/           # API and business logic
@@ -133,9 +147,10 @@ src/
 │   └── sync.ts         # Offline sync logic
 ├── stores/             # Zustand state stores
 │   ├── authStore.ts    # Authentication state
+│   ├── folderStore.ts  # Folders state
 │   ├── imageStore.ts   # Image state
 │   ├── noteStore.ts    # Notes state
-│   ├── preferencesStore.ts # User preferences (theme, layout)
+│   ├── preferencesStore.ts # User preferences (theme, layout, view mode)
 │   ├── shareStore.ts   # Sharing state
 │   ├── syncStore.ts    # Sync state
 │   └── tagStore.ts     # Tags state
@@ -167,7 +182,8 @@ The importer will:
 The app uses the following Supabase tables:
 
 - `profiles` - User profiles
-- `notes` - Notes with content, type, metadata, and sort order
+- `notes` - Notes with content, type, metadata, sort order, and folder_id
+- `folders` - Hierarchical folders with parent_folder_id for nesting
 - `tags` - User-created tags
 - `note_tags` - Many-to-many relationship between notes and tags
 - `note_images` - Image attachments for notes

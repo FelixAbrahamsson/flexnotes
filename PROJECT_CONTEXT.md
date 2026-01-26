@@ -4,13 +4,14 @@ This document provides context for AI agents working on the Felix Notes codebase
 
 ## Overview
 
-Felix Notes is a note-taking application built as a Google Keep alternative. It's a local-first Progressive Web App (PWA) that syncs to Supabase when online. The app supports multiple note types, tagging, image attachments, sharing, and works offline.
+Felix Notes is a note-taking application built as a Google Keep alternative. It's a local-first Progressive Web App (PWA) that syncs to Supabase when online. The app supports multiple note types, dual organization (tags and folders), image attachments, sharing, and works offline.
 
 **Key characteristics:**
 - Local-first: All data operations happen on IndexedDB first, then sync to server
 - Offline-capable: Full functionality without internet connection
 - Real-time sync: Uses Supabase Realtime for cross-device updates
 - Cross-platform: Web, iOS, and Android via Capacitor
+- Dual organization: Tags (list view) and folders (folder view) as separate systems
 
 ## Tech Stack
 
@@ -91,13 +92,14 @@ export const useExampleStore = create<ExampleState>((set, get) => ({
 ```
 src/
 ├── components/           # React components
+│   ├── folders/         # FolderTreeView, FolderPicker, FolderBadge, FolderManager
 │   ├── images/          # ImageGallery, ImageViewer
 │   ├── import/          # GoogleKeepImport
-│   ├── notes/           # NoteCard, NoteEditor, TextEditor, ListEditor, MarkdownEditor
+│   ├── notes/           # NoteCard, NoteEditor, NoteEditorPane, TextEditor, ListEditor, MarkdownEditor
 │   ├── sharing/         # ShareModal
 │   ├── tags/            # TagBadge, TagFilter, TagPicker, TagManager
-│   ├── ui/              # Reusable UI components (ConfirmDialog, DropdownMenu)
-│   ├── SettingsModal.tsx  # Theme, layout, tags, import, password, logout
+│   ├── ui/              # Reusable UI (ConfirmDialog, DropdownMenu, ViewSwitcher)
+│   ├── SettingsModal.tsx  # Theme, layout, tags, folders, import, password, logout
 │   └── SyncStatus.tsx
 │
 ├── hooks/               # Custom React hooks
@@ -107,11 +109,11 @@ src/
 │
 ├── pages/               # Page-level components
 │   ├── AuthPage.tsx     # Login/signup
-│   ├── NotesPage.tsx    # Main notes view with drag-and-drop reordering
+│   ├── NotesPage.tsx    # Main notes view with list/folder modes
 │   └── SharedNotePage.tsx # Public shared note view
 │
 ├── services/            # Business logic (no React)
-│   ├── db.ts            # Dexie.js setup, LocalNote/LocalTag types
+│   ├── db.ts            # Dexie.js setup, LocalNote/LocalTag/LocalFolder types
 │   ├── googleKeepImport.ts # Google Keep ZIP parser
 │   ├── imageProcessor.ts # Image compression/WebP conversion
 │   ├── share.ts         # Share link generation
@@ -120,15 +122,16 @@ src/
 │
 ├── stores/              # Zustand state stores
 │   ├── authStore.ts     # User authentication (email/password, Google SSO)
+│   ├── folderStore.ts   # Folders CRUD, hierarchy navigation
 │   ├── imageStore.ts    # Note images state
-│   ├── noteStore.ts     # Notes CRUD, trash, filters
-│   ├── preferencesStore.ts # Theme, layout preferences
+│   ├── noteStore.ts     # Notes CRUD, trash, filters, folder assignment
+│   ├── preferencesStore.ts # Theme, layout, view mode preferences
 │   ├── shareStore.ts    # Share links state
 │   ├── syncStore.ts     # Sync status, online/offline, visibility-based sync
 │   └── tagStore.ts      # Tags CRUD, reordering, note-tag relationships
 │
 ├── types/               # TypeScript type definitions
-│   └── index.ts         # Note, Tag, NoteTag, etc.
+│   └── index.ts         # Note, Tag, NoteTag, Folder, etc.
 │
 ├── App.tsx              # Router setup
 ├── main.tsx             # Entry point
@@ -166,12 +169,24 @@ Main note operations:
 - Filters: archived, trash, search, tags
 - `deleteNoteIfEmpty()` - Auto-cleanup empty notes
 - `reorderNotes()` - Drag-and-drop reordering with sort_order persistence
+- `moveNoteToFolder()` - Move note to a folder or root
+- `getNotesInFolder()` - Get notes in a specific folder (or root)
 - Pagination: `getPaginatedNotes()`, `loadMoreNotes()`, `hasMoreNotes()`
+
+### `src/stores/folderStore.ts`
+Folder management:
+- CRUD operations for folders with optimistic updates
+- Hierarchical support via `parent_folder_id`
+- `selectedFolderId` - Currently viewed folder in folder view
+- `getChildFolders()` - Get subfolders of a folder
+- `getFolderPath()` - Get breadcrumb path to a folder
+- Syncs to Supabase with realtime updates
 
 ### `src/stores/preferencesStore.ts`
 User preferences with persistence:
 - Theme: 'light' | 'dark' | 'system'
 - Layout: notes per row (1, 2, or 3)
+- View mode: 'list' | 'folder'
 - Persisted to localStorage
 - `applyTheme()` updates document class
 
@@ -216,6 +231,30 @@ Tag management in settings:
 - Custom color picker with presets and color wheel
 - `getTagColor()` generates consistent color from tag name when no color set
 
+### `src/components/folders/FolderTreeView.tsx`
+Tree-based file browser for folder view:
+- Hierarchical display of folders and notes
+- Expandable/collapsible folders
+- Drag-drop notes onto folders to move them
+- Context menus for folders (new note, new subfolder, delete)
+- Context menus for notes (share, move, archive, delete)
+- Search filtering across all notes
+- Selected note highlighting
+
+### `src/components/notes/NoteEditorPane.tsx`
+Inline note editor for split-pane layout (desktop folder view):
+- Similar to NoteEditor but without modal wrapper
+- Displays empty state when no note selected
+- `hideTags` prop to hide tag management in folder view
+- Auto-save with debouncing
+
+### `src/components/ui/ViewSwitcher.tsx`
+Dropdown menu for view switching:
+- Switch between list view and folder view
+- Access archive and trash views
+- Trash count badge shown in dropdown
+- Uses portal-based DropdownMenu for proper positioning
+
 ## Database Schema
 
 ### Local (IndexedDB via Dexie)
@@ -228,10 +267,17 @@ interface LocalNote extends Note {
   _serverUpdatedAt?: string
 }
 
+// Folders with sync metadata
+interface LocalFolder extends Folder {
+  _syncStatus: 'synced' | 'pending' | 'conflict'
+  _localUpdatedAt: string
+  _serverUpdatedAt?: string
+}
+
 // Sync queue
 interface PendingChange {
   id: string
-  entityType: 'note' | 'tag' | 'noteTag'
+  entityType: 'note' | 'tag' | 'noteTag' | 'folder'
   entityId: string
   operation: 'create' | 'update' | 'delete'
   data?: Record<string, unknown>
@@ -244,7 +290,8 @@ interface PendingChange {
 
 ```sql
 -- Main tables
-notes (id, owner_id, title, content, note_type, is_pinned, is_archived, sort_order, version, created_at, updated_at)
+notes (id, owner_id, title, content, note_type, is_pinned, is_archived, folder_id, sort_order, version, created_at, updated_at)
+folders (id, owner_id, name, color, parent_folder_id, sort_order, created_at, updated_at)
 tags (id, owner_id, name, color, sort_order, created_at)
 note_tags (note_id, tag_id)
 note_images (id, note_id, storage_path, filename, size, width, height, created_at)
@@ -401,3 +448,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 14. **Confirmation dialogs**: Use `useConfirm()` hook instead of `window.confirm()`. Must be used within `ConfirmProvider`.
 15. **Multi-line list items**: ListEditor uses `<textarea>` instead of `<input>` to support newlines. Enter creates new item, Shift+Enter adds newline (desktop), newline button for mobile.
 16. **Hierarchical checkbox**: When checking a parent list item, use `toggleChecked()` which calls `getItemWithChildren()` to find and check all descendants.
+17. **Folder view vs List view**: Tags and folders are separate organization systems. Tags are hidden in folder view, folders are hidden in list view. View mode is persisted in preferences.
+18. **Folder deletion**: When a folder is deleted, its notes are moved to the parent folder (or root if no parent). Subfolders are also moved to the parent.
+19. **Split-pane layout**: Folder view uses split-pane on desktop (tree left, editor right) but opens notes in modal on mobile. Width is resizable via drag.
+20. **DropdownMenu positioning**: Uses React Portal to render at document body level, avoiding overflow issues in scrollable containers. Auto-detects space above/below to position optimally.
