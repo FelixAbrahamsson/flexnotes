@@ -49,11 +49,17 @@ export function getContentPreview(
     try {
       const parsed = JSON.parse(content)
       if (parsed.items && Array.isArray(parsed.items)) {
-        return parsed.items
+        // Only show unchecked items in preview
+        const uncheckedItems = parsed.items.filter(
+          (item: { checked: boolean }) => !item.checked
+        )
+        if (uncheckedItems.length === 0) {
+          // If all items are checked, show a summary
+          return `All ${parsed.items.length} items completed`
+        }
+        return uncheckedItems
           .slice(0, 3)
-          .map((item: { text: string; checked: boolean }) =>
-            `${item.checked ? '✓' : '○'} ${item.text}`
-          )
+          .map((item: { text: string }) => `○ ${item.text}`)
           .join('\n')
       }
     } catch {
@@ -61,7 +67,43 @@ export function getContentPreview(
     }
   }
 
-  // For text and markdown, strip HTML tags but preserve newlines
+  if (noteType === 'markdown') {
+    // Better markdown preview - convert HTML to readable text
+    let text = content
+      // Convert headings to text with markers
+      .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n')
+      .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n')
+      .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n')
+      // Convert list items to bullet points
+      .replace(/<li[^>]*>(.*?)<\/li>/gi, '• $1\n')
+      // Convert task list items
+      .replace(/<li[^>]*data-checked="true"[^>]*>.*?<\/li>/gi, '✓ ')
+      .replace(/<li[^>]*data-checked="false"[^>]*>.*?<\/li>/gi, '○ ')
+      // Convert code blocks to show as code
+      .replace(/<pre[^>]*><code[^>]*>(.*?)<\/code><\/pre>/gis, '```\n$1\n```\n')
+      .replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`')
+      // Convert blockquotes
+      .replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gis, '> $1\n')
+      // Convert breaks and paragraphs to newlines
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<\/div>/gi, '\n')
+      // Remove remaining HTML tags
+      .replace(/<[^>]*>/g, '')
+      // Decode HTML entities
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      // Clean up excessive whitespace
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+
+    return text.slice(0, maxLength)
+  }
+
+  // For text notes, strip HTML tags but preserve newlines
   const text = content
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n')
