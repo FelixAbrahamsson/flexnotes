@@ -424,7 +424,6 @@ export function NoteEditor({ noteId: _noteId, onClose, hideTags = false }: NoteE
               content={content}
               onChange={setContent}
               placeholder="Start typing... Use the toolbar for formatting."
-              onImageUpload={handleImageButtonClick}
               onImageDrop={handleImageUpload}
             />
           ) : (

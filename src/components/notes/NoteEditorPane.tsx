@@ -387,7 +387,6 @@ export function NoteEditorPane({ noteId, onMoveToFolder, hideTags = false }: Not
             content={content}
             onChange={setContent}
             placeholder="Start typing... Use the toolbar for formatting."
-            onImageUpload={handleImageButtonClick}
             onImageDrop={handleImageUpload}
           />
         ) : (

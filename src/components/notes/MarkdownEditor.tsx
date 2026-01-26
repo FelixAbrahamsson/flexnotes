@@ -12,25 +12,11 @@ import { common, createLowlight } from 'lowlight'
 // Create lowlight instance with common languages (js, ts, python, css, html, json, bash, etc.)
 const lowlight = createLowlight(common)
 
-import {
-  Bold,
-  Italic,
-  Strikethrough,
-  Code,
-  List,
-  ListOrdered,
-  CheckSquare,
-  Quote,
-  Heading1,
-  Heading2,
-  Minus,
-  ImagePlus,
-} from 'lucide-react'
+import { ImagePlus } from 'lucide-react'
 
 interface MarkdownEditorProps {
   content: string
   onChange: (content: string) => void
-  onImageUpload?: () => void
   onImageDrop?: (files: FileList) => void
   placeholder?: string
 }
@@ -40,7 +26,7 @@ export interface MarkdownEditorHandle {
 }
 
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
-  function MarkdownEditor({ content, onChange, onImageUpload, onImageDrop, placeholder }, ref) {
+  function MarkdownEditor({ content, onChange, onImageDrop, placeholder }, ref) {
   const [isDragging, setIsDragging] = useState(false)
   const onImageDropRef = useRef(onImageDrop)
 
@@ -204,19 +190,15 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
 
   return (
     <div
-      className={`relative border rounded-lg overflow-hidden transition-colors ${
-        isDragging
-          ? 'border-primary-500'
-          : 'border-gray-200 dark:border-gray-700'
-      }`}
+      className="relative"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
-      {/* Drop overlay - appears when dragging and intercepts the drop */}
+      {/* Drop overlay - appears when dragging */}
       {isDragging && (
         <div
-          className="absolute inset-0 z-10 bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center"
+          className="absolute inset-0 z-10 bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center rounded-lg"
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDropOnOverlay}
         >
@@ -229,142 +211,8 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
         </div>
       )}
 
-      {/* Toolbar */}
-      <div className="flex items-center gap-1 p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex-wrap">
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          isActive={editor.isActive('heading', { level: 1 })}
-          title="Heading 1"
-        >
-          <Heading1 className="w-4 h-4" />
-        </ToolbarButton>
-
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          isActive={editor.isActive('heading', { level: 2 })}
-          title="Heading 2"
-        >
-          <Heading2 className="w-4 h-4" />
-        </ToolbarButton>
-
-        <ToolbarDivider />
-
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          isActive={editor.isActive('bold')}
-          title="Bold"
-        >
-          <Bold className="w-4 h-4" />
-        </ToolbarButton>
-
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          isActive={editor.isActive('italic')}
-          title="Italic"
-        >
-          <Italic className="w-4 h-4" />
-        </ToolbarButton>
-
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-          isActive={editor.isActive('strike')}
-          title="Strikethrough"
-        >
-          <Strikethrough className="w-4 h-4" />
-        </ToolbarButton>
-
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleCode().run()}
-          isActive={editor.isActive('code')}
-          title="Inline code"
-        >
-          <Code className="w-4 h-4" />
-        </ToolbarButton>
-
-        <ToolbarDivider />
-
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          isActive={editor.isActive('bulletList')}
-          title="Bullet list"
-        >
-          <List className="w-4 h-4" />
-        </ToolbarButton>
-
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          isActive={editor.isActive('orderedList')}
-          title="Numbered list"
-        >
-          <ListOrdered className="w-4 h-4" />
-        </ToolbarButton>
-
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleTaskList().run()}
-          isActive={editor.isActive('taskList')}
-          title="Task list"
-        >
-          <CheckSquare className="w-4 h-4" />
-        </ToolbarButton>
-
-        <ToolbarDivider />
-
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          isActive={editor.isActive('blockquote')}
-          title="Quote"
-        >
-          <Quote className="w-4 h-4" />
-        </ToolbarButton>
-
-        <ToolbarButton
-          onClick={() => editor.chain().focus().setHorizontalRule().run()}
-          title="Horizontal rule"
-        >
-          <Minus className="w-4 h-4" />
-        </ToolbarButton>
-
-        {onImageUpload && (
-          <>
-            <ToolbarDivider />
-            <ToolbarButton onClick={onImageUpload} title="Add image">
-              <ImagePlus className="w-4 h-4" />
-            </ToolbarButton>
-          </>
-        )}
-      </div>
-
-      {/* Editor */}
-      <div className="p-3 bg-white dark:bg-gray-900">
-        <EditorContent editor={editor} />
-      </div>
+      <EditorContent editor={editor} />
     </div>
   )
 })
-
-interface ToolbarButtonProps {
-  onClick: () => void
-  isActive?: boolean
-  title: string
-  children: React.ReactNode
-}
-
-function ToolbarButton({ onClick, isActive, title, children }: ToolbarButtonProps) {
-  return (
-    <button
-      onClick={onClick}
-      className={`p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors ${
-        isActive ? 'bg-gray-200 dark:bg-gray-700 text-primary-600 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400'
-      }`}
-      title={title}
-      type="button"
-    >
-      {children}
-    </button>
-  )
-}
-
-function ToolbarDivider() {
-  return <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1" />
-}
 
