@@ -150,14 +150,28 @@ export const useNoteStore = create<NoteState>((set, get) => ({
 
       if (error) throw error
 
+      // Get pending changes to check if a note has pending operations
+      const pendingChanges = await db.pendingChanges.where('entityType').equals('note').toArray()
+      const pendingNoteIds = new Set(pendingChanges.map(p => p.entityId))
+
       // Merge server data with local
       await db.transaction('rw', db.notes, async () => {
         for (const serverNote of data || []) {
           const localNote = await db.notes.get(serverNote.id)
 
-          // Skip if local has pending changes
-          if (localNote && localNote._syncStatus === 'pending') {
+          // Skip if local has pending changes (check both _syncStatus AND pending queue)
+          if (localNote && (localNote._syncStatus === 'pending' || pendingNoteIds.has(serverNote.id))) {
             continue
+          }
+
+          // Skip if local version is newer than server version
+          if (localNote && localNote._localUpdatedAt && serverNote.updated_at) {
+            const localTime = new Date(localNote._localUpdatedAt).getTime()
+            const serverTime = new Date(serverNote.updated_at).getTime()
+            if (localTime > serverTime) {
+              console.log('Skipping server data - local is newer:', serverNote.id)
+              continue
+            }
           }
 
           const noteData: LocalNote = {
@@ -179,8 +193,14 @@ export const useNoteStore = create<NoteState>((set, get) => ({
         const serverIds = new Set((data || []).map(n => n.id))
 
         for (const localNote of localNotes) {
-          // Don't delete notes that are in local trash - they're intentionally not on server
-          if (!serverIds.has(localNote.id) && localNote._syncStatus === 'synced' && !localNote.is_deleted) {
+          // Don't delete notes that:
+          // - Are in local trash (intentionally not on server)
+          // - Have pending sync status
+          // - Have pending changes in the queue
+          if (!serverIds.has(localNote.id) &&
+              localNote._syncStatus === 'synced' &&
+              !localNote.is_deleted &&
+              !pendingNoteIds.has(localNote.id)) {
             await db.notes.delete(localNote.id)
           }
         }
@@ -203,8 +223,11 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       // Load from local first (instant)
       await get().loadFromLocal()
 
-      // Then sync from server (background)
-      await get().syncFromServer()
+      // Push any pending changes first, then pull from server
+      // This ensures our local changes are on the server before we pull
+      if (navigator.onLine) {
+        await useSyncStore.getState().sync()
+      }
     } catch (error) {
       set({ error: (error as Error).message })
     } finally {

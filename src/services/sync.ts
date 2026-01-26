@@ -343,15 +343,30 @@ export async function fullSync(userId: string): Promise<void> {
 
   if (foldersError) throw foldersError
 
+  // Get pending changes to check if a note has pending operations
+  const pendingChanges = await db.pendingChanges.where('entityType').equals('note').toArray()
+  const pendingNoteIds = new Set(pendingChanges.map(p => p.entityId))
+
   // Update local database
   await db.transaction('rw', [db.notes, db.tags, db.noteTags, db.folders], async () => {
     // Sync notes - merge with local changes
     for (const note of notes || []) {
       const localNote = await db.notes.get(note.id)
 
-      if (localNote && localNote._syncStatus === 'pending') {
-        // Local has pending changes - keep local version but mark for sync
+      // Skip if local has pending changes (check both _syncStatus AND pending queue)
+      if (localNote && (localNote._syncStatus === 'pending' || pendingNoteIds.has(note.id))) {
+        // Local has pending changes - keep local version
         continue
+      }
+
+      // Skip if local version is newer than server version
+      if (localNote && localNote._localUpdatedAt && note.updated_at) {
+        const localTime = new Date(localNote._localUpdatedAt).getTime()
+        const serverTime = new Date(note.updated_at).getTime()
+        if (localTime > serverTime) {
+          console.log('Full sync: Skipping server data - local is newer:', note.id)
+          continue
+        }
       }
 
       const localNoteData: LocalNote = {
@@ -464,16 +479,31 @@ export async function incrementalSync(userId: string): Promise<void> {
     .eq('owner_id', userId)
     .gte('updated_at', lastSync)
 
+  // Get pending changes to check if a note has pending operations
+  const pendingChanges = await db.pendingChanges.where('entityType').equals('note').toArray()
+  const pendingNoteIds = new Set(pendingChanges.map(p => p.entityId))
+
   // Update local notes
   for (const note of notes || []) {
     const localNote = await db.notes.get(note.id)
 
-    if (localNote && localNote._syncStatus === 'pending') {
-      // Check for conflict
+    // Skip if local has pending changes (check both _syncStatus AND pending queue)
+    if (localNote && (localNote._syncStatus === 'pending' || pendingNoteIds.has(note.id))) {
+      // Check for conflict - server has changes that might conflict with ours
       if (new Date(note.updated_at) > new Date(localNote._localUpdatedAt)) {
         await db.notes.update(note.id, { _syncStatus: 'conflict' })
       }
       continue
+    }
+
+    // Skip if local version is newer than server version (protects against stale server data)
+    if (localNote && localNote._localUpdatedAt && note.updated_at) {
+      const localTime = new Date(localNote._localUpdatedAt).getTime()
+      const serverTime = new Date(note.updated_at).getTime()
+      if (localTime > serverTime) {
+        console.log('Incremental sync: Skipping server data - local is newer:', note.id)
+        continue
+      }
     }
 
     const localNoteData: LocalNote = {
