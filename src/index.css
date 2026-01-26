@@ -280,6 +280,10 @@
   .native-fab {
     bottom: calc(env(safe-area-inset-bottom) + 1.5rem);
   }
+
+  .native-drop-zones {
+    bottom: calc(env(safe-area-inset-bottom) + 1.5rem);
+  }
 }
 
 /* Prevent text selection on UI elements */

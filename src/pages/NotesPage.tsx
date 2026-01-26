@@ -273,6 +273,7 @@ export function NotesPage() {
     handlers: pullHandlers,
   } = usePullToRefresh({
     onRefresh: handleRefresh,
+    disabled: reorderMode,
   });
 
   // Track modal stack for back button handling
@@ -1012,7 +1013,7 @@ export function NotesPage() {
 
                 {/* Drop zones for archive/trash - shown when dragging */}
                 {draggingNoteId && !showTrash && (
-                  <div className="fixed bottom-6 left-0 right-0 flex justify-center gap-12 px-4 z-50 pointer-events-auto">
+                  <div className="fixed bottom-6 left-0 right-0 flex justify-center gap-12 px-4 z-50 pointer-events-auto native-drop-zones">
                     <ActionDropZone
                       id="drop-archive"
                       icon={<Archive className="w-6 h-6" />}

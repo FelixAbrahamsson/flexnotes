@@ -1,4 +1,4 @@
-import { type ReactNode, type MouseEvent, useRef, useEffect, useState } from 'react'
+import { type ReactNode, type MouseEvent, useRef, useLayoutEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 interface DropdownMenuProps {
@@ -24,10 +24,17 @@ interface DropdownMenuProps {
  */
 export function DropdownMenu({ open, onClose, children, className = '' }: DropdownMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
-  const [position, setPosition] = useState<{ top: number; left: number; openUp: boolean }>({ top: 0, left: 0, openUp: false })
+  const [position, setPosition] = useState<{ top: number; left: number; openUp: boolean; ready: boolean }>({ top: 0, left: 0, openUp: false, ready: false })
 
-  useEffect(() => {
-    if (!open || !menuRef.current) return
+  // Use useLayoutEffect to calculate position synchronously before paint
+  useLayoutEffect(() => {
+    if (!open) {
+      // Reset ready state when closing so next open recalculates
+      setPosition(prev => ({ ...prev, ready: false }))
+      return
+    }
+
+    if (!menuRef.current) return
 
     // Find the trigger button (parent element's button)
     const parent = menuRef.current.parentElement
@@ -49,6 +56,7 @@ export function DropdownMenu({ open, onClose, children, className = '' }: Dropdo
       top: openUp ? rect.top - 8 : rect.bottom + 4,
       left: rect.right - 140, // Menu width is min 140px, align to right edge
       openUp,
+      ready: true,
     })
   }, [open])
 
@@ -72,6 +80,7 @@ export function DropdownMenu({ open, onClose, children, className = '' }: Dropdo
               top: position.openUp ? 'auto' : position.top,
               bottom: position.openUp ? `${window.innerHeight - position.top}px` : 'auto',
               left: Math.max(8, position.left), // Ensure doesn't go off left edge
+              visibility: position.ready ? 'visible' : 'hidden',
             }}
           >
             {children}

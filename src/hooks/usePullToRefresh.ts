@@ -4,6 +4,7 @@ interface UsePullToRefreshOptions {
   onRefresh: () => Promise<void>
   threshold?: number // Distance to pull before triggering refresh (default: 80)
   maxPull?: number // Maximum pull distance (default: 120)
+  disabled?: boolean // Disable pull-to-refresh (e.g., when in reorder mode)
 }
 
 interface UsePullToRefreshReturn {
@@ -36,6 +37,7 @@ export function usePullToRefresh({
   onRefresh,
   threshold = 80,
   maxPull = 120,
+  disabled = false,
 }: UsePullToRefreshOptions): UsePullToRefreshReturn {
   const [pullDistance, setPullDistance] = useState(0)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -45,12 +47,15 @@ export function usePullToRefresh({
   const isPulling = useRef(false)
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
+    // Don't start if disabled (e.g., reorder mode)
+    if (disabled) return
+
     // Only start if we're at the top of the page
     if (window.scrollY > 0 || isRefreshing) return
 
     startY.current = e.touches[0].clientY
     isPulling.current = true
-  }, [isRefreshing])
+  }, [isRefreshing, disabled])
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
     if (!isPulling.current || isRefreshing) return
