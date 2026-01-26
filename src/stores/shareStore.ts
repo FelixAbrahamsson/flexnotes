@@ -91,6 +91,7 @@ export const useShareStore = create<ShareState>((set, get) => ({
     const { error } = await updateSharePermission(shareId, permission)
 
     if (error) {
+      console.error('Failed to update share permission:', error)
       // Revert on error
       set({ shares: previousShares, error: error.message })
     }

@@ -80,6 +80,10 @@ export async function updateSharePermission(
     .update({ permission })
     .eq('id', shareId)
 
+  if (error) {
+    console.error('Share permission update failed:', error)
+  }
+
   return { error: error as Error | null }
 }
 
