@@ -19,7 +19,6 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
-  useDroppable,
   type DragEndEvent,
   type DragStartEvent,
   type CollisionDetection,
@@ -27,21 +26,21 @@ import {
 import {
   SortableContext,
   sortableKeyboardCoordinates,
-  useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { hapticLight } from "@/hooks/useCapacitor";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { useResizableSidebar } from "@/hooks/useResizableSidebar";
 import { useNoteStore } from "@/stores/noteStore";
 import { useTagStore } from "@/stores/tagStore";
 import { useSyncStore } from "@/stores/syncStore";
 import { usePreferencesStore } from "@/stores/preferencesStore";
 import { useFolderStore } from "@/stores/folderStore";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { NoteCard } from "@/components/notes/NoteCard";
 import { NoteEditor } from "@/components/notes/NoteEditor";
 import { NoteEditorPane } from "@/components/notes/NoteEditorPane";
+import { SortableNoteCard } from "@/components/notes/SortableNoteCard";
+import { ActionDropZone } from "@/components/notes/ActionDropZone";
 import { TagFilter } from "@/components/tags/TagFilter";
 import { SyncStatus } from "@/components/SyncStatus";
 import { SettingsModal } from "@/components/SettingsModal";
@@ -50,117 +49,6 @@ import { ViewSwitcher } from "@/components/ui/ViewSwitcher";
 import { FolderTreeView } from "@/components/folders/FolderTreeView";
 import { FolderPicker } from "@/components/folders/FolderPicker";
 import { FolderManager } from "@/components/folders/FolderManager";
-import type { Note, Tag, Folder } from "@/types";
-
-// Sortable wrapper for NoteCard
-interface SortableNoteCardProps {
-  note: Note;
-  tags: Tag[];
-  folder?: Folder | null;
-  onClick: () => void;
-  onPin?: () => void;
-  onArchive?: () => void;
-  onDelete: () => void;
-  onRestore?: () => void;
-  onShare?: () => void;
-  onMoveToFolder?: () => void;
-  showRestore?: boolean;
-  showFolder?: boolean;
-  isDragDisabled?: boolean;
-  reorderMode?: boolean;
-}
-
-function SortableNoteCard({
-  note,
-  tags,
-  folder,
-  onClick,
-  onPin,
-  onArchive,
-  onDelete,
-  onRestore,
-  onShare,
-  onMoveToFolder,
-  showRestore,
-  showFolder,
-  isDragDisabled,
-  reorderMode,
-}: SortableNoteCardProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: note.id, disabled: isDragDisabled });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 1000 : "auto",
-    // Only disable touch scrolling when in reorder mode (mobile) or when dragging
-    touchAction: reorderMode && !isDragDisabled ? "none" : "auto",
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={isDragDisabled ? "" : "cursor-grab active:cursor-grabbing"}
-      {...attributes}
-      {...listeners}
-    >
-      <NoteCard
-        note={note}
-        tags={tags}
-        folder={folder}
-        onClick={onClick}
-        onPin={onPin}
-        onArchive={onArchive}
-        onDelete={onDelete}
-        onRestore={onRestore}
-        onShare={onShare}
-        onMoveToFolder={onMoveToFolder}
-        showRestore={showRestore}
-        showFolder={showFolder}
-      />
-    </div>
-  );
-}
-
-// Drop zone for archive/trash actions during drag
-interface ActionDropZoneProps {
-  id: string;
-  icon: React.ReactNode;
-  label: string;
-  variant: "archive" | "trash";
-}
-
-function ActionDropZone({ id, icon, label, variant }: ActionDropZoneProps) {
-  const { isOver, setNodeRef } = useDroppable({ id });
-
-  const baseClasses =
-    "flex flex-col items-center justify-center gap-2 py-4 px-6 rounded-xl transition-all duration-200";
-  const variantClasses =
-    variant === "trash"
-      ? isOver
-        ? "bg-red-500 text-white scale-110"
-        : "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
-      : isOver
-        ? "bg-amber-500 text-white scale-110"
-        : "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400";
-
-  return (
-    <div ref={setNodeRef} className={`${baseClasses} ${variantClasses}`}>
-      <div className={`transition-transform ${isOver ? "scale-125" : ""}`}>
-        {icon}
-      </div>
-      <span className="text-sm font-medium">{label}</span>
-    </div>
-  );
-}
 
 // Custom collision detection: requires pointer to be directly over action drop zones,
 // but uses closestCenter for sortable items (notes reordering)
@@ -252,50 +140,12 @@ export function NotesPage() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Resizable sidebar state
-  const [sidebarWidth, setSidebarWidth] = useState(320); // Default 320px (w-80)
-  const isResizing = useRef(false);
-  const startX = useRef(0);
-  const startWidth = useRef(0);
-
-  const handleResizeStart = useCallback(
-    (e: React.MouseEvent | React.TouchEvent) => {
-      isResizing.current = true;
-      startX.current = "touches" in e ? e.touches[0].clientX : e.clientX;
-      startWidth.current = sidebarWidth;
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-    },
-    [sidebarWidth],
-  );
-
-  useEffect(() => {
-    const handleResizeMove = (e: MouseEvent | TouchEvent) => {
-      if (!isResizing.current) return;
-      const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
-      const delta = clientX - startX.current;
-      const newWidth = Math.min(Math.max(startWidth.current + delta, 200), 600); // Min 200px, max 600px
-      setSidebarWidth(newWidth);
-    };
-
-    const handleResizeEnd = () => {
-      isResizing.current = false;
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-
-    document.addEventListener("mousemove", handleResizeMove);
-    document.addEventListener("mouseup", handleResizeEnd);
-    document.addEventListener("touchmove", handleResizeMove);
-    document.addEventListener("touchend", handleResizeEnd);
-
-    return () => {
-      document.removeEventListener("mousemove", handleResizeMove);
-      document.removeEventListener("mouseup", handleResizeEnd);
-      document.removeEventListener("touchmove", handleResizeMove);
-      document.removeEventListener("touchend", handleResizeEnd);
-    };
-  }, []);
+  // Resizable sidebar
+  const { width: sidebarWidth, handleResizeStart } = useResizableSidebar({
+    defaultWidth: 320,
+    minWidth: 200,
+    maxWidth: 600,
+  });
 
   // Pull-to-refresh
   const handleRefresh = useCallback(async () => {

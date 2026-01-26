@@ -104,9 +104,6 @@ function stripSyncMetadataFields(noteData: Record<string, unknown>): Record<stri
   return cleanData
 }
 
-// Alias for backwards compatibility
-const stripLocalOnlyFields = stripSyncMetadataFields
-
 async function processNoteChange(change: PendingChange, userId: string): Promise<void> {
   const { entityId, operation } = change
 
@@ -528,7 +525,7 @@ export async function resolveConflict(
     if (!localNote) return
 
     const { _syncStatus, _localUpdatedAt, _serverUpdatedAt, ...noteData } = localNote
-    const cleanData = stripLocalOnlyFields(noteData)
+    const cleanData = stripSyncMetadataFields(noteData)
 
     const { error } = await supabase
       .from('notes')

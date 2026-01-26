@@ -21,6 +21,7 @@ import { useFolderStore } from '@/stores/folderStore'
 import { useNoteStore } from '@/stores/noteStore'
 import { DropdownMenu, DropdownMenuItem } from '@/components/ui/DropdownMenu'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { getContentPreview } from '@/utils/formatters'
 import type { Folder, Note } from '@/types'
 import { getFolderColor } from './FolderBadge'
 
@@ -76,21 +77,7 @@ function NoteTreeItem({
 
   const title = note.title || 'Untitled note'
   const preview = useMemo(() => {
-    if (note.note_type === 'list') {
-      try {
-        const parsed = JSON.parse(note.content)
-        if (parsed.items && parsed.items.length > 0) {
-          return parsed.items.slice(0, 2).map((i: { text: string }) => i.text).join(', ')
-        }
-      } catch {
-        return ''
-      }
-    }
-    // Strip HTML for preview
-    return note.content
-      .replace(/<[^>]*>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .slice(0, 50)
+    return getContentPreview(note.content, note.note_type, 50)
   }, [note.content, note.note_type])
 
   const handleContextMenu = (e: React.MouseEvent) => {

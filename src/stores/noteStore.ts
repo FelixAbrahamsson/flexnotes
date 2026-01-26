@@ -3,6 +3,7 @@ import type { Note, NewNote, NoteType } from '@/types'
 import { supabase } from '@/services/supabase'
 import { db, generateLocalId, getCurrentTimestamp, type LocalNote } from '@/services/db'
 import { queueChange } from '@/services/sync'
+import { stripHtml } from '@/utils/formatters'
 import { useAuthStore } from './authStore'
 import { useTagStore } from './tagStore'
 import { useSyncStore, triggerSyncIfOnline } from './syncStore'
@@ -86,12 +87,8 @@ function isNoteEmpty(note: Note): boolean {
     }
   }
 
-  // For text and markdown, strip HTML and check
-  const textContent = note.content
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .trim()
-
+  // For text and markdown, use shared stripHtml utility
+  const textContent = stripHtml(note.content)
   return textContent.length === 0
 }
 
