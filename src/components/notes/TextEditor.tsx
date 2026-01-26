@@ -14,6 +14,21 @@ interface TextEditorProps {
   placeholder?: string
 }
 
+// Custom serializer to convert paragraphs to single newlines when copying
+function serializeTextContent(doc: { content: { forEach: (fn: (node: { type: { name: string }, textContent: string }) => void) => void } }): string {
+  const lines: string[] = []
+  doc.content.forEach((node) => {
+    if (node.type.name === 'paragraph') {
+      lines.push(node.textContent)
+    } else if (node.type.name === 'hardBreak') {
+      // Hard breaks within a paragraph - handled by textContent
+    } else {
+      lines.push(node.textContent)
+    }
+  })
+  return lines.join('\n')
+}
+
 export function TextEditor({ content, onChange, placeholder }: TextEditorProps) {
   const editor = useEditor({
     extensions: [
@@ -44,6 +59,10 @@ export function TextEditor({ content, onChange, placeholder }: TextEditorProps) 
     editorProps: {
       attributes: {
         class: 'tiptap focus:outline-none min-h-[100px] text-gray-900 dark:text-gray-100',
+      },
+      // Custom clipboard text serializer to prevent double newlines
+      clipboardTextSerializer: (slice) => {
+        return serializeTextContent(slice.content as unknown as Parameters<typeof serializeTextContent>[0])
       },
     },
   })
