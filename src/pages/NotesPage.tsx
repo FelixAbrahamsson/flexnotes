@@ -219,7 +219,15 @@ export function NotesPage() {
   const { tags, fetchTags, fetchNoteTags, getTagsForNote, addTagToNote } =
     useTagStore();
   const { subscribeToChanges, refreshPendingCount, sync } = useSyncStore();
-  const { notesPerRow, viewMode, setViewMode } = usePreferencesStore();
+  const {
+    notesPerRow,
+    viewMode,
+    setViewMode,
+    lastOpenedNoteId,
+    lastFolderViewNoteId,
+    setLastOpenedNoteId,
+    setLastFolderViewNoteId,
+  } = usePreferencesStore();
   const { selectedFolderId, fetchFolders, getFolderById } = useFolderStore();
   const confirm = useConfirm();
 
@@ -332,6 +340,7 @@ export function NotesPage() {
           deleteNoteIfEmpty(activeNoteId);
         }
         setActiveNote(null);
+        setLastOpenedNoteId(null);
       } else if (topModal === "settings") {
         setShowSettings(false);
       }
@@ -339,7 +348,10 @@ export function NotesPage() {
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [activeNoteId, deleteNoteIfEmpty, setActiveNote]);
+  }, [activeNoteId, deleteNoteIfEmpty, setActiveNote, setLastOpenedNoteId]);
+
+  // Track if we've restored the last opened note
+  const hasRestoredRef = useRef(false);
 
   // Initialize data and subscriptions
   useEffect(() => {
@@ -363,6 +375,37 @@ export function NotesPage() {
     subscribeToChanges,
     refreshPendingCount,
   ]);
+
+  // Restore the last opened note after data loads
+  useEffect(() => {
+    if (hasRestoredRef.current || loading || notes.length === 0) return;
+    hasRestoredRef.current = true;
+
+    // Restore folder view pane selection (desktop only)
+    if (lastFolderViewNoteId && viewMode === "folder" && !isMobile) {
+      const noteExists = notes.some((n) => n.id === lastFolderViewNoteId && !n.is_deleted);
+      if (noteExists) {
+        setFolderViewSelectedNoteId(lastFolderViewNoteId);
+      }
+    }
+
+    // Restore modal note
+    if (lastOpenedNoteId) {
+      const noteExists = notes.some((n) => n.id === lastOpenedNoteId && !n.is_deleted);
+      if (noteExists) {
+        setActiveNote(lastOpenedNoteId);
+        openModal("note");
+      }
+    }
+  }, [loading, notes, lastOpenedNoteId, lastFolderViewNoteId, viewMode, isMobile, setActiveNote, openModal]);
+
+  // Save folder view selection changes
+  useEffect(() => {
+    // Only save after initial restore is complete
+    if (hasRestoredRef.current) {
+      setLastFolderViewNoteId(folderViewSelectedNoteId);
+    }
+  }, [folderViewSelectedNoteId, setLastFolderViewNoteId]);
 
   // Get displayed notes based on view mode
   const displayedNotes = useMemo(() => {
@@ -500,6 +543,7 @@ export function NotesPage() {
           await addTagToNote(note.id, tagId);
         }
       }
+      setLastOpenedNoteId(note.id);
       openModal("note");
     }
   }, [
@@ -509,6 +553,7 @@ export function NotesPage() {
     addTagToNote,
     viewMode,
     selectedFolderId,
+    setLastOpenedNoteId,
   ]);
 
   const handleCloseEditor = useCallback(async () => {
@@ -517,8 +562,9 @@ export function NotesPage() {
       await deleteNoteIfEmpty(activeNoteId);
     }
     setActiveNote(null);
+    setLastOpenedNoteId(null);
     closeModalNormally("note");
-  }, [activeNoteId, deleteNoteIfEmpty, setActiveNote, closeModalNormally]);
+  }, [activeNoteId, deleteNoteIfEmpty, setActiveNote, setLastOpenedNoteId, closeModalNormally]);
 
   const handleArchive = useCallback(
     (noteId: string, isArchived: boolean) => {
@@ -584,9 +630,10 @@ export function NotesPage() {
   const handleOpenNote = useCallback(
     (noteId: string) => {
       setActiveNote(noteId);
+      setLastOpenedNoteId(noteId);
       openModal("note");
     },
-    [setActiveNote, openModal],
+    [setActiveNote, setLastOpenedNoteId, openModal],
   );
 
   const handleOpenSettings = useCallback(() => {
@@ -780,6 +827,7 @@ export function NotesPage() {
                   if (isMobile) {
                     // On mobile, open in modal
                     setActiveNote(noteId);
+                    setLastOpenedNoteId(noteId);
                     openModal("note");
                   } else {
                     // On desktop, show in pane
@@ -791,6 +839,7 @@ export function NotesPage() {
                   const note = await createNote({ folder_id: folderId });
                   if (note) {
                     if (isMobile) {
+                      setLastOpenedNoteId(note.id);
                       openModal("note");
                     } else {
                       setFolderViewSelectedNoteId(note.id);

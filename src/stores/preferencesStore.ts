@@ -9,10 +9,14 @@ interface PreferencesState {
   theme: Theme
   notesPerRow: NotesPerRow
   viewMode: ViewMode
+  lastOpenedNoteId: string | null // Note open in modal
+  lastFolderViewNoteId: string | null // Note selected in folder view pane
 
   setTheme: (theme: Theme) => void
   setNotesPerRow: (count: NotesPerRow) => void
   setViewMode: (mode: ViewMode) => void
+  setLastOpenedNoteId: (noteId: string | null) => void
+  setLastFolderViewNoteId: (noteId: string | null) => void
   getEffectiveTheme: () => 'light' | 'dark'
 }
 
@@ -22,6 +26,8 @@ export const usePreferencesStore = create<PreferencesState>()(
       theme: 'system',
       notesPerRow: 2,
       viewMode: 'list',
+      lastOpenedNoteId: null,
+      lastFolderViewNoteId: null,
 
       setTheme: (theme: Theme) => {
         set({ theme })
@@ -34,6 +40,14 @@ export const usePreferencesStore = create<PreferencesState>()(
 
       setViewMode: (viewMode: ViewMode) => {
         set({ viewMode })
+      },
+
+      setLastOpenedNoteId: (lastOpenedNoteId: string | null) => {
+        set({ lastOpenedNoteId })
+      },
+
+      setLastFolderViewNoteId: (lastFolderViewNoteId: string | null) => {
+        set({ lastFolderViewNoteId })
       },
 
       getEffectiveTheme: () => {
