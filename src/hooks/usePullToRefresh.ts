@@ -10,11 +10,7 @@ interface UsePullToRefreshOptions {
 interface UsePullToRefreshReturn {
   pullDistance: number
   isRefreshing: boolean
-  handlers: {
-    onTouchStart: (e: React.TouchEvent) => void
-    onTouchMove: (e: React.TouchEvent) => void
-    onTouchEnd: () => void
-  }
+  containerRef: React.RefObject<HTMLDivElement | null>
 }
 
 /**
@@ -22,12 +18,12 @@ interface UsePullToRefreshReturn {
  * Only triggers when user is at the top of the scroll container.
  *
  * @example
- * const { pullDistance, isRefreshing, handlers } = usePullToRefresh({
+ * const { pullDistance, isRefreshing, containerRef } = usePullToRefresh({
  *   onRefresh: async () => { await fetchData() }
  * })
  *
  * return (
- *   <div {...handlers}>
+ *   <div ref={containerRef}>
  *     <PullIndicator distance={pullDistance} refreshing={isRefreshing} />
  *     <Content />
  *   </div>
@@ -42,60 +38,91 @@ export function usePullToRefresh({
   const [pullDistance, setPullDistance] = useState(0)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
+  const containerRef = useRef<HTMLDivElement | null>(null)
   const startY = useRef(0)
-  const currentY = useRef(0)
   const isPulling = useRef(false)
+  const isRefreshingRef = useRef(false)
+  const pullDistanceRef = useRef(0)
 
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    // Don't start if disabled (e.g., reorder mode)
-    if (disabled) return
+  // Keep refs in sync with state for use in event handlers
+  useEffect(() => {
+    isRefreshingRef.current = isRefreshing
+  }, [isRefreshing])
 
-    // Only start if we're at the top of the page
-    if (window.scrollY > 0 || isRefreshing) return
+  useEffect(() => {
+    pullDistanceRef.current = pullDistance
+  }, [pullDistance])
 
-    startY.current = e.touches[0].clientY
-    isPulling.current = true
-  }, [isRefreshing, disabled])
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true)
+    setPullDistance(threshold) // Hold at threshold during refresh
 
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isPulling.current || isRefreshing) return
-
-    currentY.current = e.touches[0].clientY
-    const diff = currentY.current - startY.current
-
-    // Only pull down, not up
-    if (diff > 0 && window.scrollY === 0) {
-      // Apply resistance - pulling gets harder as you go
-      const resistance = 0.5
-      const adjustedDiff = Math.min(diff * resistance, maxPull)
-      setPullDistance(adjustedDiff)
-
-      // Prevent default scroll when pulling
-      if (adjustedDiff > 10) {
-        e.preventDefault()
-      }
-    }
-  }, [isRefreshing, maxPull])
-
-  const onTouchEnd = useCallback(async () => {
-    if (!isPulling.current) return
-
-    isPulling.current = false
-
-    if (pullDistance >= threshold && !isRefreshing) {
-      setIsRefreshing(true)
-      setPullDistance(threshold) // Hold at threshold during refresh
-
-      try {
-        await onRefresh()
-      } finally {
-        setIsRefreshing(false)
-        setPullDistance(0)
-      }
-    } else {
+    try {
+      await onRefresh()
+    } finally {
+      setIsRefreshing(false)
       setPullDistance(0)
     }
-  }, [pullDistance, threshold, isRefreshing, onRefresh])
+  }, [onRefresh, threshold])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const onTouchStart = (e: TouchEvent) => {
+      // Don't start if disabled (e.g., reorder mode)
+      if (disabled) return
+
+      // Only start if we're at the top of the page
+      if (window.scrollY > 0 || isRefreshingRef.current) return
+
+      startY.current = e.touches[0].clientY
+      isPulling.current = true
+    }
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isPulling.current || isRefreshingRef.current) return
+
+      const currentY = e.touches[0].clientY
+      const diff = currentY - startY.current
+
+      // Only pull down, not up
+      if (diff > 0 && window.scrollY === 0) {
+        // Apply resistance - pulling gets harder as you go
+        const resistance = 0.5
+        const adjustedDiff = Math.min(diff * resistance, maxPull)
+        setPullDistance(adjustedDiff)
+
+        // Prevent default scroll when pulling (only if event is cancelable)
+        if (adjustedDiff > 10 && e.cancelable) {
+          e.preventDefault()
+        }
+      }
+    }
+
+    const onTouchEnd = () => {
+      if (!isPulling.current) return
+
+      isPulling.current = false
+
+      if (pullDistanceRef.current >= threshold && !isRefreshingRef.current) {
+        handleRefresh()
+      } else {
+        setPullDistance(0)
+      }
+    }
+
+    // Use { passive: false } to allow preventDefault() in touchmove
+    container.addEventListener('touchstart', onTouchStart, { passive: true })
+    container.addEventListener('touchmove', onTouchMove, { passive: false })
+    container.addEventListener('touchend', onTouchEnd, { passive: true })
+
+    return () => {
+      container.removeEventListener('touchstart', onTouchStart)
+      container.removeEventListener('touchmove', onTouchMove)
+      container.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [disabled, maxPull, threshold, handleRefresh])
 
   // Reset on unmount
   useEffect(() => {
@@ -108,10 +135,6 @@ export function usePullToRefresh({
   return {
     pullDistance,
     isRefreshing,
-    handlers: {
-      onTouchStart,
-      onTouchMove,
-      onTouchEnd,
-    },
+    containerRef,
   }
 }

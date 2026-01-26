@@ -156,7 +156,7 @@ export function NotesPage() {
   const {
     pullDistance,
     isRefreshing,
-    handlers: pullHandlers,
+    containerRef: pullToRefreshRef,
   } = usePullToRefresh({
     onRefresh: handleRefresh,
     disabled: reorderMode,
@@ -530,10 +530,8 @@ export function NotesPage() {
 
   return (
     <div
+      ref={pullToRefreshRef}
       className="min-h-screen bg-gray-50 dark:bg-gray-900"
-      onTouchStart={pullHandlers.onTouchStart}
-      onTouchMove={pullHandlers.onTouchMove}
-      onTouchEnd={pullHandlers.onTouchEnd}
     >
       {/* Pull-to-refresh indicator */}
       {(pullDistance > 0 || isRefreshing) && (
