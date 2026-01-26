@@ -387,6 +387,18 @@ export async function fullSync(userId: string): Promise<void> {
       await db.tags.put(localTagData)
     }
 
+    // Remove deleted tags (deleted on server)
+    const localTags = await db.tags.where('owner_id').equals(userId).toArray()
+    const serverTagIds = new Set((tags || []).map(t => t.id))
+
+    for (const localTag of localTags) {
+      if (!serverTagIds.has(localTag.id) && localTag._syncStatus === 'synced') {
+        await db.tags.delete(localTag.id)
+        // Also remove any note_tags referencing this tag
+        await db.noteTags.where('tag_id').equals(localTag.id).delete()
+      }
+    }
+
     // Sync note_tags
     for (const nt of noteTags || []) {
       const localNT: LocalNoteTag = {
@@ -395,6 +407,17 @@ export async function fullSync(userId: string): Promise<void> {
         _syncStatus: 'synced',
       }
       await db.noteTags.put(localNT)
+    }
+
+    // Remove deleted note_tags (removed on server)
+    const localNoteTags = await db.noteTags.toArray()
+    const serverNoteTagKeys = new Set((noteTags || []).map(nt => `${nt.note_id}:${nt.tag_id}`))
+
+    for (const localNT of localNoteTags) {
+      const key = `${localNT.note_id}:${localNT.tag_id}`
+      if (!serverNoteTagKeys.has(key) && localNT._syncStatus === 'synced') {
+        await db.noteTags.where('[note_id+tag_id]').equals([localNT.note_id, localNT.tag_id]).delete()
+      }
     }
 
     // Sync folders
