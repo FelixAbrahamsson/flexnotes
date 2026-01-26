@@ -11,15 +11,16 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 - **Smart Tag Filtering**: New notes automatically get the currently filtered tags applied
 - **Folder Organization**: Hierarchical folders with unlimited nesting, drag-drop notes into folders
 - **Image Support**: Attach images via button, drag & drop, or paste with automatic compression
-- **Pin & Archive**: Pin important notes and archive completed ones
+- **Pin & Archive**: Pin important notes from the note card menu, archive completed ones
 - **Trash Bin**: Deleted notes go to trash with 30-day retention before permanent deletion
-- **Quick Actions**: Archive, delete, share, or move to folder directly from note menus
+- **Quick Actions**: Pin, archive, delete, share, or move to folder directly from note card menus
 - **Drag-to-Archive/Trash**: When dragging notes, drop zones appear to quickly archive or trash
 - **Auto-Cleanup**: Empty notes are automatically deleted when closed
 - **Search**: Full-text search works in both list and folder views
 - **Drag-to-Reorder**: Drag notes to reorder them (desktop: drag directly, mobile: tap reorder button first)
 - **Fullscreen Mode**: Expand notes to fullscreen on desktop for distraction-free editing
 - **Infinite Scroll**: Notes load progressively as you scroll for better performance
+- **Remember Last Note**: Automatically reopens the last viewed note when returning to the app
 
 ### Folder View
 - **Tree-Based Browser**: File explorer-style navigation with folders and notes in a tree structure
@@ -38,6 +39,8 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 - **Multi-line Items**: Shift+Enter (desktop) or newline button (mobile) to add line breaks within items
 - **Nested Lists**: Support for up to 5 levels of indentation
 - **Keyboard Shortcuts**: Tab/Shift+Tab to indent, Enter to add item, Backspace on empty to delete
+- **Bulk Actions**: "Uncheck all" to reset checkboxes, "Clear completed" to remove checked items
+- **Smart Preview**: Note cards only show unchecked items in the preview
 
 ### Sync & Storage
 - **Offline-First**: Works without internet, syncs when back online

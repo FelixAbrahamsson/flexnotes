@@ -133,6 +133,9 @@ src/
 ├── types/               # TypeScript type definitions
 │   └── index.ts         # Note, Tag, NoteTag, Folder, etc.
 │
+├── utils/               # Utility functions
+│   └── formatters.ts    # Date formatting, content preview generation
+│
 ├── App.tsx              # Router setup
 ├── main.tsx             # Entry point
 └── index.css            # Tailwind + custom styles
@@ -187,6 +190,8 @@ User preferences with persistence:
 - Theme: 'light' | 'dark' | 'system'
 - Layout: notes per row (1, 2, or 3)
 - View mode: 'list' | 'folder'
+- `lastOpenedNoteId` - Remembers the note open in modal (restored on page load)
+- `lastFolderViewNoteId` - Remembers the note selected in folder view pane (desktop)
 - Persisted to localStorage
 - `applyTheme()` updates document class
 
@@ -209,6 +214,7 @@ List/checklist editor with mobile-friendly interactions:
 - Hierarchical checkbox: checking a parent checks all children via `toggleChecked()`
 - Multi-line support: textarea input with Shift+Enter (desktop) or newline button (mobile)
 - Tracks `lastSavedContentRef` to prevent content prop from resetting local state
+- Bulk actions: "Uncheck all" resets all checkboxes, "Clear completed" removes checked items
 
 ### `src/components/notes/MarkdownEditor.tsx`
 TipTap-based rich text editor:
@@ -237,7 +243,7 @@ Tree-based file browser for folder view:
 - Expandable/collapsible folders
 - Drag-drop notes onto folders to move them
 - Context menus for folders (new note, new subfolder, delete)
-- Context menus for notes (share, move, archive, delete)
+- Context menus for notes (pin/unpin, share, move, archive, delete)
 - Search filtering across all notes
 - Selected note highlighting
 
@@ -391,7 +397,12 @@ Images flow through:
 1. `imageProcessor.ts` - Compression, WebP conversion, dimension extraction
 2. `imageStore.ts` - Upload to Supabase Storage, track in `note_images`
 3. `MarkdownEditor` - Insert at cursor position via `insertImage()`
-4. `ImageGallery` - Display attached images
+4. `ImageGallery` - Display attached images (text notes only, not markdown)
+
+Image cleanup:
+- `cleanupOrphanedImages()` - Deletes images from storage that are no longer referenced in markdown content
+- Called when converting from markdown to other types to remove deleted images
+- `isNoteEmpty()` checks for attached images before deleting empty notes
 
 ## Testing Locally
 
@@ -452,3 +463,6 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 18. **Folder deletion**: When a folder is deleted, its notes are moved to the parent folder (or root if no parent). Subfolders are also moved to the parent.
 19. **Split-pane layout**: Folder view uses split-pane on desktop (tree left, editor right) but opens notes in modal on mobile. Width is resizable via drag.
 20. **DropdownMenu positioning**: Uses React Portal to render at document body level, avoiding overflow issues in scrollable containers. Auto-detects space above/below to position optimally.
+21. **Remember last opened note**: `lastOpenedNoteId` and `lastFolderViewNoteId` in preferencesStore persist the currently open note. On page load, these are restored after notes are fetched, using `hasRestoredRef` to prevent duplicate restoration.
+22. **Note card preview for lists**: `getContentPreview()` in formatters.ts filters out checked items for list notes, showing only unchecked items in the card preview.
+23. **Pin from note cards**: Pin/unpin is available in the note card dropdown menu (both list view and folder view), not in the note editor header. This keeps the editor UI cleaner.
