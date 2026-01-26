@@ -6,6 +6,7 @@ import Text from '@tiptap/extension-text'
 import History from '@tiptap/extension-history'
 import Placeholder from '@tiptap/extension-placeholder'
 import HardBreak from '@tiptap/extension-hard-break'
+import Link from '@tiptap/extension-link'
 
 interface TextEditorProps {
   content: string
@@ -23,6 +24,17 @@ export function TextEditor({ content, onChange, placeholder }: TextEditorProps) 
       History,
       Placeholder.configure({
         placeholder: placeholder || 'Start typing...',
+      }),
+      Link.configure({
+        openOnClick: true,
+        autolink: true,
+        linkOnPaste: true,
+        validate: (url) => /^https?:\/\//.test(url),
+        HTMLAttributes: {
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          class: 'text-primary-600 dark:text-primary-400 underline cursor-pointer',
+        },
       }),
     ],
     content,

@@ -5,6 +5,7 @@ import Placeholder from '@tiptap/extension-placeholder'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Image from '@tiptap/extension-image'
+import Link from '@tiptap/extension-link'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { common, createLowlight } from 'lowlight'
 
@@ -73,6 +74,18 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       Image.configure({
         HTMLAttributes: {
           class: 'rounded-lg max-w-full h-auto',
+        },
+      }),
+      Link.configure({
+        openOnClick: true,
+        autolink: true,
+        linkOnPaste: true,
+        // Allow URLs with special characters like @ in the path
+        validate: (url) => /^https?:\/\//.test(url),
+        HTMLAttributes: {
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          class: 'text-primary-600 dark:text-primary-400 underline cursor-pointer',
         },
       }),
     ],

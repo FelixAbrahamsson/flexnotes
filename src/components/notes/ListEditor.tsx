@@ -42,6 +42,9 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
   // Track if Shift+Enter was just pressed (to allow newlines on desktop)
   const shiftEnterPressedRef = useRef(false)
 
+  // Track if paste just occurred (to allow pasting text with newlines)
+  const pasteOccurredRef = useRef(false)
+
   useEffect(() => {
     itemsRef.current = items
   }, [items])
@@ -255,15 +258,24 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
       return
     }
 
+    // Check if paste just occurred (allow pasting text with newlines)
+    if (pasteOccurredRef.current) {
+      pasteOccurredRef.current = false
+      updateItem(id, { text: newText })
+      return
+    }
+
     // Check if a newline was just typed (mobile fallback for Enter key)
     // Count newlines in old vs new text
     const oldNewlines = (oldText.match(/\n/g) || []).length
     const newNewlines = (newText.match(/\n/g) || []).length
 
-    if (newNewlines > oldNewlines) {
-      // A newline was typed - on mobile this means Enter was pressed
+    // Only treat as Enter key if exactly one newline was added at the end
+    // (multiple newlines means paste, newline in middle means paste)
+    if (newNewlines === oldNewlines + 1 && newText.endsWith('\n')) {
+      // A single newline was typed at the end - on mobile this means Enter was pressed
       // Remove the newline and create a new item instead
-      const cleanedText = newText.replace(/\n$/, '') // Remove trailing newline
+      const cleanedText = newText.slice(0, -1) // Remove trailing newline
       updateItem(id, { text: cleanedText })
       addItem(id)
       return
@@ -521,6 +533,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
               onToggle={() => toggleChecked(item.id)}
               onTextChange={(text, oldText) => handleTextChange(item.id, text, oldText)}
               onKeyDown={e => handleKeyDown(e, item.id)}
+              onPaste={() => { pasteOccurredRef.current = true }}
               onDelete={() => deleteItem(item.id)}
               onInsertNewline={cursorPos => insertNewline(item.id, cursorPos)}
               isDragging={isBeingDragged}
@@ -572,6 +585,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
                 onToggle={() => toggleChecked(item.id)}
                 onTextChange={(text, oldText) => handleTextChange(item.id, text, oldText)}
                 onKeyDown={e => handleKeyDown(e, item.id)}
+                onPaste={() => { pasteOccurredRef.current = true }}
                 onDelete={() => deleteItem(item.id)}
                 onInsertNewline={cursorPos => insertNewline(item.id, cursorPos)}
                 isDragging={isBeingDragged}
@@ -594,6 +608,7 @@ interface ListItemRowProps {
   onToggle: () => void
   onTextChange: (text: string, oldText: string) => void
   onKeyDown: (e: React.KeyboardEvent) => void
+  onPaste: () => void
   onDelete: () => void
   onInsertNewline: (cursorPos: number) => void
   isDragging: boolean
@@ -609,6 +624,7 @@ function ListItemRow({
   onToggle,
   onTextChange,
   onKeyDown,
+  onPaste,
   onDelete,
   onInsertNewline,
   isDragging,
@@ -671,6 +687,7 @@ function ListItemRow({
           e.target.style.height = `${e.target.scrollHeight}px`
         }}
         onKeyDown={onKeyDown}
+        onPaste={onPaste}
         placeholder="List item"
         rows={1}
         className={`flex-1 bg-transparent border-0 focus:outline-none focus:ring-0 p-1 text-sm resize-none overflow-hidden ${
