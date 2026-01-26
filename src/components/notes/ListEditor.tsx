@@ -39,6 +39,9 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
   // Track the last content we saved to avoid resetting items from our own changes
   const lastSavedContentRef = useRef<string>('')
 
+  // Track if Shift+Enter was just pressed (to allow newlines on desktop)
+  const shiftEnterPressedRef = useRef(false)
+
   useEffect(() => {
     itemsRef.current = items
   }, [items])
@@ -201,6 +204,11 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
       return
     }
 
+    // Track Shift+Enter so handleTextChange doesn't treat it as mobile Enter
+    if (e.key === 'Enter' && e.shiftKey) {
+      shiftEnterPressedRef.current = true
+    }
+
     // Backspace on empty item - delete it
     if (e.key === 'Backspace' && item.text.trim() === '') {
       e.preventDefault()
@@ -240,6 +248,13 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
 
   // Handle text changes - also catches mobile Enter key as fallback
   const handleTextChange = (id: string, newText: string, oldText: string) => {
+    // Check if Shift+Enter was pressed (allow newline on desktop)
+    if (shiftEnterPressedRef.current) {
+      shiftEnterPressedRef.current = false
+      updateItem(id, { text: newText })
+      return
+    }
+
     // Check if a newline was just typed (mobile fallback for Enter key)
     // Count newlines in old vs new text
     const oldNewlines = (oldText.match(/\n/g) || []).length
