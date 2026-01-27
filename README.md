@@ -13,7 +13,8 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 - **Image Support**: Attach images via button, drag & drop, or paste with automatic compression
 - **Pin & Archive**: Pin important notes from the note card menu, archive completed ones
 - **Trash Bin**: Deleted notes go to trash with 30-day retention before permanent deletion
-- **Quick Actions**: Pin, archive, delete, share, or move to folder directly from note card menus
+- **Quick Actions**: Pin, archive, delete, share, duplicate, or move to folder directly from note card menus
+- **Duplicate Notes**: Create a copy of any note with all its content and tags preserved
 - **Drag-to-Archive/Trash**: When dragging notes, drop zones appear to quickly archive or trash
 - **Auto-Cleanup**: Empty notes are automatically deleted when closed
 - **Search**: Full-text search works in both list and folder views
@@ -40,9 +41,9 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 - **Nested Lists**: Support for up to 5 levels of indentation
 - **Smart Text Splitting**: Press Enter to split text at cursor - text after cursor moves to new item
 - **Smart Merging**: Press Backspace at start of item to merge with previous item
-- **Keyboard Navigation**: Arrow up/down to navigate between items (respects cursor position)
+- **Full Keyboard Navigation**: All arrow keys navigate between items at text boundaries
 - **Keyboard Shortcuts**: Tab/Shift+Tab to indent, Enter to add/split item, Backspace to merge/delete
-- **Bulk Actions**: "Uncheck all" to reset checkboxes, "Clear completed" to remove checked items
+- **Bulk Actions**: "Uncheck all" and "Clear completed" with confirmation dialogs
 - **Smart Preview**: Note cards only show unchecked items in the preview
 
 ### Sync & Storage

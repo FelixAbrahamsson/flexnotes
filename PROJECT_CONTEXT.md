@@ -171,6 +171,7 @@ Main note operations:
 - Trash/restore/permanent delete
 - Filters: archived, trash, shared, search, tags
 - `deleteNoteIfEmpty()` - Auto-cleanup empty notes
+- `duplicateNote()` - Create a copy of a note with its content and tags
 - `reorderNotes()` - Drag-and-drop reordering with sort_order persistence
 - `moveNoteToFolder()` - Move note to a folder or root
 - `getNotesInFolder()` - Get notes in a specific folder (or root)
@@ -216,10 +217,11 @@ List/checklist editor with mobile-friendly interactions:
 - Hierarchical checkbox: checking a parent checks all children via `toggleChecked()`
 - Multi-line support: textarea input with Shift+Enter (desktop) or newline button (mobile)
 - Tracks `lastSavedContentRef` to prevent content prop from resetting local state
-- Bulk actions: "Uncheck all" resets all checkboxes, "Clear completed" removes checked items
+- Bulk actions: "Uncheck all" and "Clear completed" with confirmation dialogs via `useConfirm()`
 - Text splitting: Enter key splits text at cursor position, moving text after cursor to new item via `splitItem()`
 - Item merging: Backspace at start of item merges with previous via `mergeWithPreviousItem()`
-- Arrow key navigation: Up/Down arrows navigate between unchecked items when cursor is at boundaries
+- Full arrow key navigation: All four arrow keys navigate between unchecked items when cursor is at text boundaries
+- Drop indicator: Only shows for unchecked items, uses index within unchecked array for accurate positioning
 
 ### `src/components/notes/MarkdownEditor.tsx`
 TipTap-based rich text editor:
@@ -476,4 +478,6 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 25. **Shared view tabs**: The shared view has two tabs - "Shared with me" (notes others shared) and "Shared by me" (notes I've shared). These use different data sources: `sharedWithMeNotes` from saved_shares vs `sharedNoteIds` from note_shares.
 26. **List editor text splitting**: `splitItem()` handles Enter key by splitting text at cursor position atomically - it updates the current item's text AND creates a new item with the remaining text in a single state update to avoid stale closure issues.
 27. **List editor merging**: `mergeWithPreviousItem()` handles Backspace at start of item by combining text with the previous unchecked item, placing cursor at the merge point.
-28. **List editor arrow navigation**: Arrow keys only navigate to other items when cursor is at the boundary (start for ArrowUp, end for ArrowDown) and only navigate to unchecked items.
+28. **List editor arrow navigation**: All four arrow keys navigate between items when cursor is at the boundary (start for ArrowUp/ArrowLeft, end for ArrowDown/ArrowRight) and only navigate to unchecked items.
+29. **Duplicate note**: `duplicateNote()` creates a copy with "(Copy)" suffix, copies content/type/folder/tags, but NOT pinned status, archived status, or share links. Available from note card context menu.
+30. **List editor drop indicator**: Uses indices within the unchecked items array only, not the full items array. This prevents the indicator from appearing incorrectly when cursor is over checked items.
