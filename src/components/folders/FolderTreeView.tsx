@@ -250,10 +250,11 @@ function FolderTreeItem({
   const isRenamingHere = renamingFolderId === folder.id
   const isColorPickerHere = colorPickerFolderId === folder.id
 
-  // Draggable for moving folders
+  // Draggable for moving folders (only when reorder mode is enabled)
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: `folder-drag-${folder.id}`,
     data: { type: 'folder', folder },
+    disabled: !reorderMode,
   })
 
   // Droppable for notes and folders
@@ -287,12 +288,15 @@ function FolderTreeItem({
         ref={setNodeRef}
         {...attributes}
         {...listeners}
-        className={`group flex items-center gap-1 px-2 py-1.5 rounded cursor-pointer transition-colors touch-manipulation ${
+        className={`group flex items-center gap-1 px-2 py-1.5 rounded cursor-pointer transition-colors ${
           isOver
             ? 'bg-primary-100 dark:bg-primary-900/40 ring-2 ring-primary-500'
             : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'
         }`}
-        style={{ paddingLeft: `${level * 16 + 8}px` }}
+        style={{
+          paddingLeft: `${level * 16 + 8}px`,
+          touchAction: reorderMode ? 'none' : 'auto',
+        }}
         onClick={() => onToggleExpand(folder.id)}
         onContextMenu={handleContextMenu}
       >
