@@ -976,9 +976,7 @@ export function NotesPage() {
                                   ? getFolderById(note.folder_id)
                                   : null
                               }
-                              onClick={() =>
-                                !showTrash && handleOpenNote(note.id)
-                              }
+                              onClick={() => handleOpenNote(note.id)}
                               onPin={
                                 !showTrash
                                   ? () => handlePin(note.id, note.is_pinned)
