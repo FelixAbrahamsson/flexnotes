@@ -109,14 +109,14 @@ src/
 │
 ├── pages/               # Page-level components
 │   ├── AuthPage.tsx     # Login/signup
-│   ├── NotesPage.tsx    # Main notes view with list/folder modes
-│   └── SharedNotePage.tsx # Public shared note view
+│   ├── NotesPage.tsx    # Main notes view with list/folder modes, shared view tabs
+│   └── SharedNotePage.tsx # Public shared note view, auto-saves to "shared with me"
 │
 ├── services/            # Business logic (no React)
 │   ├── db.ts            # Dexie.js setup, LocalNote/LocalTag/LocalFolder types
 │   ├── googleKeepImport.ts # Google Keep ZIP parser
 │   ├── imageProcessor.ts # Image compression/WebP conversion
-│   ├── share.ts         # Share link generation
+│   ├── share.ts         # Share link generation, "shared with me" tracking
 │   ├── supabase.ts      # Supabase client instance
 │   └── sync.ts          # Sync queue processing, conflict resolution
 │
@@ -169,12 +169,14 @@ Parses Google Keep Takeout exports:
 Main note operations:
 - CRUD operations with optimistic updates
 - Trash/restore/permanent delete
-- Filters: archived, trash, search, tags
+- Filters: archived, trash, shared, search, tags
 - `deleteNoteIfEmpty()` - Auto-cleanup empty notes
 - `reorderNotes()` - Drag-and-drop reordering with sort_order persistence
 - `moveNoteToFolder()` - Move note to a folder or root
 - `getNotesInFolder()` - Get notes in a specific folder (or root)
 - Pagination: `getPaginatedNotes()`, `loadMoreNotes()`, `hasMoreNotes()`
+- Shared view: `sharedTab` ('by_me' | 'with_me'), `sharedWithMeNotes`, `fetchSharedWithMeNotes()`
+- `setSharedTab()` - Switch between "Shared by me" and "Shared with me" tabs
 
 ### `src/stores/folderStore.ts`
 Folder management:
@@ -215,6 +217,9 @@ List/checklist editor with mobile-friendly interactions:
 - Multi-line support: textarea input with Shift+Enter (desktop) or newline button (mobile)
 - Tracks `lastSavedContentRef` to prevent content prop from resetting local state
 - Bulk actions: "Uncheck all" resets all checkboxes, "Clear completed" removes checked items
+- Text splitting: Enter key splits text at cursor position, moving text after cursor to new item via `splitItem()`
+- Item merging: Backspace at start of item merges with previous via `mergeWithPreviousItem()`
+- Arrow key navigation: Up/Down arrows navigate between unchecked items when cursor is at boundaries
 
 ### `src/components/notes/MarkdownEditor.tsx`
 TipTap-based rich text editor:
@@ -257,8 +262,8 @@ Inline note editor for split-pane layout (desktop folder view):
 ### `src/components/ui/ViewSwitcher.tsx`
 Dropdown menu for view switching:
 - Switch between list view and folder view
-- Access archive and trash views
-- Trash count badge shown in dropdown
+- Access archive, trash, and shared views
+- Trash count and shared count badges shown in dropdown
 - Uses portal-based DropdownMenu for proper positioning
 
 ## Database Schema
@@ -301,7 +306,8 @@ folders (id, owner_id, name, color, parent_folder_id, sort_order, created_at, up
 tags (id, owner_id, name, color, sort_order, created_at)
 note_tags (note_id, tag_id)
 note_images (id, note_id, storage_path, filename, size, width, height, created_at)
-note_shares (id, note_id, token, permission, created_at, expires_at)
+note_shares (id, note_id, share_token, permission, created_at, expires_at)
+saved_shares (id, user_id, share_token, note_id, saved_at)  -- Tracks "shared with me" notes
 profiles (id, email, display_name, created_at)
 ```
 
@@ -466,3 +472,8 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 21. **Remember last opened note**: `lastOpenedNoteId` and `lastFolderViewNoteId` in preferencesStore persist the currently open note. On page load, these are restored after notes are fetched, using `hasRestoredRef` to prevent duplicate restoration.
 22. **Note card preview for lists**: `getContentPreview()` in formatters.ts filters out checked items for list notes, showing only unchecked items in the card preview.
 23. **Pin from note cards**: Pin/unpin is available in the note card dropdown menu (both list view and folder view), not in the note editor header. This keeps the editor UI cleaner.
+24. **Shared with me**: When a logged-in user views a shared note (not their own), it's automatically saved to `saved_shares` table. The SharedNotePage handles this auto-save on load.
+25. **Shared view tabs**: The shared view has two tabs - "Shared with me" (notes others shared) and "Shared by me" (notes I've shared). These use different data sources: `sharedWithMeNotes` from saved_shares vs `sharedNoteIds` from note_shares.
+26. **List editor text splitting**: `splitItem()` handles Enter key by splitting text at cursor position atomically - it updates the current item's text AND creates a new item with the remaining text in a single state update to avoid stale closure issues.
+27. **List editor merging**: `mergeWithPreviousItem()` handles Backspace at start of item by combining text with the previous unchecked item, placing cursor at the merge point.
+28. **List editor arrow navigation**: Arrow keys only navigate to other items when cursor is at the boundary (start for ArrowUp, end for ArrowDown) and only navigate to unchecked items.

@@ -38,7 +38,10 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 - **Hierarchical Checkbox**: Checking a parent item automatically checks all children
 - **Multi-line Items**: Shift+Enter (desktop) or newline button (mobile) to add line breaks within items
 - **Nested Lists**: Support for up to 5 levels of indentation
-- **Keyboard Shortcuts**: Tab/Shift+Tab to indent, Enter to add item, Backspace on empty to delete
+- **Smart Text Splitting**: Press Enter to split text at cursor - text after cursor moves to new item
+- **Smart Merging**: Press Backspace at start of item to merge with previous item
+- **Keyboard Navigation**: Arrow up/down to navigate between items (respects cursor position)
+- **Keyboard Shortcuts**: Tab/Shift+Tab to indent, Enter to add/split item, Backspace to merge/delete
 - **Bulk Actions**: "Uncheck all" to reset checkboxes, "Clear completed" to remove checked items
 - **Smart Preview**: Note cards only show unchecked items in the preview
 
@@ -48,7 +51,14 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 - **Visibility Sync**: App automatically syncs when you switch back to it
 - **Pull-to-Refresh**: Pull down on mobile to manually trigger sync
 - **Cross-Device Order**: Custom note ordering syncs across all your devices
+
+### Sharing
 - **Shareable Notes**: Generate links to share notes with read or write access
+- **Shared with Me**: View notes others have shared with you in a dedicated tab
+- **Shared by Me**: Track all notes you've shared with others
+- **Permission Badges**: See at a glance if you can view or edit shared notes
+- **Auto-Save Shares**: Opening a shared link automatically saves it to your "Shared with me" list
+- **Cross-Device Sharing**: Shared notes sync across all your devices when logged in
 
 ### User Experience
 - **Dark/Light Theme**: Toggle between dark, light, or system-based theme
@@ -191,6 +201,7 @@ The app uses the following Supabase tables:
 - `note_tags` - Many-to-many relationship between notes and tags
 - `note_images` - Image attachments for notes
 - `note_shares` - Share links with permissions
+- `saved_shares` - Tracks notes shared with each user (for "Shared with me" feature)
 
 See `supabase/migrations/` for the complete schema.
 
