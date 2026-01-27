@@ -7,16 +7,11 @@ import {
   ArrowUpDown,
   RefreshCw,
   X,
-  Archive,
-  Trash2,
   Share2,
   Users,
-  Trash as TrashIcon,
 } from "lucide-react";
 import {
   DndContext,
-  closestCenter,
-  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
@@ -24,19 +19,15 @@ import {
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
-  type CollisionDetection,
 } from "@dnd-kit/core";
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { hapticLight } from "@/hooks/useCapacitor";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useResizableSidebar } from "@/hooks/useResizableSidebar";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useNoteFromUrl } from "@/hooks/useNoteFromUrl";
 import { useNoteStore } from "@/stores/noteStore";
+import { useNoteUIStore } from "@/stores/noteUIStore";
 import { useTagStore } from "@/stores/tagStore";
 import { useSyncStore } from "@/stores/syncStore";
 import { usePreferencesStore } from "@/stores/preferencesStore";
@@ -44,8 +35,8 @@ import { useFolderStore } from "@/stores/folderStore";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { NoteEditor } from "@/components/notes/NoteEditor";
 import { NoteEditorPane } from "@/components/notes/NoteEditorPane";
-import { SortableNoteCard } from "@/components/notes/SortableNoteCard";
-import { ActionDropZone } from "@/components/notes/ActionDropZone";
+import { NoteGrid } from "@/components/notes/NoteGrid";
+import { SharedWithMeView } from "@/components/notes/SharedWithMeView";
 import { TagFilter } from "@/components/tags/TagFilter";
 import { SyncStatus } from "@/components/SyncStatus";
 import { SettingsModal } from "@/components/SettingsModal";
@@ -56,45 +47,16 @@ import { FolderPicker } from "@/components/folders/FolderPicker";
 import { FolderManager } from "@/components/folders/FolderManager";
 import { removeSavedShare } from "@/services/share";
 
-// Custom collision detection: requires pointer to be directly over action drop zones,
-// but uses closestCenter for sortable items (notes reordering)
-const customCollisionDetection: CollisionDetection = (args) => {
-  // First check if pointer is directly over an action drop zone
-  const pointerCollisions = pointerWithin(args);
-  const actionZoneCollision = pointerCollisions.find(
-    (collision) =>
-      collision.id === "drop-archive" || collision.id === "drop-trash"
-  );
-
-  // If pointer is over an action zone, only return that collision
-  if (actionZoneCollision) {
-    return [actionZoneCollision];
-  }
-
-  // Otherwise, use closestCenter for sortable items (exclude action zones)
-  const centerCollisions = closestCenter(args);
-  return centerCollisions.filter(
-    (collision) =>
-      collision.id !== "drop-archive" && collision.id !== "drop-trash"
-  );
-};
-
 type ModalType = "settings" | "note";
 
 export function NotesPage() {
+  // Data store
   const {
-    notes, // Subscribe to notes array for reactivity
+    notes,
     loading,
-    activeNoteId,
-    showArchived,
-    showTrash,
-    showShared,
     sharedNoteIds,
-    sharedTab,
     sharedWithMeNotes,
     sharedWithMeLoading,
-    searchQuery,
-    selectedTagIds,
     fetchNotes,
     createNote,
     updateNote,
@@ -103,23 +65,34 @@ export function NotesPage() {
     permanentlyDeleteNote,
     emptyTrash,
     duplicateNote,
+    fetchSharedNoteIds,
+    fetchSharedWithMeNotes,
+    removeSharedWithMeNote,
+    getTrashCount,
+    deleteNoteIfEmpty,
+    reorderNotes,
+    getNotesInFolder,
+  } = useNoteStore();
+
+  // UI store
+  const {
+    activeNoteId,
+    showArchived,
+    showTrash,
+    showShared,
+    sharedTab,
+    searchQuery,
+    selectedTagIds,
     setActiveNote,
     setShowArchived,
     setShowTrash,
     setShowShared,
     setSharedTab,
-    fetchSharedNoteIds,
-    fetchSharedWithMeNotes,
-    removeSharedWithMeNote,
     setSearchQuery,
-    getPaginatedNotes,
-    getTrashCount,
-    deleteNoteIfEmpty,
     loadMoreNotes,
+    getPaginatedNotes,
     hasMoreNotes,
-    reorderNotes,
-    getNotesInFolder, // Get reactively from hook
-  } = useNoteStore();
+  } = useNoteUIStore();
 
   const { tags, fetchTags, fetchNoteTags, getTagsForNote, addTagToNote } =
     useTagStore();
@@ -299,6 +272,17 @@ export function NotesPage() {
     refreshPendingCount,
   ]);
 
+  // Fetch shared data when entering shared view or switching tabs
+  useEffect(() => {
+    if (showShared) {
+      if (sharedTab === 'by_me') {
+        fetchSharedNoteIds();
+      } else {
+        fetchSharedWithMeNotes();
+      }
+    }
+  }, [showShared, sharedTab, fetchSharedNoteIds, fetchSharedWithMeNotes]);
+
   // Note: Note restoration is now handled by useNoteFromUrl via URL query param
   // for both list view modals and folder view pane selection
 
@@ -306,10 +290,10 @@ export function NotesPage() {
   const displayedNotes = useMemo(() => {
     if (viewMode === "folder" && !showArchived && !showTrash && !showShared) {
       // In folder view, show notes in the selected folder
-      return getNotesInFolder(selectedFolderId);
+      return getNotesInFolder(selectedFolderId, showArchived);
     }
     // In list view or special views, use standard paginated notes
-    return getPaginatedNotes();
+    return getPaginatedNotes(notes, sharedNoteIds);
   }, [
     viewMode,
     showArchived,
@@ -321,35 +305,15 @@ export function NotesPage() {
     getPaginatedNotes,
     getNotesInFolder,
     notes,
+    sharedNoteIds,
   ]);
 
-  const pinnedNotes = displayedNotes.filter((n) => n.is_pinned && !showTrash);
-  const unpinnedNotes = displayedNotes.filter((n) => !n.is_pinned || showTrash);
+  const pinnedNotes = displayedNotes.filter((n: { is_pinned: boolean }) => n.is_pinned && !showTrash);
+  const unpinnedNotes = displayedNotes.filter((n: { is_pinned: boolean }) => !n.is_pinned || showTrash);
   const trashCount = getTrashCount();
-  const canLoadMore = viewMode === "list" && hasMoreNotes(); // Only paginate in list view
+  const canLoadMore = viewMode === "list" && hasMoreNotes(notes, sharedNoteIds);
 
-  // Ref for infinite scroll sentinel
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-
-  // Infinite scroll observer
-  useEffect(() => {
-    const sentinel = loadMoreRef.current;
-    if (!sentinel) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && canLoadMore && !loading) {
-          loadMoreNotes();
-        }
-      },
-      { threshold: 0.1 },
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [canLoadMore, loading, loadMoreNotes]);
-
-  // Drag and drop sensors
+  // Drag and drop sensors (used by folder view)
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -405,7 +369,7 @@ export function NotesPage() {
       // Handle drop on action zones
       if (over.id === "drop-archive") {
         hapticLight();
-        const note = getPaginatedNotes().find((n) => n.id === noteId);
+        const note = getPaginatedNotes(notes, sharedNoteIds).find((n: { id: string }) => n.id === noteId);
         if (note) {
           updateNote(noteId, { is_archived: !note.is_archived });
         }
@@ -421,10 +385,10 @@ export function NotesPage() {
       // Handle reordering
       if (active.id !== over.id) {
         hapticLight();
-        reorderNotes(noteId, over.id as string);
+        reorderNotes(noteId, over.id as string, showArchived, showTrash);
       }
     },
-    [reorderNotes, getPaginatedNotes, updateNote, trashNote],
+    [reorderNotes, getPaginatedNotes, updateNote, trashNote, notes, sharedNoteIds, showArchived, showTrash],
   );
 
   const handleCreateNote = useCallback(async () => {
@@ -926,75 +890,12 @@ export function NotesPage() {
 
             {/* Shared with me content */}
             {showShared && sharedTab === 'with_me' ? (
-              sharedWithMeLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
-                </div>
-              ) : sharedWithMeNotes.length === 0 ? (
-                <div className="text-center py-12">
-                  <Users className="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
-                  <p className="text-gray-500 dark:text-gray-400 mb-2">
-                    No notes shared with you yet
-                  </p>
-                  <p className="text-sm text-gray-400 dark:text-gray-500">
-                    When someone shares a note with you, it will appear here
-                  </p>
-                </div>
-              ) : (
-                <div className={`grid gap-3 ${gridClasses}`}>
-                  {sharedWithMeNotes.map(({ note, permission, savedShareId, shareToken }) => (
-                    <a
-                      key={savedShareId}
-                      href={`/shared/${shareToken}`}
-                      className="group relative bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow cursor-pointer block"
-                    >
-                      {/* Permission badge */}
-                      <div className="absolute top-2 right-2 flex items-center gap-2">
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          permission === 'write'
-                            ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
-                            : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                        }`}>
-                          {permission === 'write' ? 'Can edit' : 'View only'}
-                        </span>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleRemoveSharedWithMe(savedShareId);
-                          }}
-                          className="p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400 rounded sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                          title="Remove from list"
-                        >
-                          <TrashIcon className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      {/* Title */}
-                      {note.title && (
-                        <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2 pr-24 line-clamp-2">
-                          {note.title}
-                        </h3>
-                      )}
-
-                      {/* Content preview */}
-                      <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-3">
-                        {note.note_type === 'list'
-                          ? (() => {
-                              try {
-                                const parsed = JSON.parse(note.content);
-                                return parsed.items?.slice(0, 3).map((i: { text: string }) => i.text).join(', ') || 'Empty list';
-                              } catch {
-                                return note.content.slice(0, 100);
-                              }
-                            })()
-                          : note.content.replace(/<[^>]*>/g, '').slice(0, 150)
-                        }
-                      </p>
-                    </a>
-                  ))}
-                </div>
-              )
+              <SharedWithMeView
+                notes={sharedWithMeNotes}
+                loading={sharedWithMeLoading}
+                gridClasses={gridClasses}
+                onRemove={handleRemoveSharedWithMe}
+              />
             ) : loading && displayedNotes.length === 0 ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
@@ -1046,168 +947,34 @@ export function NotesPage() {
                   )}
               </div>
             ) : (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={customCollisionDetection}
+              <NoteGrid
+                pinnedNotes={pinnedNotes}
+                unpinnedNotes={unpinnedNotes}
+                gridClasses={gridClasses}
+                showTrash={showTrash}
+                showArchived={showArchived}
+                reorderMode={reorderMode}
+                searchQuery={searchQuery}
+                selectedTagIds={selectedTagIds}
+                viewMode={viewMode}
+                draggingNoteId={draggingNoteId}
+                canLoadMore={canLoadMore}
+                loading={loading}
+                getTagsForNote={getTagsForNote}
+                getFolderById={getFolderById}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
-              >
-                <div className="space-y-6">
-                  {/* Pinned notes */}
-                  {pinnedNotes.length > 0 && (
-                    <section>
-                      <h2 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-                        Pinned
-                      </h2>
-                      <SortableContext
-                        items={pinnedNotes.map((n) => n.id)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        <div className={`grid gap-3 ${gridClasses}`}>
-                          {pinnedNotes.map((note) => (
-                            <SortableNoteCard
-                              key={note.id}
-                              note={note}
-                              tags={
-                                viewMode === "list"
-                                  ? getTagsForNote(note.id)
-                                  : []
-                              }
-                              folder={
-                                note.folder_id
-                                  ? getFolderById(note.folder_id)
-                                  : null
-                              }
-                              onClick={() => handleOpenNote(note.id)}
-                              onPin={() => handlePin(note.id, note.is_pinned)}
-                              onArchive={() =>
-                                handleArchive(note.id, note.is_archived)
-                              }
-                              onDelete={() => handleDelete(note.id)}
-                              onShare={() => handleShare(note.id)}
-                              onDuplicate={() => handleDuplicate(note.id)}
-                              onMoveToFolder={() => handleMoveToFolder(note.id)}
-                              showFolder={false}
-                              isDragDisabled={
-                                searchQuery.length > 0 ||
-                                selectedTagIds.length > 0
-                              }
-                              reorderMode={reorderMode}
-                            />
-                          ))}
-                        </div>
-                      </SortableContext>
-                    </section>
-                  )}
-
-                  {/* Other notes / Trash notes */}
-                  {unpinnedNotes.length > 0 && (
-                    <section>
-                      {pinnedNotes.length > 0 && !showTrash && (
-                        <h2 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-                          Others
-                        </h2>
-                      )}
-                      <SortableContext
-                        items={unpinnedNotes.map((n) => n.id)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        <div className={`grid gap-3 ${gridClasses}`}>
-                          {unpinnedNotes.map((note) => (
-                            <SortableNoteCard
-                              key={note.id}
-                              note={note}
-                              tags={
-                                viewMode === "list" && !showTrash
-                                  ? getTagsForNote(note.id)
-                                  : []
-                              }
-                              folder={
-                                note.folder_id
-                                  ? getFolderById(note.folder_id)
-                                  : null
-                              }
-                              onClick={() => handleOpenNote(note.id)}
-                              onPin={
-                                !showTrash
-                                  ? () => handlePin(note.id, note.is_pinned)
-                                  : undefined
-                              }
-                              onArchive={
-                                !showTrash
-                                  ? () =>
-                                      handleArchive(note.id, note.is_archived)
-                                  : undefined
-                              }
-                              onDelete={
-                                showTrash
-                                  ? () => handlePermanentDelete(note.id)
-                                  : () => handleDelete(note.id)
-                              }
-                              onRestore={
-                                showTrash
-                                  ? () => handleRestore(note.id)
-                                  : undefined
-                              }
-                              onShare={
-                                !showTrash
-                                  ? () => handleShare(note.id)
-                                  : undefined
-                              }
-                              onDuplicate={
-                                !showTrash
-                                  ? () => handleDuplicate(note.id)
-                                  : undefined
-                              }
-                              onMoveToFolder={
-                                !showTrash
-                                  ? () => handleMoveToFolder(note.id)
-                                  : undefined
-                              }
-                              showRestore={showTrash}
-                              showFolder={false}
-                              isDragDisabled={
-                                showTrash ||
-                                searchQuery.length > 0 ||
-                                selectedTagIds.length > 0
-                              }
-                              reorderMode={reorderMode}
-                            />
-                          ))}
-                        </div>
-                      </SortableContext>
-                    </section>
-                  )}
-
-                  {/* Load more sentinel */}
-                  {canLoadMore && (
-                    <div
-                      ref={loadMoreRef}
-                      className="flex items-center justify-center py-8"
-                    >
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Drop zones for archive/trash - shown when dragging */}
-                {draggingNoteId && !showTrash && (
-                  <div className="fixed bottom-6 left-0 right-0 flex justify-center gap-12 px-4 z-50 pointer-events-auto native-drop-zones">
-                    <ActionDropZone
-                      id="drop-archive"
-                      icon={<Archive className="w-6 h-6" />}
-                      label={showArchived ? "Unarchive" : "Archive"}
-                      variant="archive"
-                    />
-                    <ActionDropZone
-                      id="drop-trash"
-                      icon={<Trash2 className="w-6 h-6" />}
-                      label="Trash"
-                      variant="trash"
-                    />
-                  </div>
-                )}
-              </DndContext>
+                onOpenNote={handleOpenNote}
+                onPin={handlePin}
+                onArchive={handleArchive}
+                onDelete={handleDelete}
+                onRestore={handleRestore}
+                onPermanentDelete={handlePermanentDelete}
+                onShare={handleShare}
+                onDuplicate={handleDuplicate}
+                onMoveToFolder={handleMoveToFolder}
+                onLoadMore={loadMoreNotes}
+              />
             )}
           </div>
         </main>

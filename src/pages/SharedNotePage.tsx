@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, AlertCircle, Eye, Edit3 } from 'lucide-react'
 import { getSharedNote, updateSharedNote, saveSharedNote } from '@/services/share'
 import { useAuthStore } from '@/stores/authStore'
-import { useNoteStore } from '@/stores/noteStore'
+import { useNoteUIStore } from '@/stores/noteUIStore'
 import { TextEditor } from '@/components/notes/TextEditor'
 import { ListEditor } from '@/components/notes/ListEditor'
 import { MarkdownEditor } from '@/components/notes/MarkdownEditor'
@@ -13,7 +13,7 @@ export function SharedNotePage() {
   const { token } = useParams<{ token: string }>()
   const navigate = useNavigate()
   const { user } = useAuthStore()
-  const { setShowShared, setSharedTab } = useNoteStore()
+  const { setShowShared, setSharedTab } = useNoteUIStore()
   const [note, setNote] = useState<Note | null>(null)
   const [permission, setPermission] = useState<'read' | 'write'>('read')
   const [loading, setLoading] = useState(true)

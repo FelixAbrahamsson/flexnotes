@@ -12,9 +12,9 @@ import { useImageStore } from './imageStore'
 
 // Constants
 const TRASH_RETENTION_DAYS = 30
-const NOTES_PER_PAGE = 20
 
-export type SharedTab = 'by_me' | 'with_me'
+// Re-export types from UI store for backward compatibility
+export type { SharedTab } from './noteUIStore'
 
 export interface SharedWithMeNote {
   note: Note
@@ -27,23 +27,13 @@ interface NoteState {
   notes: Note[]
   loading: boolean
   error: string | null
-  activeNoteId: string | null
 
-  // Filters
-  showArchived: boolean
-  showTrash: boolean
-  showShared: boolean
+  // Shared notes data
   sharedNoteIds: Set<string>
-  sharedTab: SharedTab
   sharedWithMeNotes: SharedWithMeNote[]
   sharedWithMeLoading: boolean
-  selectedTagIds: string[]
-  searchQuery: string
 
-  // Pagination
-  displayLimit: number
-
-  // Actions
+  // Data actions
   fetchNotes: () => Promise<void>
   createNote: (note?: NewNote) => Promise<Note | null>
   createNoteFromImport: (note: Omit<Note, 'id'> & { id: string }) => Promise<string>
@@ -55,34 +45,19 @@ interface NoteState {
   permanentlyDeleteNote: (id: string) => Promise<void>
   emptyTrash: () => Promise<void>
   cleanupOldTrash: () => Promise<void>
-  setActiveNote: (id: string | null) => void
   deleteNoteIfEmpty: (id: string) => Promise<boolean>
-  reorderNotes: (activeId: string, overId: string) => Promise<void>
+  reorderNotes: (activeId: string, overId: string, showArchived?: boolean, showTrash?: boolean) => Promise<void>
 
   // Folder actions
   moveNoteToFolder: (noteId: string, folderId: string | null) => Promise<void>
-  getNotesInFolder: (folderId: string | null) => Note[]
+  getNotesInFolder: (folderId: string | null, showArchived: boolean) => Note[]
 
-  // Filter actions
-  setShowArchived: (show: boolean) => void
-  setShowTrash: (show: boolean) => void
-  setShowShared: (show: boolean) => void
-  setSharedTab: (tab: SharedTab) => void
-  setSelectedTagIds: (ids: string[]) => void
-  setSearchQuery: (query: string) => void
+  // Shared notes actions
   fetchSharedNoteIds: () => Promise<void>
   fetchSharedWithMeNotes: () => Promise<void>
   removeSharedWithMeNote: (savedShareId: string) => void
 
-  // Pagination actions
-  loadMoreNotes: () => void
-  resetDisplayLimit: () => void
-  hasMoreNotes: () => boolean
-
   // Computed
-  getFilteredNotes: () => Note[]
-  getPaginatedNotes: () => Note[]
-  getActiveNote: () => Note | undefined
   getTrashedNotes: () => Note[]
   getTrashCount: () => number
 
@@ -117,18 +92,10 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   notes: [],
   loading: false,
   error: null,
-  activeNoteId: null,
 
-  showArchived: false,
-  showTrash: false,
-  showShared: false,
   sharedNoteIds: new Set<string>(),
-  sharedTab: 'with_me' as SharedTab,
   sharedWithMeNotes: [],
   sharedWithMeLoading: false,
-  selectedTagIds: [],
-  searchQuery: '',
-  displayLimit: NOTES_PER_PAGE,
 
   // Load notes from local IndexedDB first
   loadFromLocal: async () => {
@@ -309,7 +276,6 @@ export const useNoteStore = create<NoteState>((set, get) => ({
 
       set(state => ({
         notes: [uiNote, ...state.notes],
-        activeNoteId: id
       }))
 
       // Try to sync immediately if online
@@ -491,7 +457,6 @@ export const useNoteStore = create<NoteState>((set, get) => ({
           ? { ...n, is_deleted: true, deleted_at: now, is_pinned: false, _pendingSync: true }
           : n
       ),
-      activeNoteId: state.activeNoteId === id ? null : state.activeNoteId
     }))
 
     try {
@@ -569,7 +534,6 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     const previousNotes = get().notes
     set(state => ({
       notes: state.notes.filter(n => n.id !== id),
-      activeNoteId: state.activeNoteId === id ? null : state.activeNoteId
     }))
 
     try {
@@ -655,7 +619,6 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       const previousNotes = get().notes
       set(state => ({
         notes: state.notes.filter(n => n.id !== id),
-        activeNoteId: null
       }))
 
       try {
@@ -685,12 +648,8 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     return false
   },
 
-  setActiveNote: (id: string | null) => {
-    set({ activeNoteId: id })
-  },
-
-  reorderNotes: async (activeId: string, overId: string) => {
-    const { notes, showArchived, showTrash } = get()
+  reorderNotes: async (activeId: string, overId: string, showArchived = false, showTrash = false) => {
+    const { notes } = get()
 
     // Get the filtered notes (same view user is seeing)
     const filteredNotes = notes.filter(note => {
@@ -800,8 +759,8 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     }
   },
 
-  getNotesInFolder: (folderId: string | null) => {
-    const { notes, showArchived } = get()
+  getNotesInFolder: (folderId: string | null, showArchived = false) => {
+    const { notes } = get()
 
     return notes.filter(note => {
       // Exclude trash
@@ -811,37 +770,6 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       // Filter by folder
       return note.folder_id === folderId
     })
-  },
-
-  setShowArchived: (show: boolean) => {
-    set({ showArchived: show, showTrash: false, showShared: false, displayLimit: NOTES_PER_PAGE })
-  },
-
-  setShowTrash: (show: boolean) => {
-    set({ showTrash: show, showArchived: false, showShared: false, displayLimit: NOTES_PER_PAGE })
-  },
-
-  setShowShared: (show: boolean) => {
-    set({ showShared: show, showArchived: false, showTrash: false, displayLimit: NOTES_PER_PAGE })
-    // Fetch shared note data when entering shared view
-    if (show) {
-      const { sharedTab } = get()
-      if (sharedTab === 'by_me') {
-        get().fetchSharedNoteIds()
-      } else {
-        get().fetchSharedWithMeNotes()
-      }
-    }
-  },
-
-  setSharedTab: (tab: SharedTab) => {
-    set({ sharedTab: tab, displayLimit: NOTES_PER_PAGE })
-    // Fetch data for the selected tab
-    if (tab === 'by_me') {
-      get().fetchSharedNoteIds()
-    } else {
-      get().fetchSharedWithMeNotes()
-    }
   },
 
   fetchSharedNoteIds: async () => {
@@ -884,88 +812,11 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     }))
   },
 
-  setSelectedTagIds: (ids: string[]) => {
-    set({ selectedTagIds: ids, displayLimit: NOTES_PER_PAGE })
-  },
-
-  setSearchQuery: (query: string) => {
-    set({ searchQuery: query, displayLimit: NOTES_PER_PAGE })
-  },
-
-  loadMoreNotes: () => {
-    set(state => ({ displayLimit: state.displayLimit + NOTES_PER_PAGE }))
-  },
-
-  resetDisplayLimit: () => {
-    set({ displayLimit: NOTES_PER_PAGE })
-  },
-
-  hasMoreNotes: () => {
-    const { displayLimit } = get()
-    const allFiltered = get().getFilteredNotes()
-    return allFiltered.length > displayLimit
-  },
-
-  getFilteredNotes: () => {
-    const { notes, showArchived, showTrash, showShared, sharedNoteIds, searchQuery, selectedTagIds } = get()
-    const { noteTags } = useTagStore.getState()
-
-    return notes.filter(note => {
-      // Trash filter
-      if (showTrash) {
-        return note.is_deleted === true
-      }
-
-      // Exclude deleted notes from normal views
-      if (note.is_deleted) return false
-
-      // Shared filter - show only notes that have been shared
-      if (showShared) {
-        if (!sharedNoteIds.has(note.id)) return false
-        // In shared view, show both archived and non-archived shared notes
-      } else {
-        // Archive filter (only apply when not in shared view)
-        if (note.is_archived !== showArchived) return false
-      }
-
-      // Search filter
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase()
-        const titleMatch = note.title?.toLowerCase().includes(q)
-        const contentMatch = note.content.toLowerCase().includes(q)
-        if (!titleMatch && !contentMatch) return false
-      }
-
-      // Tag filter - note must have ALL selected tags
-      if (selectedTagIds.length > 0) {
-        const noteTagIds = noteTags
-          .filter(nt => nt.note_id === note.id)
-          .map(nt => nt.tag_id)
-
-        const hasAllTags = selectedTagIds.every(tagId => noteTagIds.includes(tagId))
-        if (!hasAllTags) return false
-      }
-
-      return true
-    })
-  },
-
-  getPaginatedNotes: () => {
-    const { displayLimit } = get()
-    const allFiltered = get().getFilteredNotes()
-    return allFiltered.slice(0, displayLimit)
-  },
-
   getTrashedNotes: () => {
     return get().notes.filter(n => n.is_deleted)
   },
 
   getTrashCount: () => {
     return get().notes.filter(n => n.is_deleted).length
-  },
-
-  getActiveNote: () => {
-    const { notes, activeNoteId } = get()
-    return notes.find(n => n.id === activeNoteId)
   },
 }))

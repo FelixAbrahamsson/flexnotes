@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useTagStore } from '@/stores/tagStore'
-import { useNoteStore } from '@/stores/noteStore'
+import { useNoteUIStore } from '@/stores/noteUIStore'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { TagBadge, DEFAULT_COLORS, getTagColor } from './TagBadge'
 import { DropdownMenu, DropdownMenuItem } from '@/components/ui/DropdownMenu'
@@ -117,7 +117,7 @@ function SortableTag({
 
 export function TagFilter() {
   const { tags, updateTag, deleteTag, reorderTags } = useTagStore()
-  const { selectedTagIds, setSelectedTagIds } = useNoteStore()
+  const { selectedTagIds, setSelectedTagIds } = useNoteUIStore()
   const confirm = useConfirm()
 
   const [menuTagId, setMenuTagId] = useState<string | null>(null)
