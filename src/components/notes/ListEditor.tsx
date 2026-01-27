@@ -8,6 +8,7 @@ import {
   Trash2,
   RotateCcw,
 } from "lucide-react";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import type { ListItem, ListContent } from "@/types";
 
 interface ListEditorProps {
@@ -28,6 +29,7 @@ interface DragState {
 }
 
 export function ListEditor({ content, onChange }: ListEditorProps) {
+  const confirm = useConfirm();
   const [items, setItems] = useState<ListItem[]>([]);
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [draggedIds, setDraggedIds] = useState<string[]>([]);
@@ -705,16 +707,40 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
   const uncheckedItems = items.filter((item) => !item.checked);
   const checkedItems = items.filter((item) => item.checked);
 
-  const removeCompleted = () => {
-    const newItems = items.filter((item) => !item.checked);
-    setItems(newItems);
-    saveItems(newItems);
+  const removeCompleted = async () => {
+    const completedCount = items.filter((item) => item.checked).length;
+    if (completedCount === 0) return;
+
+    const confirmed = await confirm({
+      title: "Clear completed items",
+      message: `Remove ${completedCount} completed item${completedCount === 1 ? "" : "s"}? This cannot be undone.`,
+      confirmText: "Clear",
+      variant: "danger",
+    });
+
+    if (confirmed) {
+      const newItems = items.filter((item) => !item.checked);
+      setItems(newItems);
+      saveItems(newItems);
+    }
   };
 
-  const uncheckAll = () => {
-    const newItems = items.map((item) => ({ ...item, checked: false }));
-    setItems(newItems);
-    saveItems(newItems);
+  const uncheckAll = async () => {
+    const checkedCount = items.filter((item) => item.checked).length;
+    if (checkedCount === 0) return;
+
+    const confirmed = await confirm({
+      title: "Uncheck all items",
+      message: `Uncheck ${checkedCount} item${checkedCount === 1 ? "" : "s"}?`,
+      confirmText: "Uncheck all",
+      variant: "default",
+    });
+
+    if (confirmed) {
+      const newItems = items.map((item) => ({ ...item, checked: false }));
+      setItems(newItems);
+      saveItems(newItems);
+    }
   };
 
   return (
