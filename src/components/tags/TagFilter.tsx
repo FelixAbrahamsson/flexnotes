@@ -59,6 +59,7 @@ function SortableTag({
     transition,
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 1 : 0,
+    touchAction: 'none' as const, // Allow dnd-kit to capture touch events for dragging
   }
 
   // Intercept pointer down to prevent dnd-kit from capturing right-clicks
