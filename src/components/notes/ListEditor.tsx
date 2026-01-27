@@ -411,6 +411,63 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
       }
       // Otherwise, let the textarea handle normal cursor movement
     }
+
+    if (e.key === "ArrowLeft") {
+      const textarea = e.target as HTMLTextAreaElement;
+      const { selectionStart, selectionEnd } = textarea;
+
+      // Only navigate to previous item if cursor is at the very start
+      const isAtStart = selectionStart === 0 && selectionEnd === 0;
+
+      if (isAtStart) {
+        // Find previous unchecked item
+        const uncheckedItems = items.filter((i) => !i.checked);
+        const currentUncheckedIndex = uncheckedItems.findIndex((i) => i.id === id);
+
+        if (currentUncheckedIndex > 0) {
+          e.preventDefault();
+          const prevItem = uncheckedItems[currentUncheckedIndex - 1];
+          setFocusedId(prevItem.id);
+          // Put cursor at the end of the previous item
+          setTimeout(() => {
+            const prevTextarea = inputRefs.current.get(prevItem.id);
+            if (prevTextarea) {
+              const endPos = prevItem.text.length;
+              prevTextarea.selectionStart = endPos;
+              prevTextarea.selectionEnd = endPos;
+            }
+          }, 0);
+        }
+      }
+    }
+
+    if (e.key === "ArrowRight") {
+      const textarea = e.target as HTMLTextAreaElement;
+      const { selectionStart, selectionEnd, value } = textarea;
+
+      // Only navigate to next item if cursor is at the very end
+      const isAtEnd = selectionStart === value.length && selectionStart === selectionEnd;
+
+      if (isAtEnd) {
+        // Find next unchecked item
+        const uncheckedItems = items.filter((i) => !i.checked);
+        const currentUncheckedIndex = uncheckedItems.findIndex((i) => i.id === id);
+
+        if (currentUncheckedIndex < uncheckedItems.length - 1) {
+          e.preventDefault();
+          const nextItem = uncheckedItems[currentUncheckedIndex + 1];
+          setFocusedId(nextItem.id);
+          // Put cursor at the start of the next item
+          setTimeout(() => {
+            const nextTextarea = inputRefs.current.get(nextItem.id);
+            if (nextTextarea) {
+              nextTextarea.selectionStart = 0;
+              nextTextarea.selectionEnd = 0;
+            }
+          }, 0);
+        }
+      }
+    }
   };
 
   // Handle text changes - also catches mobile Enter key as fallback
