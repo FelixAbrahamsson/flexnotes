@@ -4,6 +4,7 @@ import { supabase } from '@/services/supabase'
 import { db, generateLocalId, getCurrentTimestamp, type LocalNote } from '@/services/db'
 import { queueChange } from '@/services/sync'
 import { stripHtml } from '@/utils/formatters'
+import { getSharedWithMeNotes } from '@/services/share'
 import { useAuthStore } from './authStore'
 import { useTagStore } from './tagStore'
 import { useSyncStore, triggerSyncIfOnline } from './syncStore'
@@ -12,6 +13,15 @@ import { useImageStore } from './imageStore'
 // Constants
 const TRASH_RETENTION_DAYS = 30
 const NOTES_PER_PAGE = 20
+
+export type SharedTab = 'by_me' | 'with_me'
+
+export interface SharedWithMeNote {
+  note: Note
+  permission: 'read' | 'write'
+  savedShareId: string
+  shareToken: string
+}
 
 interface NoteState {
   notes: Note[]
@@ -22,6 +32,11 @@ interface NoteState {
   // Filters
   showArchived: boolean
   showTrash: boolean
+  showShared: boolean
+  sharedNoteIds: Set<string>
+  sharedTab: SharedTab
+  sharedWithMeNotes: SharedWithMeNote[]
+  sharedWithMeLoading: boolean
   selectedTagIds: string[]
   searchQuery: string
 
@@ -50,8 +65,13 @@ interface NoteState {
   // Filter actions
   setShowArchived: (show: boolean) => void
   setShowTrash: (show: boolean) => void
+  setShowShared: (show: boolean) => void
+  setSharedTab: (tab: SharedTab) => void
   setSelectedTagIds: (ids: string[]) => void
   setSearchQuery: (query: string) => void
+  fetchSharedNoteIds: () => Promise<void>
+  fetchSharedWithMeNotes: () => Promise<void>
+  removeSharedWithMeNote: (savedShareId: string) => void
 
   // Pagination actions
   loadMoreNotes: () => void
@@ -100,6 +120,11 @@ export const useNoteStore = create<NoteState>((set, get) => ({
 
   showArchived: false,
   showTrash: false,
+  showShared: false,
+  sharedNoteIds: new Set<string>(),
+  sharedTab: 'with_me' as SharedTab,
+  sharedWithMeNotes: [],
+  sharedWithMeLoading: false,
   selectedTagIds: [],
   searchQuery: '',
   displayLimit: NOTES_PER_PAGE,
@@ -712,11 +737,74 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   },
 
   setShowArchived: (show: boolean) => {
-    set({ showArchived: show, showTrash: false, displayLimit: NOTES_PER_PAGE })
+    set({ showArchived: show, showTrash: false, showShared: false, displayLimit: NOTES_PER_PAGE })
   },
 
   setShowTrash: (show: boolean) => {
-    set({ showTrash: show, showArchived: false, displayLimit: NOTES_PER_PAGE })
+    set({ showTrash: show, showArchived: false, showShared: false, displayLimit: NOTES_PER_PAGE })
+  },
+
+  setShowShared: (show: boolean) => {
+    set({ showShared: show, showArchived: false, showTrash: false, displayLimit: NOTES_PER_PAGE })
+    // Fetch shared note data when entering shared view
+    if (show) {
+      const { sharedTab } = get()
+      if (sharedTab === 'by_me') {
+        get().fetchSharedNoteIds()
+      } else {
+        get().fetchSharedWithMeNotes()
+      }
+    }
+  },
+
+  setSharedTab: (tab: SharedTab) => {
+    set({ sharedTab: tab, displayLimit: NOTES_PER_PAGE })
+    // Fetch data for the selected tab
+    if (tab === 'by_me') {
+      get().fetchSharedNoteIds()
+    } else {
+      get().fetchSharedWithMeNotes()
+    }
+  },
+
+  fetchSharedNoteIds: async () => {
+    const user = useAuthStore.getState().user
+    if (!user) return
+
+    try {
+      // Get all note IDs that have active (non-expired) shares
+      const { data, error } = await supabase
+        .from('note_shares')
+        .select('note_id')
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+
+      if (error) throw error
+
+      const sharedIds = new Set((data || []).map(row => row.note_id))
+      set({ sharedNoteIds: sharedIds })
+    } catch (error) {
+      console.error('Failed to fetch shared note IDs:', error)
+    }
+  },
+
+  fetchSharedWithMeNotes: async () => {
+    const user = useAuthStore.getState().user
+    if (!user) return
+
+    set({ sharedWithMeLoading: true })
+    try {
+      const results = await getSharedWithMeNotes()
+      set({ sharedWithMeNotes: results, sharedWithMeLoading: false })
+    } catch (error) {
+      console.error('Failed to fetch shared with me notes:', error)
+      set({ sharedWithMeLoading: false })
+    }
+  },
+
+  removeSharedWithMeNote: (savedShareId: string) => {
+    set(state => ({
+      sharedWithMeNotes: state.sharedWithMeNotes.filter(n => n.savedShareId !== savedShareId)
+    }))
   },
 
   setSelectedTagIds: (ids: string[]) => {
@@ -742,7 +830,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   },
 
   getFilteredNotes: () => {
-    const { notes, showArchived, showTrash, searchQuery, selectedTagIds } = get()
+    const { notes, showArchived, showTrash, showShared, sharedNoteIds, searchQuery, selectedTagIds } = get()
     const { noteTags } = useTagStore.getState()
 
     return notes.filter(note => {
@@ -754,8 +842,14 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       // Exclude deleted notes from normal views
       if (note.is_deleted) return false
 
-      // Archive filter
-      if (note.is_archived !== showArchived) return false
+      // Shared filter - show only notes that have been shared
+      if (showShared) {
+        if (!sharedNoteIds.has(note.id)) return false
+        // In shared view, show both archived and non-archived shared notes
+      } else {
+        // Archive filter (only apply when not in shared view)
+        if (note.is_archived !== showArchived) return false
+      }
 
       // Search filter
       if (searchQuery) {

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { List, FolderOpen, Archive, Trash2, ChevronDown, Check } from 'lucide-react'
+import { List, FolderOpen, Archive, Trash2, ChevronDown, Check, Share2 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuItem } from './DropdownMenu'
 
 interface ViewSwitcherProps {
@@ -7,9 +7,12 @@ interface ViewSwitcherProps {
   onViewModeChange: (mode: 'list' | 'folder') => void
   showArchived: boolean
   showTrash: boolean
+  showShared: boolean
   onShowArchived: (show: boolean) => void
   onShowTrash: (show: boolean) => void
+  onShowShared: (show: boolean) => void
   trashCount?: number
+  sharedCount?: number
 }
 
 export function ViewSwitcher({
@@ -17,32 +20,42 @@ export function ViewSwitcher({
   onViewModeChange,
   showArchived,
   showTrash,
+  showShared,
   onShowArchived,
   onShowTrash,
+  onShowShared,
   trashCount = 0,
+  sharedCount = 0,
 }: ViewSwitcherProps) {
   const [open, setOpen] = useState(false)
 
   // Determine current display state
-  const isInSpecialView = showArchived || showTrash
+  const isInSpecialView = showArchived || showTrash || showShared
 
   const handleViewClick = (mode: 'list' | 'folder') => {
     onViewModeChange(mode)
     // Clear special views when switching view mode
     if (showArchived) onShowArchived(false)
     if (showTrash) onShowTrash(false)
+    if (showShared) onShowShared(false)
     setOpen(false)
   }
 
   const handleArchiveClick = () => {
-    // Store already handles clearing showTrash when setting showArchived
+    // Store already handles clearing other views when setting showArchived
     onShowArchived(!showArchived)
     setOpen(false)
   }
 
   const handleTrashClick = () => {
-    // Store already handles clearing showArchived when setting showTrash
+    // Store already handles clearing other views when setting showTrash
     onShowTrash(!showTrash)
+    setOpen(false)
+  }
+
+  const handleSharedClick = () => {
+    // Store already handles clearing other views when setting showShared
+    onShowShared(!showShared)
     setOpen(false)
   }
 
@@ -50,6 +63,7 @@ export function ViewSwitcher({
   const getButtonIcon = () => {
     if (showArchived) return <Archive className="w-5 h-5" />
     if (showTrash) return <Trash2 className="w-5 h-5" />
+    if (showShared) return <Share2 className="w-5 h-5" />
     if (viewMode === 'folder') return <FolderOpen className="w-5 h-5" />
     return <List className="w-5 h-5" />
   }
@@ -89,6 +103,18 @@ export function ViewSwitcher({
         <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
 
         {/* Special views */}
+        <DropdownMenuItem
+          icon={showShared ? <Check className="w-4 h-4" /> : <div className="w-4 h-4" />}
+          onClick={handleSharedClick}
+        >
+          <Share2 className="w-4 h-4" />
+          <span className="flex-1">Shared</span>
+          {sharedCount > 0 && (
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {sharedCount}
+            </span>
+          )}
+        </DropdownMenuItem>
         <DropdownMenuItem
           icon={showArchived ? <Check className="w-4 h-4" /> : <div className="w-4 h-4" />}
           onClick={handleArchiveClick}

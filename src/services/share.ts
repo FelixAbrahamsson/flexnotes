@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { Note, NoteShare } from '@/types'
+import type { Note, NoteShare, SavedShare } from '@/types'
 
 // Generate a random share token
 function generateShareToken(): string {
@@ -172,4 +172,79 @@ export async function copyToClipboard(text: string): Promise<boolean> {
       document.body.removeChild(textarea)
     }
   }
+}
+
+// Save a shared note to the user's "Shared with me" list
+export async function saveSharedNote(
+  shareToken: string,
+  noteId: string,
+  userId: string
+): Promise<{ error: Error | null }> {
+  const { error } = await supabase
+    .from('saved_shares')
+    .upsert({
+      user_id: userId,
+      share_token: shareToken,
+      note_id: noteId,
+    }, {
+      onConflict: 'user_id,share_token',
+      ignoreDuplicates: true,
+    })
+
+  if (error) {
+    console.error('Failed to save shared note:', error)
+    return { error: error as Error }
+  }
+
+  return { error: null }
+}
+
+// Remove a saved share from the user's "Shared with me" list
+export async function removeSavedShare(savedShareId: string): Promise<{ error: Error | null }> {
+  const { error } = await supabase
+    .from('saved_shares')
+    .delete()
+    .eq('id', savedShareId)
+
+  return { error: error as Error | null }
+}
+
+// Get all saved shares for the current user (notes shared with me)
+export async function getSavedShares(): Promise<SavedShare[]> {
+  const { data, error } = await supabase
+    .from('saved_shares')
+    .select('*')
+    .order('saved_at', { ascending: false })
+
+  if (error) {
+    console.error('Failed to fetch saved shares:', error)
+    return []
+  }
+
+  return data || []
+}
+
+// Fetch full note data for saved shares (shared with me)
+export async function getSharedWithMeNotes(): Promise<{ note: Note; permission: 'read' | 'write'; savedShareId: string; shareToken: string }[]> {
+  // First get the user's saved shares
+  const savedShares = await getSavedShares()
+
+  // Then fetch each note using its share token
+  const results = await Promise.all(
+    savedShares.map(async (saved) => {
+      const result = await getSharedNote(saved.share_token)
+      if ('error' in result) {
+        return null // Share may have expired or been revoked
+      }
+      return {
+        note: result.note,
+        permission: result.permission,
+        savedShareId: saved.id,
+        shareToken: saved.share_token,
+      }
+    })
+  )
+
+  // Filter out failed lookups (expired/revoked shares)
+  return results.filter((r): r is NonNullable<typeof r> => r !== null)
 }

@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, AlertCircle, Eye, Edit3 } from 'lucide-react'
-import { getSharedNote, updateSharedNote } from '@/services/share'
+import { getSharedNote, updateSharedNote, saveSharedNote } from '@/services/share'
+import { useAuthStore } from '@/stores/authStore'
+import { useNoteStore } from '@/stores/noteStore'
 import { TextEditor } from '@/components/notes/TextEditor'
 import { ListEditor } from '@/components/notes/ListEditor'
 import { MarkdownEditor } from '@/components/notes/MarkdownEditor'
@@ -9,6 +11,9 @@ import type { Note } from '@/types'
 
 export function SharedNotePage() {
   const { token } = useParams<{ token: string }>()
+  const navigate = useNavigate()
+  const { user } = useAuthStore()
+  const { setShowShared, setSharedTab } = useNoteStore()
   const [note, setNote] = useState<Note | null>(null)
   const [permission, setPermission] = useState<'read' | 'write'>('read')
   const [loading, setLoading] = useState(true)
@@ -19,6 +24,12 @@ export function SharedNotePage() {
   // Editable state
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
+
+  const handleBackToShared = useCallback(() => {
+    setShowShared(true)
+    setSharedTab('with_me')
+    navigate('/')
+  }, [setShowShared, setSharedTab, navigate])
 
   useEffect(() => {
     async function loadNote() {
@@ -37,13 +48,25 @@ export function SharedNotePage() {
         setPermission(result.permission)
         setTitle(result.note.title || '')
         setContent(result.note.content)
+
+        // Auto-save to "Shared with me" if user is logged in and it's not their own note
+        if (user && result.note.owner_id !== user.id) {
+          const { error } = await saveSharedNote(token, result.note.id, user.id)
+          if (error) {
+            console.error('Failed to save shared note:', error)
+          }
+        } else if (user) {
+          console.log('Not saving to shared with me: viewing own note')
+        } else {
+          console.log('Not saving to shared with me: not logged in')
+        }
       }
 
       setLoading(false)
     }
 
     loadNote()
-  }, [token])
+  }, [token, user])
 
   const handleSave = useCallback(async () => {
     if (!token || !note || permission !== 'write') return
@@ -108,13 +131,13 @@ export function SharedNotePage() {
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link
-            to="/"
+          <button
+            onClick={handleBackToShared}
             className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span className="text-sm">Open app</span>
-          </Link>
+            <span className="text-sm">Shared with me</span>
+          </button>
 
           <div className="flex items-center gap-2">
             {permission === 'write' ? (
@@ -235,17 +258,11 @@ function SharedNoteContent({ note }: { note: Note }) {
     }
   }
 
-  if (note.note_type === 'markdown') {
-    return (
-      <div
-        className="prose prose-sm dark:prose-invert max-w-none"
-        dangerouslySetInnerHTML={{ __html: note.content }}
-      />
-    )
-  }
-
-  // Plain text
+  // Text and markdown notes both store HTML content
   return (
-    <div className="whitespace-pre-wrap text-gray-900 dark:text-gray-100">{note.content}</div>
+    <div
+      className="prose prose-sm dark:prose-invert max-w-none"
+      dangerouslySetInnerHTML={{ __html: note.content }}
+    />
   )
 }

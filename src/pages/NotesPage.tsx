@@ -9,6 +9,9 @@ import {
   X,
   Archive,
   Trash2,
+  Share2,
+  Users,
+  Trash as TrashIcon,
 } from "lucide-react";
 import {
   DndContext,
@@ -51,6 +54,7 @@ import { ViewSwitcher } from "@/components/ui/ViewSwitcher";
 import { FolderTreeView } from "@/components/folders/FolderTreeView";
 import { FolderPicker } from "@/components/folders/FolderPicker";
 import { FolderManager } from "@/components/folders/FolderManager";
+import { removeSavedShare } from "@/services/share";
 
 // Custom collision detection: requires pointer to be directly over action drop zones,
 // but uses closestCenter for sortable items (notes reordering)
@@ -84,6 +88,11 @@ export function NotesPage() {
     activeNoteId,
     showArchived,
     showTrash,
+    showShared,
+    sharedNoteIds,
+    sharedTab,
+    sharedWithMeNotes,
+    sharedWithMeLoading,
     searchQuery,
     selectedTagIds,
     fetchNotes,
@@ -96,6 +105,11 @@ export function NotesPage() {
     setActiveNote,
     setShowArchived,
     setShowTrash,
+    setShowShared,
+    setSharedTab,
+    fetchSharedNoteIds,
+    fetchSharedWithMeNotes,
+    removeSharedWithMeNote,
     setSearchQuery,
     getPaginatedNotes,
     getTrashCount,
@@ -188,7 +202,9 @@ export function NotesPage() {
   const handleRefresh = useCallback(async () => {
     await sync();
     await fetchNotes();
-  }, [sync, fetchNotes]);
+    await fetchSharedNoteIds();
+    await fetchSharedWithMeNotes();
+  }, [sync, fetchNotes, fetchSharedNoteIds, fetchSharedWithMeNotes]);
 
   const {
     pullDistance,
@@ -261,6 +277,8 @@ export function NotesPage() {
     fetchTags();
     fetchNoteTags();
     fetchFolders();
+    fetchSharedNoteIds();
+    fetchSharedWithMeNotes();
     refreshPendingCount();
 
     // Subscribe to realtime changes
@@ -274,6 +292,8 @@ export function NotesPage() {
     fetchTags,
     fetchNoteTags,
     fetchFolders,
+    fetchSharedNoteIds,
+    fetchSharedWithMeNotes,
     subscribeToChanges,
     refreshPendingCount,
   ]);
@@ -283,7 +303,7 @@ export function NotesPage() {
 
   // Get displayed notes based on view mode
   const displayedNotes = useMemo(() => {
-    if (viewMode === "folder" && !showArchived && !showTrash) {
+    if (viewMode === "folder" && !showArchived && !showTrash && !showShared) {
       // In folder view, show notes in the selected folder
       return getNotesInFolder(selectedFolderId);
     }
@@ -293,6 +313,7 @@ export function NotesPage() {
     viewMode,
     showArchived,
     showTrash,
+    showShared,
     selectedFolderId,
     searchQuery,
     selectedTagIds,
@@ -347,10 +368,10 @@ export function NotesPage() {
 
   // Exit reorder mode when switching views
   useEffect(() => {
-    if (showArchived || showTrash) {
+    if (showArchived || showTrash || showShared) {
       setReorderMode(false);
     }
-  }, [showArchived, showTrash]);
+  }, [showArchived, showTrash, showShared]);
 
   // Handle drag start - give haptic feedback and track dragging state
   const handleDragStart = useCallback(
@@ -558,6 +579,14 @@ export function NotesPage() {
     setFolderPickerNoteId(noteId);
   }, []);
 
+  const handleRemoveSharedWithMe = useCallback(async (savedShareId: string) => {
+    hapticLight();
+    const { error } = await removeSavedShare(savedShareId);
+    if (!error) {
+      removeSharedWithMeNote(savedShareId);
+    }
+  }, [removeSharedWithMeNote]);
+
   const handleFolderSelected = useCallback(
     async (folderId: string | null) => {
       if (folderPickerNoteId) {
@@ -608,14 +637,14 @@ export function NotesPage() {
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-              {showTrash ? "Trash" : showArchived ? "Archive" : "Notes"}
+              {showTrash ? "Trash" : showArchived ? "Archive" : showShared ? "Shared" : "Notes"}
             </h1>
             <SyncStatus />
           </div>
 
           <div className="flex items-center gap-1">
             {/* Reorder mode toggle - only show on mobile in main notes view */}
-            {!showArchived && !showTrash && (
+            {!showArchived && !showTrash && !showShared && (
               <button
                 onClick={() => setReorderMode(!reorderMode)}
                 className={`btn p-2 sm:hidden ${
@@ -635,9 +664,12 @@ export function NotesPage() {
               onViewModeChange={setViewMode}
               showArchived={showArchived}
               showTrash={showTrash}
+              showShared={showShared}
               onShowArchived={setShowArchived}
               onShowTrash={setShowTrash}
+              onShowShared={setShowShared}
               trashCount={trashCount}
+              sharedCount={sharedWithMeNotes.length + sharedNoteIds.size}
             />
 
             {/* Settings */}
@@ -683,7 +715,7 @@ export function NotesPage() {
 
       {/* Main content */}
       {/* Folder View - Split Pane Layout */}
-      {viewMode === "folder" && !showArchived && !showTrash ? (
+      {viewMode === "folder" && !showArchived && !showTrash && !showShared ? (
         <main className="flex h-[calc(100vh-120px)]">
           {/* Tree Panel */}
           <div
@@ -855,7 +887,106 @@ export function NotesPage() {
               </div>
             )}
 
-            {loading && displayedNotes.length === 0 ? (
+            {/* Shared tabs */}
+            {showShared && (
+              <div className="flex gap-1 mb-4 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <button
+                  onClick={() => setSharedTab('with_me')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                    sharedTab === 'with_me'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  Shared with me
+                </button>
+                <button
+                  onClick={() => setSharedTab('by_me')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                    sharedTab === 'by_me'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                  }`}
+                >
+                  <Share2 className="w-4 h-4" />
+                  Shared by me
+                </button>
+              </div>
+            )}
+
+            {/* Shared with me content */}
+            {showShared && sharedTab === 'with_me' ? (
+              sharedWithMeLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+                </div>
+              ) : sharedWithMeNotes.length === 0 ? (
+                <div className="text-center py-12">
+                  <Users className="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400 mb-2">
+                    No notes shared with you yet
+                  </p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500">
+                    When someone shares a note with you, it will appear here
+                  </p>
+                </div>
+              ) : (
+                <div className={`grid gap-3 ${gridClasses}`}>
+                  {sharedWithMeNotes.map(({ note, permission, savedShareId, shareToken }) => (
+                    <a
+                      key={savedShareId}
+                      href={`/shared/${shareToken}`}
+                      className="group relative bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow cursor-pointer block"
+                    >
+                      {/* Permission badge */}
+                      <div className="absolute top-2 right-2 flex items-center gap-2">
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          permission === 'write'
+                            ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
+                            : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                        }`}>
+                          {permission === 'write' ? 'Can edit' : 'View only'}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleRemoveSharedWithMe(savedShareId);
+                          }}
+                          className="p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400 rounded sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                          title="Remove from list"
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* Title */}
+                      {note.title && (
+                        <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2 pr-24 line-clamp-2">
+                          {note.title}
+                        </h3>
+                      )}
+
+                      {/* Content preview */}
+                      <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-3">
+                        {note.note_type === 'list'
+                          ? (() => {
+                              try {
+                                const parsed = JSON.parse(note.content);
+                                return parsed.items?.slice(0, 3).map((i: { text: string }) => i.text).join(', ') || 'Empty list';
+                              } catch {
+                                return note.content.slice(0, 100);
+                              }
+                            })()
+                          : note.content.replace(/<[^>]*>/g, '').slice(0, 150)
+                        }
+                      </p>
+                    </a>
+                  ))}
+                </div>
+              )
+            ) : loading && displayedNotes.length === 0 ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
               </div>
@@ -864,6 +995,8 @@ export function NotesPage() {
                 <div className="mb-4">
                   {showTrash ? (
                     <Trash className="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600" />
+                  ) : showShared ? (
+                    <Share2 className="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600" />
                   ) : null}
                 </div>
                 <p className="text-gray-500 dark:text-gray-400 mb-4">
@@ -871,18 +1004,26 @@ export function NotesPage() {
                     ? "Trash is empty"
                     : showArchived
                       ? "No archived notes"
-                      : searchQuery
-                        ? "No notes match your search"
-                        : selectedTagIds.length > 0
-                          ? "No notes with selected tags"
-                          : viewMode === "folder"
-                            ? selectedFolderId
-                              ? "No notes in this folder"
-                              : "No notes without a folder"
-                            : "No notes yet"}
+                      : showShared
+                        ? "You haven't shared any notes yet"
+                        : searchQuery
+                          ? "No notes match your search"
+                          : selectedTagIds.length > 0
+                            ? "No notes with selected tags"
+                            : viewMode === "folder"
+                              ? selectedFolderId
+                                ? "No notes in this folder"
+                                : "No notes without a folder"
+                              : "No notes yet"}
                 </p>
+                {showShared && sharedTab === 'by_me' && (
+                  <p className="text-sm text-gray-400 dark:text-gray-500">
+                    Share a note to see it here
+                  </p>
+                )}
                 {!showArchived &&
                   !showTrash &&
+                  !showShared &&
                   !searchQuery &&
                   selectedTagIds.length === 0 && (
                     <button
@@ -1058,7 +1199,7 @@ export function NotesPage() {
       )}
 
       {/* Floating action button - hide in folder view on desktop (tree has create buttons) */}
-      {!showArchived && !showTrash && (viewMode === "list" || isMobile) && (
+      {!showArchived && !showTrash && !showShared && (viewMode === "list" || isMobile) && (
         <button
           onClick={handleCreateNote}
           className="fixed right-6 w-14 h-14 bg-primary-600 text-white rounded-full shadow-lg hover:bg-primary-700 active:bg-primary-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:focus:ring-offset-gray-900 flex items-center justify-center transition-transform active:scale-95 native-fab bottom-6"
