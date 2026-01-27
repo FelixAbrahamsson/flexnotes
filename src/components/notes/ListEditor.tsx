@@ -120,10 +120,10 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     [],
   );
 
-  const addItem = (afterId?: string) => {
+  const addItem = (afterId?: string, initialText?: string) => {
     const newItem: ListItem = {
       id: `item-${Date.now()}`,
-      text: "",
+      text: initialText ?? "",
       checked: false,
       indent: 0,
     };
@@ -153,6 +153,60 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     );
     setItems(newItems);
     saveItems(newItems);
+  };
+
+  // Split an item at cursor position - keeps text before cursor, creates new item with text after
+  const splitItem = (id: string, textBefore: string, textAfter: string) => {
+    const index = items.findIndex((item) => item.id === id);
+    if (index === -1) return;
+
+    const currentItem = items[index];
+    const newItem: ListItem = {
+      id: `item-${Date.now()}`,
+      text: textAfter,
+      checked: false,
+      indent: currentItem.indent ?? 0,
+    };
+
+    const newItems = [
+      ...items.slice(0, index),
+      { ...currentItem, text: textBefore },
+      newItem,
+      ...items.slice(index + 1),
+    ];
+
+    setItems(newItems);
+    saveItems(newItems);
+    setFocusedId(newItem.id);
+  };
+
+  // Merge current item with the previous item (backspace at start)
+  const mergeWithPreviousItem = (id: string) => {
+    const index = items.findIndex((item) => item.id === id);
+    if (index <= 0) return;
+
+    const currentItem = items[index];
+    const prevItem = items[index - 1];
+    const cursorPosition = prevItem.text.length; // Where to place cursor after merge
+
+    const newItems = [
+      ...items.slice(0, index - 1),
+      { ...prevItem, text: prevItem.text + currentItem.text },
+      ...items.slice(index + 1),
+    ];
+
+    setItems(newItems);
+    saveItems(newItems);
+    setFocusedId(prevItem.id);
+
+    // Set cursor position at the join point after focus
+    setTimeout(() => {
+      const textarea = inputRefs.current.get(prevItem.id);
+      if (textarea) {
+        textarea.selectionStart = cursorPosition;
+        textarea.selectionEnd = cursorPosition;
+      }
+    }, 0);
   };
 
   // Toggle checked state - when checking, also check all children
@@ -219,11 +273,19 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     const item = items.find((i) => i.id === id);
     if (!item) return;
 
-    // Enter key - create new item (Shift+Enter for newline on desktop)
+    // Enter key - split text at cursor and create new item (Shift+Enter for newline on desktop)
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       e.stopPropagation();
-      addItem(id);
+
+      // Get cursor position and split text
+      const textarea = e.target as HTMLTextAreaElement;
+      const cursorPos = textarea.selectionStart;
+      const textBefore = item.text.slice(0, cursorPos);
+      const textAfter = item.text.slice(cursorPos);
+
+      // Split the item - update current with text before, create new with text after
+      splitItem(id, textBefore, textAfter);
       return;
     }
 
@@ -232,11 +294,41 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
       shiftEnterPressedRef.current = true;
     }
 
-    // Backspace on empty item - delete it
-    if (e.key === "Backspace" && item.text.trim() === "") {
-      e.preventDefault();
-      deleteItem(id);
-      return;
+    // Backspace at start of item - merge with previous item
+    if (e.key === "Backspace") {
+      const textarea = e.target as HTMLTextAreaElement;
+      const cursorPos = textarea.selectionStart;
+      const selectionEnd = textarea.selectionEnd;
+
+      // Only handle if cursor is at the very start with no selection
+      if (cursorPos === 0 && selectionEnd === 0) {
+        const index = items.findIndex((i) => i.id === id);
+
+        // If this is the first item and it's empty, just delete it
+        if (index === 0) {
+          if (item.text.trim() === "") {
+            e.preventDefault();
+            deleteItem(id);
+          }
+          return;
+        }
+
+        // Find the previous unchecked item to merge with
+        // (we only show unchecked items together, so merge within that group)
+        const prevItem = items[index - 1];
+        if (prevItem && !prevItem.checked) {
+          e.preventDefault();
+          mergeWithPreviousItem(id);
+        }
+        return;
+      }
+
+      // Backspace on empty item - delete it (fallback for non-start positions)
+      if (item.text.trim() === "") {
+        e.preventDefault();
+        deleteItem(id);
+        return;
+      }
     }
 
     // Tab for indentation
@@ -310,15 +402,20 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     const oldNewlines = (oldText.match(/\n/g) || []).length;
     const newNewlines = (newText.match(/\n/g) || []).length;
 
-    // Only treat as Enter key if exactly one newline was added at the end
-    // (multiple newlines means paste, newline in middle means paste)
-    if (newNewlines === oldNewlines + 1 && newText.endsWith("\n")) {
-      // A single newline was typed at the end - on mobile this means Enter was pressed
-      // Remove the newline and create a new item instead
-      const cleanedText = newText.slice(0, -1); // Remove trailing newline
-      updateItem(id, { text: cleanedText });
-      addItem(id);
-      return;
+    // Only treat as Enter key if exactly one newline was added
+    // (multiple newlines means paste)
+    if (newNewlines === oldNewlines + 1) {
+      // Find where the new newline was inserted
+      const newlineIndex = newText.indexOf("\n", oldText.lastIndexOf("\n") + 1);
+
+      if (newlineIndex !== -1) {
+        // Split text at the newline - text before stays, text after goes to new item
+        const textBefore = newText.slice(0, newlineIndex);
+        const textAfter = newText.slice(newlineIndex + 1);
+
+        splitItem(id, textBefore, textAfter);
+        return;
+      }
     }
 
     updateItem(id, { text: newText });
