@@ -47,6 +47,7 @@ interface NoteState {
   fetchNotes: () => Promise<void>
   createNote: (note?: NewNote) => Promise<Note | null>
   createNoteFromImport: (note: Omit<Note, 'id'> & { id: string }) => Promise<string>
+  duplicateNote: (id: string) => Promise<Note | null>
   updateNote: (id: string, updates: Partial<Note>) => Promise<void>
   deleteNote: (id: string) => Promise<void>
   trashNote: (id: string) => Promise<void>
@@ -309,6 +310,82 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       set(state => ({
         notes: [uiNote, ...state.notes],
         activeNoteId: id
+      }))
+
+      // Try to sync immediately if online
+      triggerSyncIfOnline()
+
+      return uiNote
+    } catch (error) {
+      set({ error: (error as Error).message })
+      return null
+    }
+  },
+
+  duplicateNote: async (id: string) => {
+    const user = useAuthStore.getState().user
+    if (!user) return null
+
+    // Find the original note
+    const originalNote = get().notes.find(n => n.id === id)
+    if (!originalNote) return null
+
+    const newId = generateLocalId()
+    const now = getCurrentTimestamp()
+
+    // Get lowest sort_order from existing notes and subtract 1 to place new note at top
+    const existingNotes = get().notes.filter(n => !n.is_deleted && !n.is_archived)
+    const minSortOrder = existingNotes.length > 0
+      ? Math.min(...existingNotes.map(n => n.sort_order))
+      : 0
+    const sortOrder = minSortOrder - 1
+
+    // Create duplicate with "Copy" suffix on title
+    const duplicateTitle = originalNote.title
+      ? `${originalNote.title} (Copy)`
+      : 'Untitled (Copy)'
+
+    const newNote: LocalNote = {
+      id: newId,
+      owner_id: user.id,
+      title: duplicateTitle,
+      content: originalNote.content,
+      note_type: originalNote.note_type,
+      is_pinned: false,
+      is_archived: false,
+      is_deleted: false,
+      deleted_at: null,
+      folder_id: originalNote.folder_id,
+      created_at: now,
+      updated_at: now,
+      version: 1,
+      sort_order: sortOrder,
+      _syncStatus: 'pending',
+      _localUpdatedAt: now,
+    }
+
+    try {
+      // Save to local DB first
+      await db.notes.add(newNote)
+
+      // Queue for sync
+      await queueChange('note', newId, 'create')
+
+      // Copy tags from original note
+      const { noteTags, addTagToNote } = useTagStore.getState()
+      const originalTags = noteTags.filter(nt => nt.note_id === id)
+      for (const noteTag of originalTags) {
+        await addTagToNote(newId, noteTag.tag_id)
+      }
+
+      // Update UI state
+      const uiNote: Note = {
+        ...newNote,
+        _pendingSync: true,
+      }
+
+      set(state => ({
+        notes: [uiNote, ...state.notes],
       }))
 
       // Try to sync immediately if online

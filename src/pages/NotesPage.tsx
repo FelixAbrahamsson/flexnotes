@@ -102,6 +102,7 @@ export function NotesPage() {
     restoreNote,
     permanentlyDeleteNote,
     emptyTrash,
+    duplicateNote,
     setActiveNote,
     setShowArchived,
     setShowTrash,
@@ -569,6 +570,14 @@ export function NotesPage() {
     hapticLight();
     setShareNoteId(noteId);
   }, []);
+
+  const handleDuplicate = useCallback(
+    async (noteId: string) => {
+      hapticLight();
+      await duplicateNote(noteId);
+    },
+    [duplicateNote],
+  );
 
   const handleCloseShare = useCallback(() => {
     setShareNoteId(null);
@@ -1076,6 +1085,7 @@ export function NotesPage() {
                               }
                               onDelete={() => handleDelete(note.id)}
                               onShare={() => handleShare(note.id)}
+                              onDuplicate={() => handleDuplicate(note.id)}
                               onMoveToFolder={() => handleMoveToFolder(note.id)}
                               showFolder={false}
                               isDragDisabled={
@@ -1142,6 +1152,11 @@ export function NotesPage() {
                               onShare={
                                 !showTrash
                                   ? () => handleShare(note.id)
+                                  : undefined
+                              }
+                              onDuplicate={
+                                !showTrash
+                                  ? () => handleDuplicate(note.id)
                                   : undefined
                               }
                               onMoveToFolder={

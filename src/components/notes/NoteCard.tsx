@@ -8,6 +8,7 @@ import {
   RotateCcw,
   Share2,
   FolderOpen,
+  Copy,
 } from "lucide-react";
 import type { Note, Tag, Folder } from "@/types";
 import { TagBadge } from "@/components/tags/TagBadge";
@@ -25,6 +26,7 @@ interface NoteCardProps {
   onDelete?: () => void;
   onRestore?: () => void;
   onShare?: () => void;
+  onDuplicate?: () => void;
   onMoveToFolder?: () => void;
   showRestore?: boolean;
   showFolder?: boolean; // Show folder badge on the card
@@ -40,6 +42,7 @@ export function NoteCard({
   onDelete,
   onRestore,
   onShare,
+  onDuplicate,
   onMoveToFolder,
   showRestore,
   showFolder,
@@ -93,6 +96,12 @@ export function NoteCard({
     e.stopPropagation();
     setShowMenu(false);
     onMoveToFolder?.();
+  };
+
+  const handleDuplicate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMenu(false);
+    onDuplicate?.();
   };
 
   return (
@@ -170,6 +179,7 @@ export function NoteCard({
         onDelete ||
         onRestore ||
         onShare ||
+        onDuplicate ||
         onMoveToFolder) && (
         <div className="absolute top-2 right-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           <button
@@ -208,6 +218,14 @@ export function NoteCard({
                 onClick={handleShare}
               >
                 Share
+              </DropdownMenuItem>
+            )}
+            {onDuplicate && !showRestore && (
+              <DropdownMenuItem
+                icon={<Copy className="w-4 h-4" />}
+                onClick={handleDuplicate}
+              >
+                Duplicate
               </DropdownMenuItem>
             )}
             {onMoveToFolder && !showRestore && (

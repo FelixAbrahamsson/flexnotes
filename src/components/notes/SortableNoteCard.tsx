@@ -13,6 +13,7 @@ export interface SortableNoteCardProps {
   onDelete: () => void
   onRestore?: () => void
   onShare?: () => void
+  onDuplicate?: () => void
   onMoveToFolder?: () => void
   showRestore?: boolean
   showFolder?: boolean
@@ -30,6 +31,7 @@ export function SortableNoteCard({
   onDelete,
   onRestore,
   onShare,
+  onDuplicate,
   onMoveToFolder,
   showRestore,
   showFolder,
@@ -72,6 +74,7 @@ export function SortableNoteCard({
         onDelete={onDelete}
         onRestore={onRestore}
         onShare={onShare}
+        onDuplicate={onDuplicate}
         onMoveToFolder={onMoveToFolder}
         showRestore={showRestore}
         showFolder={showFolder}
