@@ -35,14 +35,14 @@ export function ViewSwitcher({
   }
 
   const handleArchiveClick = () => {
+    // Store already handles clearing showTrash when setting showArchived
     onShowArchived(!showArchived)
-    if (showTrash) onShowTrash(false)
     setOpen(false)
   }
 
   const handleTrashClick = () => {
+    // Store already handles clearing showArchived when setting showTrash
     onShowTrash(!showTrash)
-    if (showArchived) onShowArchived(false)
     setOpen(false)
   }
 
@@ -58,11 +58,7 @@ export function ViewSwitcher({
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className={`btn p-2 flex items-center gap-1 ${
-          isInSpecialView
-            ? 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100'
-            : 'btn-ghost'
-        }`}
+        className="btn btn-ghost p-2 flex items-center gap-1"
         title="View options"
       >
         {getButtonIcon()}
