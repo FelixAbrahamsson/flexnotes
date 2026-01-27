@@ -342,20 +342,35 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
       return;
     }
 
-    // Arrow keys for navigation between items (only at text boundaries)
+    // Arrow keys for navigation between items
+    // Only navigate to another item when at the very edge of the current item
     if (e.key === "ArrowDown") {
       const textarea = e.target as HTMLTextAreaElement;
-      const { selectionStart, value } = textarea;
+      const { selectionStart, selectionEnd, value } = textarea;
 
-      // Check if cursor is on the last line
+      // Check if cursor is on the last line AND at the end of the text
       const textAfterCursor = value.substring(selectionStart);
       const isOnLastLine = !textAfterCursor.includes('\n');
+      const isAtEnd = selectionStart === value.length && selectionStart === selectionEnd;
 
-      if (isOnLastLine) {
-        const index = items.findIndex((i) => i.id === id);
-        if (index < items.length - 1) {
+      // Only navigate to next item if we're at the very end
+      if (isOnLastLine && isAtEnd) {
+        // Find next unchecked item
+        const uncheckedItems = items.filter((i) => !i.checked);
+        const currentUncheckedIndex = uncheckedItems.findIndex((i) => i.id === id);
+
+        if (currentUncheckedIndex < uncheckedItems.length - 1) {
           e.preventDefault();
-          setFocusedId(items[index + 1]?.id ?? null);
+          const nextItem = uncheckedItems[currentUncheckedIndex + 1];
+          setFocusedId(nextItem.id);
+          // Put cursor at the start of the next item
+          setTimeout(() => {
+            const nextTextarea = inputRefs.current.get(nextItem.id);
+            if (nextTextarea) {
+              nextTextarea.selectionStart = 0;
+              nextTextarea.selectionEnd = 0;
+            }
+          }, 0);
         }
       }
       // Otherwise, let the textarea handle normal cursor movement
@@ -364,17 +379,32 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
 
     if (e.key === "ArrowUp") {
       const textarea = e.target as HTMLTextAreaElement;
-      const { selectionStart, value } = textarea;
+      const { selectionStart, selectionEnd, value } = textarea;
 
-      // Check if cursor is on the first line
+      // Check if cursor is on the first line AND at the start of the text
       const textBeforeCursor = value.substring(0, selectionStart);
       const isOnFirstLine = !textBeforeCursor.includes('\n');
+      const isAtStart = selectionStart === 0 && selectionEnd === 0;
 
-      if (isOnFirstLine) {
-        const index = items.findIndex((i) => i.id === id);
-        if (index > 0) {
+      // Only navigate to previous item if we're at the very start
+      if (isOnFirstLine && isAtStart) {
+        // Find previous unchecked item
+        const uncheckedItems = items.filter((i) => !i.checked);
+        const currentUncheckedIndex = uncheckedItems.findIndex((i) => i.id === id);
+
+        if (currentUncheckedIndex > 0) {
           e.preventDefault();
-          setFocusedId(items[index - 1]?.id ?? null);
+          const prevItem = uncheckedItems[currentUncheckedIndex - 1];
+          setFocusedId(prevItem.id);
+          // Put cursor at the end of the previous item
+          setTimeout(() => {
+            const prevTextarea = inputRefs.current.get(prevItem.id);
+            if (prevTextarea) {
+              const endPos = prevItem.text.length;
+              prevTextarea.selectionStart = endPos;
+              prevTextarea.selectionEnd = endPos;
+            }
+          }, 0);
         }
       }
       // Otherwise, let the textarea handle normal cursor movement
