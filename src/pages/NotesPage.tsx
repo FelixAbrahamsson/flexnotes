@@ -75,7 +75,7 @@ const customCollisionDetection: CollisionDetection = (args) => {
   );
 };
 
-type ModalType = "settings";
+type ModalType = "settings" | "note";
 
 export function NotesPage() {
   const {
@@ -124,8 +124,14 @@ export function NotesPage() {
   // Track modal stack for back button handling
   const modalStackRef = useRef<ModalType[]>([]);
 
+  // Track activeNoteId in ref for popstate handler (avoids stale closure)
+  const activeNoteIdRef = useRef(activeNoteId);
+  useEffect(() => {
+    activeNoteIdRef.current = activeNoteId;
+  }, [activeNoteId]);
+
   // Sync open note with URL (allows each tab to remember its own note)
-  const { setNoteInUrl, clearNoteFromUrl } = useNoteFromUrl({
+  const { noteIdFromUrl, setNoteInUrl, clearNoteFromUrl } = useNoteFromUrl({
     onNoteIdChange: useCallback((noteId: string | null) => {
       if (noteId) {
         // In folder view desktop, show in pane; otherwise show in modal
@@ -208,18 +214,46 @@ export function NotesPage() {
     }
   }, []);
 
-  // Handle back button / swipe back for settings modal
+  // Track previous noteIdFromUrl to detect back navigation
+  const prevNoteIdFromUrlRef = useRef(noteIdFromUrl);
+
+  // Safety net: if URL changes from having a note ID to not having one,
+  // but note is still open on mobile, close it.
+  // This handles edge cases where popstate doesn't properly close the note.
+  useEffect(() => {
+    const hadNoteId = prevNoteIdFromUrlRef.current;
+    const hasNoteId = noteIdFromUrl;
+
+    // Only close if URL HAD a note ID and now doesn't (back navigation)
+    // Don't close if URL was never set (initial note open - URL update is async)
+    if (hadNoteId && !hasNoteId && activeNoteId && isMobileRef.current) {
+      setActiveNote(null);
+    }
+
+    prevNoteIdFromUrlRef.current = noteIdFromUrl;
+  }, [noteIdFromUrl, activeNoteId, setActiveNote]);
+
+  // Handle back button / swipe back for modals (settings, notes)
   useEffect(() => {
     const handlePopState = () => {
       const topModal = modalStackRef.current.pop();
       if (topModal === "settings") {
         setShowSettings(false);
+      } else if (topModal === "note") {
+        // Close note without triggering another history.back()
+        // Use ref to get current activeNoteId (avoids stale closure)
+        const noteId = activeNoteIdRef.current;
+        if (noteId) {
+          deleteNoteIfEmpty(noteId);
+        }
+        setActiveNote(null);
+        clearNoteFromUrl();
       }
     };
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
+  }, [deleteNoteIfEmpty, setActiveNote, clearNoteFromUrl]);
 
   // Initialize data and subscriptions
   useEffect(() => {
@@ -385,6 +419,11 @@ export function NotesPage() {
       }
       setActiveNote(note.id);
       setNoteInUrl(note.id);
+      // Push to history stack on mobile so back button closes the note
+      if (isMobileRef.current) {
+        modalStackRef.current.push("note");
+        window.history.pushState({ modal: "note" }, "");
+      }
     }
   }, [
     createNote,
@@ -397,13 +436,29 @@ export function NotesPage() {
   ]);
 
   const handleCloseEditor = useCallback(async () => {
-    if (activeNoteId) {
-      // Delete the note if it's empty
-      await deleteNoteIfEmpty(activeNoteId);
+    const noteId = activeNoteIdRef.current;
+    // On mobile, use history.back() to trigger popstate handler
+    // This ensures proper cleanup of history stack
+    if (isMobileRef.current && modalStackRef.current.includes("note")) {
+      const index = modalStackRef.current.lastIndexOf("note");
+      if (index !== -1) {
+        modalStackRef.current.splice(index, 1);
+      }
+      if (noteId) {
+        await deleteNoteIfEmpty(noteId);
+      }
+      setActiveNote(null);
+      clearNoteFromUrl();
+      window.history.back();
+    } else {
+      // On desktop or when history was already handled, just close directly
+      if (noteId) {
+        await deleteNoteIfEmpty(noteId);
+      }
+      setActiveNote(null);
+      clearNoteFromUrl();
     }
-    setActiveNote(null);
-    clearNoteFromUrl();
-  }, [activeNoteId, deleteNoteIfEmpty, setActiveNote, clearNoteFromUrl]);
+  }, [deleteNoteIfEmpty, setActiveNote, clearNoteFromUrl]);
 
   const handleArchive = useCallback(
     (noteId: string, isArchived: boolean) => {
@@ -470,6 +525,11 @@ export function NotesPage() {
     (noteId: string) => {
       setActiveNote(noteId);
       setNoteInUrl(noteId);
+      // Push to history stack on mobile so back button closes the note
+      if (isMobileRef.current) {
+        modalStackRef.current.push("note");
+        window.history.pushState({ modal: "note" }, "");
+      }
     },
     [setActiveNote, setNoteInUrl],
   );
@@ -682,9 +742,12 @@ export function NotesPage() {
                 reorderMode={reorderMode}
                 onSelectNote={(noteId) => {
                   hapticLight();
-                  if (isMobile) {
+                  if (isMobileRef.current) {
                     // On mobile, open in modal
                     setActiveNote(noteId);
+                    // Push to history stack so back button closes the note
+                    modalStackRef.current.push("note");
+                    window.history.pushState({ modal: "note" }, "");
                   } else {
                     // On desktop, show in pane (close any modal first)
                     setActiveNote(null);
@@ -696,8 +759,11 @@ export function NotesPage() {
                   hapticLight();
                   const note = await createNote({ folder_id: folderId });
                   if (note) {
-                    if (isMobile) {
+                    if (isMobileRef.current) {
                       setActiveNote(note.id);
+                      // Push to history stack so back button closes the note
+                      modalStackRef.current.push("note");
+                      window.history.pushState({ modal: "note" }, "");
                     } else {
                       // On desktop, show in pane (close any modal first)
                       setActiveNote(null);
