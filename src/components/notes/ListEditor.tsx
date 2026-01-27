@@ -472,25 +472,28 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     }, 0);
   };
 
-  // Calculate drop target based on Y position
+  // Calculate drop target based on Y position (only considers unchecked items)
   const calculateDropTarget = useCallback((clientY: number): number => {
     const currentItems = itemsRef.current;
     const dragState = dragStateRef.current;
     if (!dragState) return 0;
 
+    // Only consider unchecked items for drop targets
+    const uncheckedItems = currentItems.filter((item) => !item.checked);
     let targetIndex = 0;
 
-    // Find which item we're hovering over
-    for (let i = 0; i < currentItems.length; i++) {
+    // Find which unchecked item we're hovering over
+    for (let i = 0; i < uncheckedItems.length; i++) {
+      const item = uncheckedItems[i];
       // Skip items being dragged
-      if (dragState.draggedIds.includes(currentItems[i].id)) continue;
+      if (dragState.draggedIds.includes(item.id)) continue;
 
-      const rowEl = rowRefs.current.get(currentItems[i].id);
+      const rowEl = rowRefs.current.get(item.id);
       if (rowEl) {
         const rect = rowEl.getBoundingClientRect();
         const midY = rect.top + rect.height / 2;
         if (clientY > midY) {
-          // Count how many non-dragged items we've passed
+          // targetIndex is the position in uncheckedItems array
           targetIndex = i + 1;
         }
       }
@@ -499,20 +502,27 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     return targetIndex;
   }, []);
 
-  // Move items to new position
+  // Move items to new position (targetIdx is index within unchecked items)
   const moveItemsToPosition = useCallback(
     (draggedItemIds: string[], targetIdx: number) => {
       const currentItems = itemsRef.current;
       if (draggedItemIds.length === 0) return;
 
-      const firstDraggedIndex = currentItems.findIndex(
+      // Get unchecked items (excluding dragged ones) to map targetIdx to actual position
+      const uncheckedItems = currentItems.filter((item) => !item.checked);
+      const uncheckedExcludingDragged = uncheckedItems.filter(
+        (item) => !draggedItemIds.includes(item.id),
+      );
+
+      // Find the index in uncheckedItems of the first dragged item
+      const firstDraggedUncheckedIdx = uncheckedItems.findIndex(
         (item) => item.id === draggedItemIds[0],
       );
 
       // Don't move if we're dropping in the same spot
       if (
-        targetIdx === firstDraggedIndex ||
-        targetIdx === firstDraggedIndex + draggedItemIds.length
+        targetIdx === firstDraggedUncheckedIdx ||
+        targetIdx === firstDraggedUncheckedIdx + draggedItemIds.length
       ) {
         return;
       }
@@ -522,16 +532,31 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
         .map((id) => currentItems.find((item) => item.id === id))
         .filter((item): item is ListItem => item !== undefined);
 
-      // Remove dragged items
+      // Remove dragged items from the full array
       const remaining = currentItems.filter(
         (item) => !draggedItemIds.includes(item.id),
       );
 
-      // Calculate insertion point
-      let insertAt = targetIdx;
-      if (firstDraggedIndex < targetIdx) {
-        insertAt = targetIdx - draggedItemIds.length;
+      // Find where to insert in the full array
+      // targetIdx is the position in unchecked items (after removing dragged)
+      // We need to find the corresponding position in the remaining array
+      let insertAt: number;
+      if (targetIdx >= uncheckedExcludingDragged.length) {
+        // Insert after all unchecked items - find last unchecked item in remaining
+        let lastUncheckedIdx = -1;
+        for (let i = remaining.length - 1; i >= 0; i--) {
+          if (!remaining[i].checked) {
+            lastUncheckedIdx = i;
+            break;
+          }
+        }
+        insertAt = lastUncheckedIdx === -1 ? 0 : lastUncheckedIdx + 1;
+      } else {
+        // Find the item at targetIdx in uncheckedExcludingDragged
+        const targetItem = uncheckedExcludingDragged[targetIdx];
+        insertAt = remaining.findIndex((item) => item.id === targetItem.id);
       }
+
       insertAt = Math.max(0, Math.min(insertAt, remaining.length));
 
       // Insert at new position
@@ -748,8 +773,8 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
       {/* Unchecked items */}
       {uncheckedItems.map((item, index) => {
         const isBeingDragged = draggedIds.includes(item.id);
-        const itemIndex = items.findIndex((i) => i.id === item.id);
-        const showDropBefore = dropTargetIndex === itemIndex && !isBeingDragged;
+        // dropTargetIndex is now based on uncheckedItems array, so compare with index
+        const showDropBefore = dropTargetIndex === index && !isBeingDragged;
 
         return (
           <div key={item.id}>
@@ -784,7 +809,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
             {/* Show drop indicator after last unchecked item */}
             {index === uncheckedItems.length - 1 &&
               dropTargetIndex !== null &&
-              dropTargetIndex >= items.filter((i) => !i.checked).length &&
+              dropTargetIndex === uncheckedItems.length &&
               !isBeingDragged && (
                 <div className="h-1 bg-primary-500 rounded-full mx-2 my-1" />
               )}
