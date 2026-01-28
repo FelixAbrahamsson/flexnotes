@@ -1,4 +1,4 @@
-# Felix Notes
+# FlexNotes
 
 A modern, cross-platform note-taking app with offline support and real-time sync. Built as a Google Keep alternative with additional features like markdown editing and shareable notes.
 
@@ -75,6 +75,7 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 ### Cross-Platform
 - **Web**: Modern PWA with offline support
 - **iOS & Android**: Native apps via Capacitor
+- **Linux Desktop**: Native app via Tauri (deb, AppImage)
 
 ## Tech Stack
 
@@ -85,6 +86,7 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 - **Backend**: Supabase (Auth, PostgreSQL, Storage, Realtime)
 - **Offline Storage**: Dexie.js (IndexedDB)
 - **Mobile**: Capacitor for iOS/Android builds
+- **Desktop**: Tauri for Linux builds
 - **PWA**: Workbox for service worker and caching
 
 ## Getting Started
@@ -99,8 +101,8 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/felix-notes.git
-   cd felix-notes
+   git clone https://github.com/yourusername/flexnotes.git
+   cd flexnotes
    ```
 
 2. Install dependencies:
@@ -137,10 +139,17 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 | `npm run cap:sync` | Sync web assets to native platforms |
 | `npm run cap:ios` | Build and open in Xcode |
 | `npm run cap:android` | Build and open in Android Studio |
+| `npm run tauri:dev` | Start Tauri development mode |
+| `npm run tauri:build` | Build Linux desktop app |
 
 ## Project Structure
 
 ```
+src-tauri/                  # Tauri desktop app configuration
+├── icons/                  # App icons for Linux
+├── src/                    # Rust source (minimal, just runs webview)
+├── Cargo.toml              # Rust dependencies
+└── tauri.conf.json         # Tauri configuration
 src/
 ├── components/          # React components
 │   ├── folders/        # Folder tree view, picker, badge, manager
@@ -179,7 +188,7 @@ You can import your existing notes from Google Keep:
 2. Click "Deselect all", then select only **Google Keep**
 3. Click "Next step" and choose your export options
 4. Create the export and download the ZIP file
-5. In Felix Notes, open **Settings** (gear icon)
+5. In FlexNotes, open **Settings** (gear icon)
 6. Scroll to "Import from Google Keep" and select the ZIP file
 7. Wait for the import to complete
 
@@ -246,6 +255,56 @@ This builds the web app and opens Android Studio. From there:
 For Play Store release:
 1. Build → Generate Signed Bundle/APK
 2. Follow the signing wizard
+
+## Building for Linux Desktop
+
+The app can be built as a native Linux desktop application using Tauri.
+
+### Prerequisites
+
+Install the required system dependencies:
+
+```bash
+# Ubuntu/Debian
+sudo apt install libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev
+
+# Fedora
+sudo dnf install webkit2gtk4.1-devel
+
+# Arch
+sudo pacman -S webkit2gtk-4.1
+```
+
+### Development
+
+```bash
+npm run tauri:dev
+```
+
+This starts the app in development mode with hot reload.
+
+### Building
+
+```bash
+npm run tauri:build
+```
+
+This produces:
+- `.deb` package: `src-tauri/target/release/bundle/deb/`
+- `.AppImage`: `src-tauri/target/release/bundle/appimage/`
+
+### Installation
+
+**From .deb (Debian/Ubuntu):**
+```bash
+sudo dpkg -i flexnotes_0.1.0_amd64.deb
+```
+
+**From .AppImage:**
+```bash
+chmod +x flexnotes_0.1.0_amd64.AppImage
+./flexnotes_0.1.0_amd64.AppImage
+```
 
 ## PWA Installation
 

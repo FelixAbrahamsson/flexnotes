@@ -13,7 +13,7 @@ export default defineConfig({
         enabled: true,
       },
       manifest: {
-        name: 'Felix Notes',
+        name: 'FlexNotes',
         short_name: 'Notes',
         description: 'A simple, beautiful note-taking app with offline support',
         theme_color: '#6366f1',

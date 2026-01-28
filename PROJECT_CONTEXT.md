@@ -1,10 +1,10 @@
 # Project Context for AI Agents
 
-This document provides context for AI agents working on the Felix Notes codebase. It explains the architecture, patterns, and conventions used throughout the project.
+This document provides context for AI agents working on the FlexNotes codebase. It explains the architecture, patterns, and conventions used throughout the project.
 
 ## Overview
 
-Felix Notes is a note-taking application built as a Google Keep alternative. It's a local-first Progressive Web App (PWA) that syncs to Supabase when online. The app supports multiple note types, dual organization (tags and folders), image attachments, sharing, and works offline.
+FlexNotes is a note-taking application built as a Google Keep alternative. It's a local-first Progressive Web App (PWA) that syncs to Supabase when online. The app supports multiple note types, dual organization (tags and folders), image attachments, sharing, and works offline.
 
 **Key characteristics:**
 - Local-first: All data operations happen on IndexedDB first, then sync to server

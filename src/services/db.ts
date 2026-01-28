@@ -53,7 +53,7 @@ class NotesDatabase extends Dexie {
   syncMeta!: EntityTable<SyncMeta, 'key'>
 
   constructor() {
-    super('felix-notes')
+    super('flexnotes')
 
     this.version(1).stores({
       notes: 'id, owner_id, is_archived, is_pinned, updated_at, _syncStatus',

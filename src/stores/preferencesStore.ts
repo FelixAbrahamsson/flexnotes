@@ -59,7 +59,7 @@ export const usePreferencesStore = create<PreferencesState>()(
       },
     }),
     {
-      name: 'felix-notes-preferences',
+      name: 'flexnotes-preferences',
       onRehydrateStorage: () => (state) => {
         // Apply theme when store is rehydrated
         if (state) {
@@ -101,7 +101,7 @@ if (typeof window !== 'undefined') {
 
   // Apply theme immediately on load from localStorage (before React hydration)
   try {
-    const stored = localStorage.getItem('felix-notes-preferences')
+    const stored = localStorage.getItem('flexnotes-preferences')
     if (stored) {
       const parsed = JSON.parse(stored)
       if (parsed.state?.theme) {

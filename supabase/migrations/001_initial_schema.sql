@@ -1,4 +1,4 @@
--- Felix Notes - Initial Database Schema
+-- FlexNotes - Initial Database Schema
 -- Run this in your Supabase SQL Editor
 
 -- Enable UUID extension (usually already enabled)
