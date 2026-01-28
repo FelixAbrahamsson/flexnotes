@@ -60,8 +60,8 @@ export function NoteEditor({
       <div
         className={`absolute bg-white dark:bg-gray-800 shadow-xl flex flex-col ${
           isFullscreen
-            ? "inset-0 sm:inset-0 max-h-full"
-            : "inset-x-0 bottom-0 top-0 sm:inset-4 sm:top-12 sm:bottom-auto sm:left-1/2 sm:-translate-x-1/2 sm:max-w-2xl sm:rounded-xl max-h-full sm:max-h-[calc(100vh-6rem)]"
+            ? "inset-0 sm:inset-0"
+            : "inset-x-0 bottom-0 top-0 sm:top-12 sm:bottom-12 sm:left-1/2 sm:-translate-x-1/2 sm:max-w-2xl sm:rounded-xl"
         }`}
         onMouseDown={(e) => e.stopPropagation()}
       >
