@@ -114,6 +114,44 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
         }
         return false // Let TipTap handle it
       },
+      handleKeyDown: (view, event) => {
+        if (!editor?.isActive('codeBlock')) return false
+
+        // Insert 2 spaces when Tab is pressed inside a code block
+        if (event.key === 'Tab') {
+          event.preventDefault()
+          editor.commands.insertContent('  ')
+          return true
+        }
+
+        // Continue with same indentation on Enter
+        if (event.key === 'Enter') {
+          const { state } = view
+          const { $from } = state.selection
+
+          // Get text from start of code block to cursor
+          const codeBlockStart = $from.start()
+          const textBeforeCursor = state.doc.textBetween(codeBlockStart, $from.pos)
+
+          // Find the last newline to get the current line
+          const lastNewline = textBeforeCursor.lastIndexOf('\n')
+          const currentLine = lastNewline === -1
+            ? textBeforeCursor
+            : textBeforeCursor.slice(lastNewline + 1)
+
+          // Extract leading whitespace from current line
+          const match = currentLine.match(/^(\s*)/)
+          const indent = match ? match[1] : ''
+
+          if (indent) {
+            event.preventDefault()
+            editor.commands.insertContent('\n' + indent)
+            return true
+          }
+        }
+
+        return false
+      },
     },
   })
 
