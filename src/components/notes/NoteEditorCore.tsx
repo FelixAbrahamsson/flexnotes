@@ -36,6 +36,8 @@ export interface NoteEditorCoreProps {
   onAfterDelete?: () => void;
   /** Use 'delete' for permanent delete (modal), 'trash' for move to trash (pane) */
   deleteMode?: "delete" | "trash";
+  /** Whether the editor is in fullscreen mode (affects content width) */
+  isFullscreen?: boolean;
   /** Header slot for additional buttons (e.g., close, fullscreen) */
   headerLeft?: React.ReactNode;
   headerRight?: React.ReactNode;
@@ -54,6 +56,7 @@ export function NoteEditorCore({
   onAfterArchive,
   onAfterDelete,
   deleteMode = "trash",
+  isFullscreen = false,
   headerLeft,
   headerRight,
   onContentChange,
@@ -240,7 +243,7 @@ export function NoteEditorCore({
 
   return (
     <div
-      className="flex flex-col h-full"
+      className="flex flex-col h-full min-h-0"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -398,7 +401,8 @@ export function NoteEditorCore({
       />
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+        <div className={isFullscreen ? "max-w-3xl mx-auto" : ""}>
         {/* Title */}
         <input
           type="text"
@@ -471,6 +475,7 @@ export function NoteEditorCore({
             editable={true}
           />
         )}
+        </div>
       </div>
 
       {/* Full-screen image viewer */}

@@ -155,7 +155,7 @@ export function NoteGrid({
               items={pinnedNotes.map((n) => n.id)}
               strategy={verticalListSortingStrategy}
             >
-              <div className={`grid gap-3 ${gridClasses}`}>
+              <div className={`grid ${gridClasses} gap-3 items-start`}>
                 {pinnedNotes.map((note) => (
                   <SortableNoteCard
                     key={note.id}
@@ -193,7 +193,7 @@ export function NoteGrid({
               items={unpinnedNotes.map((n) => n.id)}
               strategy={verticalListSortingStrategy}
             >
-              <div className={`grid gap-3 ${gridClasses}`}>
+              <div className={`grid ${gridClasses} gap-3 items-start`}>
                 {unpinnedNotes.map((note) => (
                   <SortableNoteCard
                     key={note.id}

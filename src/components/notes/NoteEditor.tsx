@@ -58,10 +58,10 @@ export function NoteEditor({
       onMouseDown={handleClose}
     >
       <div
-        className={`absolute bg-white dark:bg-gray-800 shadow-xl flex flex-col ${
+        className={`absolute bg-white dark:bg-gray-800 shadow-xl flex flex-col overflow-hidden ${
           isFullscreen
             ? "inset-0 sm:inset-0"
-            : "inset-x-0 bottom-0 top-0 sm:top-12 sm:bottom-12 sm:left-1/2 sm:-translate-x-1/2 sm:max-w-2xl sm:rounded-xl"
+            : "inset-x-0 bottom-0 top-0 sm:top-12 sm:bottom-auto sm:left-1/2 sm:-translate-x-1/2 sm:max-w-2xl sm:max-h-[calc(100vh-6rem)] sm:rounded-xl"
         }`}
         onMouseDown={(e) => e.stopPropagation()}
       >
@@ -69,6 +69,7 @@ export function NoteEditor({
           note={note}
           hideTags={hideTags}
           deleteMode="delete"
+          isFullscreen={isFullscreen}
           onAfterArchive={onClose}
           onAfterDelete={onClose}
           onContentChange={setContent}

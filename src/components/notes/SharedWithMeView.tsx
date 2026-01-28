@@ -40,7 +40,7 @@ export function SharedWithMeView({
   }
 
   return (
-    <div className={`grid gap-3 ${gridClasses}`}>
+    <div className={`grid ${gridClasses} gap-3 items-start`}>
       {notes.map(({ note, permission, savedShareId, shareToken }) => (
         <a
           key={savedShareId}

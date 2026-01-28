@@ -571,7 +571,7 @@ export function NotesPage() {
     [folderPickerNoteId],
   );
 
-  // Grid classes based on notesPerRow setting (respects setting on all screen sizes)
+  // Grid classes based on notesPerRow setting
   const gridClasses = {
     1: "grid-cols-1",
     2: "grid-cols-2",
