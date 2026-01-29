@@ -128,11 +128,22 @@ export function NoteEditorCore({
     }
   }, [note, title, content, updateNote]);
 
+  // Keep a ref to the latest save function for unmount flush
+  const handleSaveRef = useRef(handleSave);
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+  }, [handleSave]);
+
   // Auto-save on changes
   useEffect(() => {
     const timer = setTimeout(handleSave, 500);
     return () => clearTimeout(timer);
   }, [handleSave]);
+
+  // Flush any pending save when unmounting
+  useEffect(() => {
+    return () => handleSaveRef.current();
+  }, []);
 
   const handleToggleArchive = () => {
     updateNote(note.id, { is_archived: !note.is_archived });
