@@ -642,7 +642,7 @@ export function NotesPage() {
               onShowTrash={setShowTrash}
               onShowShared={setShowShared}
               trashCount={trashCount}
-              sharedCount={sharedWithMeNotes.length + sharedNoteIds.size}
+              sharedCount={sharedWithMeNotes.length + notes.filter(n => !n.is_deleted && sharedNoteIds.has(n.id)).length}
             />
 
             {/* Settings */}
