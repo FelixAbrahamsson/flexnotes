@@ -19,6 +19,7 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { TextEditor } from "./TextEditor";
 import { ListEditor } from "./ListEditor";
 import { MarkdownEditor, type MarkdownEditorHandle } from "./MarkdownEditor";
+import { HeadingOutline } from "./HeadingOutline";
 import { TagBadge } from "@/components/tags/TagBadge";
 import { TagPicker } from "@/components/tags/TagPicker";
 import { ImageGallery, ImageViewer } from "@/components/images/ImageGallery";
@@ -66,8 +67,8 @@ export function NoteEditorCore({
   const { fetchImagesForNote } = useImageStore();
   const confirm = useConfirm();
 
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  const [title, setTitle] = useState(note.title || "");
+  const [content, setContent] = useState(note.content);
   const [showMenu, setShowMenu] = useState(false);
   const [showTypeMenu, setShowTypeMenu] = useState(false);
   const [showTagPicker, setShowTagPicker] = useState(false);
@@ -75,6 +76,7 @@ export function NoteEditorCore({
   const [viewingImage, setViewingImage] = useState<string | null>(null);
 
   const markdownEditorRef = useRef<MarkdownEditorHandle>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const {
     isDragging,
@@ -94,7 +96,7 @@ export function NoteEditorCore({
   const noteTags = getTagsForNote(note.id);
 
   // Sync from store when note ID changes
-  const [lastNoteId, setLastNoteId] = useState<string | null>(null);
+  const [lastNoteId, setLastNoteId] = useState<string | null>(note.id);
   useEffect(() => {
     if (note.id !== lastNoteId) {
       setTitle(note.title || "");
@@ -412,7 +414,10 @@ export function NoteEditorCore({
       />
 
       {/* Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+      <div ref={scrollContainerRef} className="relative flex-1 min-h-0 overflow-y-auto p-4">
+        {note.note_type === "markdown" && (
+          <HeadingOutline scrollContainerRef={scrollContainerRef} />
+        )}
         <div className={isFullscreen ? "max-w-3xl mx-auto" : ""}>
         {/* Title */}
         <input
