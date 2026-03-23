@@ -80,16 +80,24 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     batchResizeTextareas();
   }, []);
 
-  // Re-measure when window/modal resizes (debounced)
+  // Re-measure when container width changes (window resize OR modal resize).
+  // Only triggers on width changes to avoid firing during typing (which only changes height).
   useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    let lastWidth = el.offsetWidth;
     let timer: ReturnType<typeof setTimeout>;
-    const handler = () => {
-      clearTimeout(timer);
-      timer = setTimeout(batchResizeTextareas, 150);
-    };
-    window.addEventListener("resize", handler);
+    const ro = new ResizeObserver((entries) => {
+      const newWidth = entries[0].contentRect.width;
+      if (newWidth !== lastWidth) {
+        lastWidth = newWidth;
+        clearTimeout(timer);
+        timer = setTimeout(batchResizeTextareas, 150);
+      }
+    });
+    ro.observe(el);
     return () => {
-      window.removeEventListener("resize", handler);
+      ro.disconnect();
       clearTimeout(timer);
     };
   }, [batchResizeTextareas]);
