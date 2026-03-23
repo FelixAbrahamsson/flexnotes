@@ -18,6 +18,7 @@ import {
   PinOff,
   Pencil,
   Palette,
+  Copy,
 } from 'lucide-react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { hapticLight } from '@/hooks/useCapacitor'
@@ -61,6 +62,7 @@ interface TreeItemProps {
   onShareNote: (noteId: string) => void
   onArchiveNote: (noteId: string) => void
   onPinNote: (noteId: string) => void
+  onDuplicateNote: (noteId: string) => void
 }
 
 // Draggable note item in the tree
@@ -75,6 +77,7 @@ function NoteTreeItem({
   onShare,
   onArchive,
   onPin,
+  onDuplicate,
 }: {
   note: Note
   isSelected: boolean
@@ -86,6 +89,7 @@ function NoteTreeItem({
   onShare: () => void
   onArchive: () => void
   onPin: () => void
+  onDuplicate: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -172,6 +176,16 @@ function NoteTreeItem({
             Share
           </DropdownMenuItem>
           <DropdownMenuItem
+            icon={<Copy className="w-4 h-4" />}
+            onClick={e => {
+              e.stopPropagation()
+              setMenuOpen(false)
+              onDuplicate()
+            }}
+          >
+            Duplicate
+          </DropdownMenuItem>
+          <DropdownMenuItem
             icon={<FolderInput className="w-4 h-4" />}
             onClick={e => {
               e.stopPropagation()
@@ -241,6 +255,7 @@ function FolderTreeItem({
   onShareNote,
   onArchiveNote,
   onPinNote,
+  onDuplicateNote,
 }: TreeItemProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [addMenuOpen, setAddMenuOpen] = useState(false)
@@ -540,6 +555,7 @@ function FolderTreeItem({
               onShareNote={onShareNote}
               onArchiveNote={onArchiveNote}
               onPinNote={onPinNote}
+              onDuplicateNote={onDuplicateNote}
             />
           ))}
 
@@ -557,6 +573,7 @@ function FolderTreeItem({
               onShare={() => onShareNote(note.id)}
               onArchive={() => onArchiveNote(note.id)}
               onPin={() => onPinNote(note.id)}
+              onDuplicate={() => onDuplicateNote(note.id)}
             />
           ))}
         </div>
@@ -575,6 +592,7 @@ interface FolderTreeViewProps {
   onShareNote: (noteId: string) => void
   onArchiveNote: (noteId: string) => void
   onPinNote: (noteId: string) => void
+  onDuplicateNote: (noteId: string) => void
 }
 
 export function FolderTreeView({
@@ -587,6 +605,7 @@ export function FolderTreeView({
   onShareNote,
   onArchiveNote,
   onPinNote,
+  onDuplicateNote,
 }: FolderTreeViewProps) {
   const { folders, createFolder, deleteFolder } = useFolderStore()
   const { notes: allNotes } = useNoteStore()
@@ -835,6 +854,7 @@ export function FolderTreeView({
             onShareNote={onShareNote}
             onArchiveNote={onArchiveNote}
             onPinNote={onPinNote}
+            onDuplicateNote={onDuplicateNote}
           />
         ))}
 
@@ -862,6 +882,7 @@ export function FolderTreeView({
                 onShare={() => onShareNote(note.id)}
                 onArchive={() => onArchiveNote(note.id)}
                 onPin={() => onPinNote(note.id)}
+                onDuplicate={() => onDuplicateNote(note.id)}
               />
             ))}
           </div>

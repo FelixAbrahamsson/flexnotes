@@ -10,6 +10,9 @@ import {
   ImagePlus,
   Share2,
   FolderInput,
+  Pin,
+  PinOff,
+  Copy,
 } from "lucide-react";
 import { useNoteStore } from "@/stores/noteStore";
 import { useTagStore } from "@/stores/tagStore";
@@ -62,7 +65,7 @@ export function NoteEditorCore({
   headerRight,
   onContentChange,
 }: NoteEditorCoreProps) {
-  const { updateNote, deleteNote, trashNote } = useNoteStore();
+  const { updateNote, deleteNote, trashNote, duplicateNote } = useNoteStore();
   const { getTagsForNote, removeTagFromNote } = useTagStore();
   const { fetchImagesForNote } = useImageStore();
   const confirm = useConfirm();
@@ -360,6 +363,15 @@ export function NoteEditorCore({
 
             <DropdownMenu open={showMenu} onClose={() => setShowMenu(false)}>
               <DropdownMenuItem
+                icon={note.is_pinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+                onClick={() => {
+                  setShowMenu(false);
+                  updateNote(note.id, { is_pinned: !note.is_pinned });
+                }}
+              >
+                {note.is_pinned ? "Unpin" : "Pin"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
                 icon={<Share2 className="w-4 h-4" />}
                 onClick={() => {
                   setShowMenu(false);
@@ -367,6 +379,15 @@ export function NoteEditorCore({
                 }}
               >
                 Share
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                icon={<Copy className="w-4 h-4" />}
+                onClick={() => {
+                  setShowMenu(false);
+                  duplicateNote(note.id);
+                }}
+              >
+                Duplicate
               </DropdownMenuItem>
               {onMoveToFolder && (
                 <DropdownMenuItem

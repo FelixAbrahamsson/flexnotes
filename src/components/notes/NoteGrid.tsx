@@ -170,7 +170,7 @@ export function NoteGrid({
                     onDelete={() => onDelete(note.id)}
                     onShare={() => onShare(note.id)}
                     onDuplicate={() => onDuplicate(note.id)}
-                    onMoveToFolder={() => onMoveToFolder(note.id)}
+                    onMoveToFolder={viewMode === "folder" ? () => onMoveToFolder(note.id) : undefined}
                     showFolder={false}
                     isDragDisabled={isDragDisabled}
                     reorderMode={reorderMode}
@@ -228,7 +228,7 @@ export function NoteGrid({
                       !showTrash ? () => onDuplicate(note.id) : undefined
                     }
                     onMoveToFolder={
-                      !showTrash ? () => onMoveToFolder(note.id) : undefined
+                      !showTrash && viewMode === "folder" ? () => onMoveToFolder(note.id) : undefined
                     }
                     showRestore={showTrash}
                     showFolder={false}

@@ -7,7 +7,7 @@ import {
   MoreVertical,
   RotateCcw,
   Share2,
-  FolderOpen,
+  FolderInput,
   Copy,
 } from "lucide-react";
 import type { Note, Tag, Folder } from "@/types";
@@ -230,7 +230,7 @@ export function NoteCard({
             )}
             {onMoveToFolder && !showRestore && (
               <DropdownMenuItem
-                icon={<FolderOpen className="w-4 h-4" />}
+                icon={<FolderInput className="w-4 h-4" />}
                 onClick={handleMoveToFolder}
               >
                 Move to folder

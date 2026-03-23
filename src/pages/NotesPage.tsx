@@ -798,6 +798,10 @@ export function NotesPage() {
                     is_pinned: !notes.find((n) => n.id === noteId)?.is_pinned,
                   });
                 }}
+                onDuplicateNote={(noteId) => {
+                  hapticLight();
+                  duplicateNote(noteId);
+                }}
               />
             </DndContext>
           </div>
