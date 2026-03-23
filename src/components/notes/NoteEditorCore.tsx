@@ -470,17 +470,11 @@ export function NoteEditorCore({
             </div>
 
             {showTagPicker && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setShowTagPicker(false)}
-                />
-                <TagPicker
-                  noteId={note.id}
-                  selectedTags={noteTags}
-                  onClose={() => setShowTagPicker(false)}
-                />
-              </>
+              <TagPicker
+                noteId={note.id}
+                selectedTags={noteTags}
+                onClose={() => setShowTagPicker(false)}
+              />
             )}
           </div>
         )}
