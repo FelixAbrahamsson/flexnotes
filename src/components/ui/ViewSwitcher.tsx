@@ -11,6 +11,7 @@ interface ViewSwitcherProps {
   onShowArchived: (show: boolean) => void
   onShowTrash: (show: boolean) => void
   onShowShared: (show: boolean) => void
+  archiveCount?: number
   trashCount?: number
   sharedCount?: number
 }
@@ -24,6 +25,7 @@ export function ViewSwitcher({
   onShowArchived,
   onShowTrash,
   onShowShared,
+  archiveCount = 0,
   trashCount = 0,
   sharedCount = 0,
 }: ViewSwitcherProps) {
@@ -120,7 +122,12 @@ export function ViewSwitcher({
           onClick={handleArchiveClick}
         >
           <Archive className="w-4 h-4" />
-          <span>Archive</span>
+          <span className="flex-1">Archive</span>
+          {archiveCount > 0 && (
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {archiveCount}
+            </span>
+          )}
         </DropdownMenuItem>
         <DropdownMenuItem
           icon={showTrash ? <Check className="w-4 h-4" /> : <div className="w-4 h-4" />}

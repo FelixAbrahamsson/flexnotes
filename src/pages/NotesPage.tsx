@@ -508,6 +508,7 @@ export function NotesPage() {
               onShowArchived={setShowArchived}
               onShowTrash={setShowTrash}
               onShowShared={setShowShared}
+              archiveCount={notes.filter(n => !n.is_deleted && n.is_archived).length}
               trashCount={trashCount}
               sharedCount={sharedWithMeNotes.length + notes.filter(n => !n.is_deleted && sharedNoteIds.has(n.id)).length}
             />
