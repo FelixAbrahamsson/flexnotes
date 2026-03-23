@@ -122,15 +122,4 @@ export function getContentPreview(
 /**
  * Strip HTML tags from content, preserving basic text structure.
  */
-export function stripHtml(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<\/div>/gi, '\n')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .trim()
-}
+export { htmlToPlainText as stripHtml } from './noteContentConverter'

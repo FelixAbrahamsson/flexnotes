@@ -38,7 +38,6 @@ interface NoteUIState {
 
   // Pagination actions
   loadMoreNotes: () => void
-  resetDisplayLimit: () => void
 
   // Computed helpers (require notes to be passed in)
   getFilteredNotes: (
@@ -113,9 +112,6 @@ export const useNoteUIStore = create<NoteUIState>((set, get) => ({
     set((state) => ({ displayLimit: state.displayLimit + NOTES_PER_PAGE }))
   },
 
-  resetDisplayLimit: () => {
-    set({ displayLimit: NOTES_PER_PAGE })
-  },
 
   getFilteredNotes: (notes: Note[], sharedNoteIds: Set<string>) => {
     const { showArchived, showTrash, showShared, searchQuery, selectedTagIds } = get()

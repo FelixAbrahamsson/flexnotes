@@ -28,6 +28,7 @@ import { TagPicker } from "@/components/tags/TagPicker";
 import { ImageGallery, ImageViewer } from "@/components/images/ImageGallery";
 import { ShareModal } from "@/components/sharing/ShareModal";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/DropdownMenu";
+import { convertNoteContent } from "@/utils/noteContentConverter";
 import type { Note, NoteType } from "@/types";
 
 export interface NoteEditorCoreProps {
@@ -235,66 +236,12 @@ export function NoteEditorCore({
     };
 
     // Convert content between types
-    if (note.note_type === "list" && newType !== "list") {
-      try {
-        const parsed = JSON.parse(content);
-        if (parsed.items && Array.isArray(parsed.items)) {
-          newContent = parsed.items
-            .map((item: { text: string }) => item.text)
-            .join("\n");
-        }
-      } catch {
-        // Keep as-is
-      }
-      if (newType === "markdown" && newContent.trim()) {
-        // Convert plain text lines to HTML paragraphs for TipTap
-        const escaped = newContent
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;");
-        newContent = escaped
-          .split("\n")
-          .map((line) => `<p>${line || "<br>"}</p>`)
-          .join("");
-        newContent = appendMissingImages(newContent);
-      }
-    } else if (note.note_type !== "list" && newType === "list") {
-      const plainText = content.replace(/<[^>]*>/g, "\n");
-      const lines = plainText.split("\n").filter((line) => line.trim());
-      newContent = JSON.stringify({
-        items: lines.map((text, i) => ({
-          id: `item-${i}-${Date.now()}`,
-          text: text.trim(),
-          checked: false,
-        })),
-      });
-    } else if (note.note_type === "markdown" && newType === "text") {
-      // Markdown to text - convert HTML to plain text preserving line structure
-      newContent = content
-        .replace(/<br\s*\/?>/gi, "\n")
-        .replace(/<\/p>\s*<p[^>]*>/gi, "\n")
-        .replace(/<\/li>\s*<li[^>]*>/gi, "\n")
-        .replace(/<[^>]*>/g, "")
-        .replace(/&amp;/g, "&")
-        .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">")
-        .replace(/&nbsp;/g, " ")
-        .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
-        .trim();
-    } else if (note.note_type === "text" && newType === "markdown") {
-      // Text to markdown - convert plain text to HTML paragraphs for TipTap
-      if (content.trim()) {
-        const escaped = content
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;");
-        newContent = escaped
-          .split("\n")
-          .map((line) => `<p>${line || "<br>"}</p>`)
-          .join("");
-        newContent = removeOrphanedImgTags(newContent);
-        newContent = appendMissingImages(newContent);
-      }
+    newContent = convertNoteContent(content, note.note_type, newType);
+
+    // Post-process image tags when converting to markdown
+    if (newType === "markdown" && newContent) {
+      newContent = removeOrphanedImgTags(newContent);
+      newContent = appendMissingImages(newContent);
     }
 
     updateNote(note.id, { note_type: newType, content: newContent });

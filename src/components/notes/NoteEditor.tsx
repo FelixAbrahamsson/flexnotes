@@ -3,6 +3,7 @@ import { X, Maximize2, Minimize2 } from "lucide-react";
 import { useNoteStore } from "@/stores/noteStore";
 import { useNoteUIStore } from "@/stores/noteUIStore";
 import { useImageStore } from "@/stores/imageStore";
+import { useEscapeKey } from "@/hooks/useEscapeKey";
 import { NoteEditorCore, useNoteEditorContent } from "./NoteEditorCore";
 
 interface NoteEditorProps {
@@ -112,16 +113,7 @@ export function NoteEditor({
     onClose();
   }, [note, contentRef, flushSaveRef, onClose]);
 
-  // Handle ESC key to close modal
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        handleClose();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [handleClose]);
+  useEscapeKey(handleClose);
 
   if (!note) {
     return null;
