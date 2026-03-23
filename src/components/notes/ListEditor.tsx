@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { Plus, Trash2, RotateCcw } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { ListItemRow } from "./ListItemRow";
@@ -63,6 +63,37 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     swipeStateRef.current = swipeState;
   }, [swipeState]);
 
+  // Batch-resize all textareas using read/write separation to avoid layout thrashing.
+  // Instead of N individual (write + layout + read) cycles, this does:
+  // N writes → 1 layout → N reads → N writes
+  const batchResizeTextareas = useCallback(() => {
+    const textareas = Array.from(inputRefs.current.values());
+    if (textareas.length === 0) return;
+    for (const ta of textareas) ta.style.height = "auto";
+    const heights = textareas.map((ta) => ta.scrollHeight);
+    textareas.forEach((ta, i) => (ta.style.height = `${heights[i]}px`));
+  }, []);
+
+  // Batch-resize on mount (before paint to avoid flash)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    batchResizeTextareas();
+  }, []);
+
+  // Re-measure when window/modal resizes (debounced)
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const handler = () => {
+      clearTimeout(timer);
+      timer = setTimeout(batchResizeTextareas, 150);
+    };
+    window.addEventListener("resize", handler);
+    return () => {
+      window.removeEventListener("resize", handler);
+      clearTimeout(timer);
+    };
+  }, [batchResizeTextareas]);
+
   // Parse content on mount and when it changes externally
   // Skip if the content matches what we just saved (avoid resetting our own changes)
   useEffect(() => {
@@ -77,10 +108,12 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
         indent: item.indent ?? 0,
       }));
       setItems(itemsWithIndent);
+      // Schedule batch resize after new textareas mount
+      requestAnimationFrame(batchResizeTextareas);
     } catch {
       setItems([]);
     }
-  }, [content]);
+  }, [content, batchResizeTextareas]);
 
   const saveItems = useCallback(
     (newItems: ListItem[]) => {
@@ -770,6 +803,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     },
     [startDrag, moveDrag, endDrag],
   );
+
 
   // Focus management - also scroll into view for mobile keyboards
   useEffect(() => {

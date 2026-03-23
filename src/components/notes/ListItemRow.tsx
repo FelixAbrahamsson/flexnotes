@@ -79,16 +79,11 @@ export const ListItemRow = memo(function ListItemRow({
         ref={(el) => {
           textareaRef.current = el;
           inputRef(el);
-          // Auto-resize on mount and when content changes
-          if (el) {
-            el.style.height = "auto";
-            el.style.height = `${el.scrollHeight}px`;
-          }
         }}
         value={item.text}
         onChange={(e) => {
           onTextChange(e.target.value, item.text);
-          // Auto-resize on change
+          // Auto-resize the single edited textarea
           e.target.style.height = "auto";
           e.target.style.height = `${e.target.scrollHeight}px`;
         }}
