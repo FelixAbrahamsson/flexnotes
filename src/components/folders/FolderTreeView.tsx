@@ -1,7 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import {
   FolderPlus,
-  Folder as FolderIcon,
   Plus,
 } from 'lucide-react'
 import { useDroppable } from '@dnd-kit/core'

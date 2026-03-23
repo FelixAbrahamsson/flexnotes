@@ -170,7 +170,6 @@ export function NotesPage() {
   // Editor lifecycle: modal stack, popstate, beforeunload, close handling
   const {
     modalStackRef,
-    activeNoteIdRef,
     editorFlushSaveRef,
     editorDirtyRef,
     paneFlushSaveRef,
