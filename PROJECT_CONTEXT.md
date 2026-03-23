@@ -215,6 +215,7 @@ List/checklist editor with mobile-friendly interactions:
 - Touch and mouse drag support for reordering
 - Swipe gestures for indentation changes
 - Uses refs (`itemsRef`, `dragStateRef`, `dropTargetRef`) to avoid stale closures
+- Performance: `ListItemRow` is wrapped in `React.memo` with custom comparator (checks `item`, `isDragging`, `swipeOffset` only); all item-manipulating handlers use `useCallback` + `itemsRef.current` for stable references
 - Direction detection: first 10px of movement determines vertical vs horizontal mode
 - Hierarchical drag: moving a parent moves all children
 - Hierarchical checkbox: checking a parent checks all children via `toggleChecked()`
@@ -489,3 +490,4 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 33. **TagPicker portal**: TagPicker renders via `createPortal` to `document.body` to avoid being clipped by the note modal's `overflow-hidden`.
 34. **Resizable note modal**: NoteEditor has drag handles on left/right edges for resizing. In normal mode they control modal width, in fullscreen they control the inner content column width. Both use `× 2` delta since the content is centered. Handles are positioned with `calc(50% - width/2)` in fullscreen.
 35. **Fullscreen content distinction**: In fullscreen mode, the scroll area gets `bg-gray-50 dark:bg-gray-900` while the content column stays `bg-white dark:bg-gray-800` with `rounded-lg` and `shadow-sm`, making the editable area visually distinct.
+36. **ListItemRow memo pattern**: `ListItemRow` uses `React.memo` with a custom comparator that deliberately skips callback props. This is safe because all callbacks use `useCallback` + `itemsRef.current` (not `items` state), so stale callbacks still read current data via refs. If you add new data props to `ListItemRow`, you must add them to the comparator.
