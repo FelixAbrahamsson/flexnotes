@@ -13,13 +13,14 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 - **Image Support**: Attach images via button, drag & drop, or paste with automatic compression
 - **Pin & Archive**: Pin important notes from the note card menu, archive completed ones
 - **Trash Bin**: Deleted notes go to trash with 30-day retention before permanent deletion
-- **Quick Actions**: Pin, archive, delete, share, duplicate, or move to folder directly from note card menus
+- **Quick Actions**: Pin, archive, delete, share, duplicate, or move to folder from note card menus, folder tree, and note editor
 - **Duplicate Notes**: Create a copy of any note with all its content and tags preserved
 - **Drag-to-Archive/Trash**: When dragging notes, drop zones appear to quickly archive or trash
 - **Auto-Cleanup**: Empty notes are automatically deleted when closed
 - **Search**: Full-text search works in both list and folder views
 - **Drag-to-Reorder**: Drag notes to reorder them (desktop: drag directly, mobile: tap reorder button first)
-- **Fullscreen Mode**: Expand notes to fullscreen on desktop for distraction-free editing
+- **Fullscreen Mode**: Expand notes to fullscreen on desktop for distraction-free editing with distinct content column
+- **Resizable Note Modal**: Drag left/right edges to resize the note modal width on desktop (works in both normal and fullscreen modes)
 - **Infinite Scroll**: Notes load progressively as you scroll for better performance
 - **Remember Last Note**: Automatically reopens the last viewed note when returning to the app
 
@@ -52,6 +53,7 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 - **Visibility Sync**: App automatically syncs when you switch back to it
 - **Pull-to-Refresh**: Pull down on mobile to manually trigger sync
 - **Cross-Device Order**: Custom note ordering syncs across all your devices
+- **Unsaved Changes Warning**: Browser warns before closing tab when there are unsaved or unsynced changes
 
 ### Sharing
 - **Shareable Notes**: Generate links to share notes with read or write access

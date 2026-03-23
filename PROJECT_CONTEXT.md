@@ -201,11 +201,14 @@ User preferences with persistence:
 ### `src/components/notes/NoteEditor.tsx`
 Modal for editing a note:
 - Title input
-- Tag picker
+- Tag picker (rendered via portal to avoid overflow clipping)
 - Type switcher (text/list/markdown)
 - Image upload/gallery
 - Auto-save on changes (500ms debounce)
 - Tracks `lastNoteId` to prevent sync from overwriting local edits
+- Flushes pending save before close to prevent data loss with `deleteNoteIfEmpty`
+- Resizable width on desktop via drag handles on left/right edges
+- Fullscreen mode: content column rendered on distinct background, resizable width
 
 ### `src/components/notes/ListEditor.tsx`
 List/checklist editor with mobile-friendly interactions:
@@ -473,11 +476,16 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 20. **DropdownMenu positioning**: Uses React Portal to render at document body level, avoiding overflow issues in scrollable containers. Auto-detects space above/below to position optimally.
 21. **Remember last opened note**: `lastOpenedNoteId` and `lastFolderViewNoteId` in preferencesStore persist the currently open note. On page load, these are restored after notes are fetched, using `hasRestoredRef` to prevent duplicate restoration.
 22. **Note card preview for lists**: `getContentPreview()` in formatters.ts filters out checked items for list notes, showing only unchecked items in the card preview.
-23. **Pin from note cards**: Pin/unpin is available in the note card dropdown menu (both list view and folder view), not in the note editor header. This keeps the editor UI cleaner.
+23. **Unified note menus**: Pin, share, duplicate, archive, and delete are available consistently across note card menus, folder tree context menus, and the note editor hamburger menu. "Move to folder" is only shown in folder view (not list view).
 24. **Shared with me**: When a logged-in user views a shared note (not their own), it's automatically saved to `saved_shares` table. The SharedNotePage handles this auto-save on load.
 25. **Shared view tabs**: The shared view has two tabs - "Shared with me" (notes others shared) and "Shared by me" (notes I've shared). These use different data sources: `sharedWithMeNotes` from saved_shares vs `sharedNoteIds` from note_shares.
 26. **List editor text splitting**: `splitItem()` handles Enter key by splitting text at cursor position atomically - it updates the current item's text AND creates a new item with the remaining text in a single state update to avoid stale closure issues.
 27. **List editor merging**: `mergeWithPreviousItem()` handles Backspace at start of item by combining text with the previous unchecked item, placing cursor at the merge point.
 28. **List editor arrow navigation**: All four arrow keys navigate between items when cursor is at the boundary (start for ArrowUp/ArrowLeft, end for ArrowDown/ArrowRight) and only navigate to unchecked items.
-29. **Duplicate note**: `duplicateNote()` creates a copy with "(Copy)" suffix, copies content/type/folder/tags, but NOT pinned status, archived status, or share links. Available from note card context menu.
+29. **Duplicate note**: `duplicateNote()` creates a copy with "(Copy)" suffix, copies content/type/folder/tags, but NOT pinned status, archived status, or share links. Available from all note context menus (card, tree, editor).
 30. **List editor drop indicator**: Uses indices within the unchecked items array only, not the full items array. This prevents the indicator from appearing incorrectly when cursor is over checked items.
+31. **Flush save before close**: NoteEditor and NoteEditorPane expose `flushSaveRef` so parent components can force-save before running `deleteNoteIfEmpty`. Without this, the 500ms debounce means quickly-typed content could be lost on close. The `useNoteEditorContent()` hook provides `flushSaveRef`, `dirtyRef`, and `contentRef`.
+32. **Beforeunload warning**: NotesPage registers a `beforeunload` handler that flushes pending editor saves and warns the user if there are dirty editor changes or `pendingCount > 0` unsynced changes.
+33. **TagPicker portal**: TagPicker renders via `createPortal` to `document.body` to avoid being clipped by the note modal's `overflow-hidden`.
+34. **Resizable note modal**: NoteEditor has drag handles on left/right edges for resizing. In normal mode they control modal width, in fullscreen they control the inner content column width. Both use `× 2` delta since the content is centered. Handles are positioned with `calc(50% - width/2)` in fullscreen.
+35. **Fullscreen content distinction**: In fullscreen mode, the scroll area gets `bg-gray-50 dark:bg-gray-900` while the content column stays `bg-white dark:bg-gray-800` with `rounded-lg` and `shadow-sm`, making the editable area visually distinct.
