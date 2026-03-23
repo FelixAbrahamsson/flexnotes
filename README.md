@@ -159,7 +159,7 @@ src/
 │   ├── import/         # Google Keep importer
 │   ├── notes/          # Note editors (text, list, markdown, editor pane)
 │   ├── sharing/        # Share modal
-│   ├── tags/           # Tag picker, filter, and manager
+│   ├── tags/           # Tag picker and filter
 │   └── ui/             # Reusable UI (dropdown menu, confirm dialog, view switcher)
 ├── hooks/              # Custom React hooks
 ├── pages/              # Page components

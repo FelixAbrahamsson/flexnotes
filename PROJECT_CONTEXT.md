@@ -94,19 +94,23 @@ export const useExampleStore = create<ExampleState>((set, get) => ({
 ```
 src/
 ├── components/           # React components
-│   ├── folders/         # FolderTreeView, FolderPicker, FolderBadge, FolderManager
+│   ├── folders/         # FolderTreeView, FolderTreeItem, NoteTreeItem, FolderPicker, FolderBadge, FolderManager
 │   ├── images/          # ImageGallery, ImageViewer
 │   ├── import/          # GoogleKeepImport
 │   ├── notes/           # NoteCard, NoteEditor, NoteEditorPane, TextEditor, ListEditor, MarkdownEditor
 │   ├── sharing/         # ShareModal
-│   ├── tags/            # TagBadge, TagFilter, TagPicker, TagManager
+│   ├── tags/            # TagBadge, TagFilter, TagPicker
 │   ├── ui/              # Reusable UI (ConfirmDialog, DropdownMenu, ViewSwitcher)
 │   ├── SettingsModal.tsx  # Theme, layout, tags, folders, import, password, logout
 │   └── SyncStatus.tsx
 │
 ├── hooks/               # Custom React hooks
 │   ├── useCapacitor.ts  # Native platform utilities (haptics, etc.)
+│   ├── useEscapeKey.ts  # ESC key handler for closing modals
 │   ├── useImageUpload.ts # Image upload handling with drag & drop
+│   ├── useNoteDragAndDrop.ts # DnD sensors, drag start/end, reorder mode
+│   ├── useNoteEditorLifecycle.ts # Modal stack, popstate, beforeunload, editor close
+│   ├── useNoteFromUrl.ts # URL-based note restoration across tabs
 │   └── usePullToRefresh.ts # Pull-to-refresh gesture for mobile
 │
 ├── pages/               # Page-level components
@@ -136,7 +140,8 @@ src/
 │   └── index.ts         # Note, Tag, NoteTag, Folder, etc.
 │
 ├── utils/               # Utility functions
-│   └── formatters.ts    # Date formatting, content preview generation
+│   ├── formatters.ts    # Date formatting, content preview generation
+│   └── noteContentConverter.ts # Note type conversion (text↔markdown↔list)
 │
 ├── App.tsx              # Router setup
 ├── main.tsx             # Entry point
@@ -264,26 +269,17 @@ Context-based confirmation dialog system:
 - Customizable title, message, and button text
 - Replaces browser's `window.confirm()` with themed dialogs
 
-### `src/components/tags/TagManager.tsx`
-
-Tag management in settings:
-
-- Drag-to-reorder tags using dnd-kit
-- Edit tag name and color
-- Custom color picker with presets and color wheel
-- `getTagColor()` generates consistent color from tag name when no color set
-
 ### `src/components/folders/FolderTreeView.tsx`
 
 Tree-based file browser for folder view:
 
-- Hierarchical display of folders and notes
-- Expandable/collapsible folders
+- Hierarchical display of folders and notes via `FolderTreeItem` and `NoteTreeItem`
+- Expandable/collapsible folders with auto-expand on note selection
 - Drag-drop notes onto folders to move them
-- Context menus for folders (new note, new subfolder, delete)
-- Context menus for notes (pin/unpin, share, move, archive, delete)
 - Search filtering across all notes
-- Selected note highlighting
+- Folder CRUD: create, rename, delete, color picker
+- `NoteTreeItem` (separate file): draggable note with context menu (pin, share, duplicate, move, archive, delete)
+- `FolderTreeItem` (separate file): folder node with expand/collapse, drag+drop, rename, color picker, subfolder creation
 
 ### `src/components/notes/NoteEditorPane.tsx`
 
@@ -541,4 +537,4 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 34. **Resizable note modal**: NoteEditor has drag handles on left/right edges for resizing. In normal mode they control modal width, in fullscreen they control the inner content column width. Both use `× 2` delta since the content is centered. Handles are positioned with `calc(50% - width/2)` in fullscreen.
 35. **Fullscreen content distinction**: In fullscreen mode, the scroll area gets `bg-gray-50 dark:bg-gray-900` while the content column stays `bg-white dark:bg-gray-800` with `rounded-lg` and `shadow-sm`, making the editable area visually distinct.
 36. **ListItemRow memo pattern**: `ListItemRow` uses `React.memo` with a custom comparator that deliberately skips callback props. This is safe because all callbacks use `useCallback` + `itemsRef.current` (not `items` state), so stale callbacks still read current data via refs. If you add new data props to `ListItemRow`, you must add them to the comparator.
-37. **Note type conversion**: `handleChangeType` in NoteEditorCore converts content between types: text→markdown wraps each line in `<p>` tags (with HTML escaping), markdown→text strips HTML via regex preserving newlines between `</p><p>` and `<br>`, list→text/markdown joins item texts with `\n`. Empty content is left as-is to avoid spurious `<p><br></p>`. Round-trip text→markdown→text preserves content.
+37. **Note type conversion**: `convertNoteContent()` in `utils/noteContentConverter.ts` handles conversion between types: text→markdown wraps each line in `<p>` tags (with HTML escaping), markdown→text strips HTML via `htmlToPlainText()` preserving newlines between `</p><p>` and `<br>`, list→text/markdown joins item texts with `\n`. Empty content is left as-is to avoid spurious `<p><br></p>`. Round-trip text→markdown→text preserves content. `htmlToPlainText` is also re-exported as `stripHtml` from `formatters.ts`.
