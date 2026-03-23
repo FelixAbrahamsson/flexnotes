@@ -47,6 +47,10 @@ export interface NoteEditorCoreProps {
   headerRight?: React.ReactNode;
   /** Called when content changes, useful for parent to track current content */
   onContentChange?: (content: string) => void;
+  /** Ref that will be populated with a function to flush pending saves immediately */
+  flushSaveRef?: React.MutableRefObject<() => void>;
+  /** Ref that tracks whether the editor has unsaved local changes */
+  dirtyRef?: React.MutableRefObject<boolean>;
 }
 
 /**
@@ -64,6 +68,8 @@ export function NoteEditorCore({
   headerLeft,
   headerRight,
   onContentChange,
+  flushSaveRef,
+  dirtyRef,
 }: NoteEditorCoreProps) {
   const { updateNote, deleteNote, trashNote, duplicateNote } = useNoteStore();
   const { getTagsForNote, removeTagFromNote } = useTagStore();
@@ -133,11 +139,18 @@ export function NoteEditorCore({
     }
   }, [note, title, content, updateNote]);
 
+  // Track whether editor has unsaved local changes
+  const isDirty = title !== (note.title || "") || content !== note.content;
+  useEffect(() => {
+    if (dirtyRef) dirtyRef.current = isDirty;
+  }, [isDirty, dirtyRef]);
+
   // Keep a ref to the latest save function for unmount flush
   const handleSaveRef = useRef(handleSave);
   useEffect(() => {
     handleSaveRef.current = handleSave;
-  }, [handleSave]);
+    if (flushSaveRef) flushSaveRef.current = handleSave;
+  }, [handleSave, flushSaveRef]);
 
   // Auto-save on changes
   useEffect(() => {
@@ -526,11 +539,13 @@ export function NoteEditorCore({
   );
 }
 
-/** Expose current content for cleanup purposes */
+/** Expose current content, flush-save, and dirty state for cleanup purposes */
 export function useNoteEditorContent() {
   const contentRef = useRef<string>("");
+  const flushSaveRef = useRef<() => void>(() => {});
+  const dirtyRef = useRef(false);
   const setContent = useCallback((content: string) => {
     contentRef.current = content;
   }, []);
-  return { contentRef, setContent };
+  return { contentRef, flushSaveRef, dirtyRef, setContent };
 }

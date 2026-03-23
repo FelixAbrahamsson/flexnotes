@@ -96,7 +96,7 @@ export function NotesPage() {
 
   const { tags, fetchTags, fetchNoteTags, getTagsForNote, addTagToNote } =
     useTagStore();
-  const { subscribeToChanges, refreshPendingCount, sync } = useSyncStore();
+  const { subscribeToChanges, refreshPendingCount, pendingCount, sync } = useSyncStore();
   const { notesPerRow, viewMode, setViewMode } = usePreferencesStore();
   const { selectedFolderId, fetchFolders, getFolderById } = useFolderStore();
   const confirm = useConfirm();
@@ -117,6 +117,14 @@ export function NotesPage() {
   useEffect(() => {
     activeNoteIdRef.current = activeNoteId;
   }, [activeNoteId]);
+
+  // Ref to flush pending editor saves before close/cleanup
+  const editorFlushSaveRef = useRef<() => void>(() => {});
+  // Ref tracking whether the editor has unsaved local changes
+  const editorDirtyRef = useRef(false);
+  // Same refs for the folder view editor pane
+  const paneFlushSaveRef = useRef<() => void>(() => {});
+  const paneDirtyRef = useRef(false);
 
   // Sync open note with URL (allows each tab to remember its own note)
   const { noteIdFromUrl, setNoteInUrl, clearNoteFromUrl } = useNoteFromUrl({
@@ -231,7 +239,8 @@ export function NotesPage() {
         setShowSettings(false);
       } else if (topModal === "note") {
         // Close note without triggering another history.back()
-        // Use ref to get current activeNoteId (avoids stale closure)
+        // Flush pending save so store has latest content before empty check
+        editorFlushSaveRef.current();
         const noteId = activeNoteIdRef.current;
         if (noteId) {
           deleteNoteIfEmpty(noteId);
@@ -244,6 +253,22 @@ export function NotesPage() {
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, [deleteNoteIfEmpty, setActiveNote, clearNoteFromUrl]);
+
+  // Warn user before closing tab if there are unsaved or unsynced changes
+  const pendingCountRef = useRef(pendingCount);
+  useEffect(() => { pendingCountRef.current = pendingCount; }, [pendingCount]);
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Flush any debounced editor saves (modal and pane)
+      editorFlushSaveRef.current();
+      paneFlushSaveRef.current();
+      if (editorDirtyRef.current || paneDirtyRef.current || pendingCountRef.current > 0) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
 
   // Initialize data and subscriptions
   useEffect(() => {
@@ -422,6 +447,8 @@ export function NotesPage() {
   ]);
 
   const handleCloseEditor = useCallback(async () => {
+    // Flush pending save so store has latest content before empty check
+    editorFlushSaveRef.current();
     const noteId = activeNoteIdRef.current;
     // On mobile, use history.back() to trigger popstate handler
     // This ensures proper cleanup of history stack
@@ -826,6 +853,8 @@ export function NotesPage() {
                   }
                 }}
                 hideTags
+                flushSaveRef={paneFlushSaveRef}
+                dirtyRef={paneDirtyRef}
               />
             </div>
           )}
@@ -1001,6 +1030,8 @@ export function NotesPage() {
           noteId={activeNoteId}
           onClose={handleCloseEditor}
           hideTags={viewMode === "folder"}
+          flushSaveRef={editorFlushSaveRef}
+          dirtyRef={editorDirtyRef}
         />
       )}
 

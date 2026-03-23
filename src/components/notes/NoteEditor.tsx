@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type MutableRefObject } from "react";
 import { X, Maximize2, Minimize2 } from "lucide-react";
 import { useNoteStore } from "@/stores/noteStore";
 import { useNoteUIStore } from "@/stores/noteUIStore";
@@ -9,6 +9,10 @@ interface NoteEditorProps {
   noteId: string;
   onClose: () => void;
   hideTags?: boolean;
+  /** Parent ref that will be kept in sync with the editor's flush function */
+  flushSaveRef?: MutableRefObject<() => void>;
+  /** Parent ref that will be kept in sync with the editor's dirty state */
+  dirtyRef?: MutableRefObject<boolean>;
 }
 
 /**
@@ -19,15 +23,30 @@ export function NoteEditor({
   noteId: _noteId,
   onClose,
   hideTags = false,
+  flushSaveRef: parentFlushSaveRef,
+  dirtyRef: parentDirtyRef,
 }: NoteEditorProps) {
   const { notes } = useNoteStore();
   const { getActiveNote } = useNoteUIStore();
   const note = getActiveNote(notes);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const { contentRef, setContent } = useNoteEditorContent();
+  const { contentRef, flushSaveRef, dirtyRef, setContent } = useNoteEditorContent();
+
+  // Keep parent refs in sync so external close paths (e.g. popstate) can flush
+  useEffect(() => {
+    if (parentFlushSaveRef) parentFlushSaveRef.current = flushSaveRef.current;
+    if (parentDirtyRef) parentDirtyRef.current = dirtyRef.current;
+    return () => {
+      if (parentFlushSaveRef) parentFlushSaveRef.current = () => {};
+      if (parentDirtyRef) parentDirtyRef.current = false;
+    };
+  });
 
   const handleClose = useCallback(async () => {
+    // Flush any pending save so the store has the latest content
+    // before onClose triggers deleteNoteIfEmpty
+    flushSaveRef.current();
     // Clean up any images that were removed from markdown content
     if (note && note.note_type === "markdown") {
       await useImageStore
@@ -35,7 +54,7 @@ export function NoteEditor({
         .cleanupOrphanedImages(note.id, contentRef.current);
     }
     onClose();
-  }, [note, contentRef, onClose]);
+  }, [note, contentRef, flushSaveRef, onClose]);
 
   // Handle ESC key to close modal
   useEffect(() => {
@@ -73,6 +92,8 @@ export function NoteEditor({
           onAfterArchive={onClose}
           onAfterDelete={onClose}
           onContentChange={setContent}
+          flushSaveRef={flushSaveRef}
+          dirtyRef={dirtyRef}
           headerLeft={
             <button onClick={handleClose} className="btn btn-ghost p-2 -ml-2">
               <X className="w-5 h-5" />

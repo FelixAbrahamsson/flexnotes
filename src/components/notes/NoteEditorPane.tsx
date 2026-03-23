@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MutableRefObject } from "react";
 import { FileText } from "lucide-react";
 import { useNoteStore } from "@/stores/noteStore";
 import { useImageStore } from "@/stores/imageStore";
@@ -8,6 +8,10 @@ interface NoteEditorPaneProps {
   noteId: string;
   onMoveToFolder?: () => void;
   hideTags?: boolean;
+  /** Parent ref for flushing pending saves */
+  flushSaveRef?: MutableRefObject<() => void>;
+  /** Parent ref for tracking dirty state */
+  dirtyRef?: MutableRefObject<boolean>;
 }
 
 /**
@@ -18,17 +22,34 @@ export function NoteEditorPane({
   noteId,
   onMoveToFolder,
   hideTags = false,
+  flushSaveRef: parentFlushSaveRef,
+  dirtyRef: parentDirtyRef,
 }: NoteEditorPaneProps) {
   const { notes } = useNoteStore();
   const note = notes.find((n) => n.id === noteId);
 
-  const { contentRef, setContent } = useNoteEditorContent();
+  const { contentRef, flushSaveRef, dirtyRef, setContent } = useNoteEditorContent();
+
+  // Keep parent refs in sync
+  useEffect(() => {
+    if (parentFlushSaveRef) parentFlushSaveRef.current = flushSaveRef.current;
+    if (parentDirtyRef) parentDirtyRef.current = dirtyRef.current;
+    return () => {
+      if (parentFlushSaveRef) parentFlushSaveRef.current = () => {};
+      if (parentDirtyRef) parentDirtyRef.current = false;
+    };
+  });
 
   // Track previous note for cleanup on switch
   const lastNoteIdRef = useRef<string | null>(null);
   const lastNoteTypeRef = useRef<string | null>(null);
 
   useEffect(() => {
+    // Flush save for previous note before switching
+    if (lastNoteIdRef.current && lastNoteIdRef.current !== noteId) {
+      flushSaveRef.current();
+    }
+
     // Clean up orphaned images from previous markdown note before switching
     if (
       lastNoteIdRef.current &&
@@ -44,7 +65,7 @@ export function NoteEditorPane({
       lastNoteIdRef.current = note.id;
       lastNoteTypeRef.current = note.note_type;
     }
-  }, [noteId, note, contentRef]);
+  }, [noteId, note, contentRef, flushSaveRef]);
 
   if (!note) {
     return (
@@ -65,6 +86,8 @@ export function NoteEditorPane({
         deleteMode="trash"
         onMoveToFolder={onMoveToFolder}
         onContentChange={setContent}
+        flushSaveRef={flushSaveRef}
+        dirtyRef={dirtyRef}
       />
     </div>
   );
