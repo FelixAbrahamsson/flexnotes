@@ -42,6 +42,8 @@ export interface NoteEditorCoreProps {
   deleteMode?: "delete" | "trash";
   /** Whether the editor is in fullscreen mode (affects content width) */
   isFullscreen?: boolean;
+  /** Custom content max-width in fullscreen mode (in pixels) */
+  fullscreenContentWidth?: number;
   /** Header slot for additional buttons (e.g., close, fullscreen) */
   headerLeft?: React.ReactNode;
   headerRight?: React.ReactNode;
@@ -65,6 +67,7 @@ export function NoteEditorCore({
   onAfterDelete,
   deleteMode = "trash",
   isFullscreen = false,
+  fullscreenContentWidth,
   headerLeft,
   headerRight,
   onContentChange,
@@ -448,11 +451,14 @@ export function NoteEditorCore({
       />
 
       {/* Content */}
-      <div ref={scrollContainerRef} className="relative flex-1 min-h-0 overflow-y-auto p-4">
+      <div ref={scrollContainerRef} className={`relative flex-1 min-h-0 overflow-y-auto p-4 ${isFullscreen ? "bg-gray-50 dark:bg-gray-900" : ""}`}>
         {note.note_type === "markdown" && (
           <HeadingOutline scrollContainerRef={scrollContainerRef} />
         )}
-        <div className={isFullscreen ? "max-w-3xl mx-auto" : ""}>
+        <div
+          className={isFullscreen ? "mx-auto bg-white dark:bg-gray-800 rounded-lg p-6 min-h-full shadow-sm" : ""}
+          style={isFullscreen ? { maxWidth: fullscreenContentWidth ?? 896 } : undefined}
+        >
         {/* Title */}
         <input
           type="text"

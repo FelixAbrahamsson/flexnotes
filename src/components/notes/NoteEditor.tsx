@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type MutableRefObject } from "react";
+import { useState, useEffect, useCallback, useRef, type MutableRefObject } from "react";
 import { X, Maximize2, Minimize2 } from "lucide-react";
 import { useNoteStore } from "@/stores/noteStore";
 import { useNoteUIStore } from "@/stores/noteUIStore";
@@ -31,7 +31,63 @@ export function NoteEditor({
   const note = getActiveNote(notes);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [modalWidth, setModalWidth] = useState<number | null>(null);
+  const [fullscreenContentWidth, setFullscreenContentWidth] = useState<number | null>(null);
   const { contentRef, flushSaveRef, dirtyRef, setContent } = useNoteEditorContent();
+
+  // Resize handling for desktop modal / fullscreen content width
+  const isResizing = useRef(false);
+  const resizeStartX = useRef(0);
+  const resizeStartWidth = useRef(0);
+  const resizeSide = useRef<"left" | "right">("right");
+  const resizeTarget = useRef<"modal" | "content">("modal");
+
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent, side: "left" | "right") => {
+      e.preventDefault();
+      e.stopPropagation();
+      isResizing.current = true;
+      resizeSide.current = side;
+      resizeStartX.current = e.clientX;
+      resizeTarget.current = isFullscreen ? "content" : "modal";
+      resizeStartWidth.current = isFullscreen
+        ? (fullscreenContentWidth ?? 896)
+        : (modalWidth ?? Math.min(672, window.innerWidth));
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    },
+    [isFullscreen, modalWidth, fullscreenContentWidth]
+  );
+
+  useEffect(() => {
+    const handleResizeMove = (e: MouseEvent) => {
+      if (!isResizing.current) return;
+      const delta = e.clientX - resizeStartX.current;
+      const direction = resizeSide.current === "right" ? 1 : -1;
+      // Multiply by 2 because both modal and fullscreen content are centered
+      const newWidth = resizeStartWidth.current + delta * direction * 2;
+      const clamped = Math.min(Math.max(newWidth, 400), window.innerWidth - 48);
+      if (resizeTarget.current === "content") {
+        setFullscreenContentWidth(clamped);
+      } else {
+        setModalWidth(clamped);
+      }
+    };
+
+    const handleResizeEnd = () => {
+      if (!isResizing.current) return;
+      isResizing.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.addEventListener("mousemove", handleResizeMove);
+    document.addEventListener("mouseup", handleResizeEnd);
+    return () => {
+      document.removeEventListener("mousemove", handleResizeMove);
+      document.removeEventListener("mouseup", handleResizeEnd);
+    };
+  }, []);
 
   // Keep parent refs in sync so external close paths (e.g. popstate) can flush
   useEffect(() => {
@@ -80,15 +136,50 @@ export function NoteEditor({
         className={`absolute bg-white dark:bg-gray-800 shadow-xl flex flex-col overflow-hidden ${
           isFullscreen
             ? "inset-0 sm:inset-0"
-            : "inset-x-0 bottom-0 top-0 sm:top-12 sm:bottom-auto sm:left-1/2 sm:-translate-x-1/2 sm:max-w-2xl sm:max-h-[calc(100vh-6rem)] sm:rounded-xl"
+            : "inset-x-0 bottom-0 top-0 sm:top-12 sm:bottom-auto sm:left-1/2 sm:-translate-x-1/2 sm:max-h-[calc(100vh-6rem)] sm:rounded-xl"
         }`}
+        style={!isFullscreen && modalWidth ? { width: modalWidth, maxWidth: "calc(100vw - 48px)" } : !isFullscreen ? { maxWidth: 672 } : undefined}
         onMouseDown={(e) => e.stopPropagation()}
       >
+        {/* Resize handles - desktop only */}
+        {(() => {
+          if (isFullscreen) {
+            // In fullscreen, position handles at edges of content column
+            const w = fullscreenContentWidth ?? 896;
+            return (
+              <>
+                <div
+                  className="hidden sm:block absolute top-0 bottom-0 w-1.5 cursor-col-resize z-10 hover:bg-primary-400/50 transition-colors"
+                  style={{ left: `calc(50% - ${w / 2}px)` }}
+                  onMouseDown={(e) => handleResizeStart(e, "left")}
+                />
+                <div
+                  className="hidden sm:block absolute top-0 bottom-0 w-1.5 cursor-col-resize z-10 hover:bg-primary-400/50 transition-colors"
+                  style={{ right: `calc(50% - ${w / 2}px)` }}
+                  onMouseDown={(e) => handleResizeStart(e, "right")}
+                />
+              </>
+            );
+          }
+          return (
+            <>
+              <div
+                className="hidden sm:block absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-10 hover:bg-primary-400/50 transition-colors"
+                onMouseDown={(e) => handleResizeStart(e, "left")}
+              />
+              <div
+                className="hidden sm:block absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize z-10 hover:bg-primary-400/50 transition-colors"
+                onMouseDown={(e) => handleResizeStart(e, "right")}
+              />
+            </>
+          );
+        })()}
         <NoteEditorCore
           note={note}
           hideTags={hideTags}
           deleteMode="delete"
           isFullscreen={isFullscreen}
+          fullscreenContentWidth={fullscreenContentWidth ?? undefined}
           onAfterArchive={onClose}
           onAfterDelete={onClose}
           onContentChange={setContent}
