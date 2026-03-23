@@ -115,7 +115,8 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     [],
   );
 
-  const addItem = (afterId?: string, initialText?: string) => {
+  const addItem = useCallback((afterId?: string, initialText?: string) => {
+    const currentItems = itemsRef.current;
     const newItem: ListItem = {
       id: `item-${Date.now()}`,
       text: initialText ?? "",
@@ -125,37 +126,38 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
 
     let newItems: ListItem[];
     if (afterId) {
-      const index = items.findIndex((item) => item.id === afterId);
-      const currentItem = items[index];
+      const index = currentItems.findIndex((item) => item.id === afterId);
+      const currentItem = currentItems[index];
       newItem.indent = currentItem?.indent ?? 0;
       newItems = [
-        ...items.slice(0, index + 1),
+        ...currentItems.slice(0, index + 1),
         newItem,
-        ...items.slice(index + 1),
+        ...currentItems.slice(index + 1),
       ];
     } else {
-      newItems = [...items, newItem];
+      newItems = [...currentItems, newItem];
     }
 
     setItems(newItems);
     saveItems(newItems);
     setFocusedId(newItem.id);
-  };
+  }, [saveItems]);
 
-  const updateItem = (id: string, updates: Partial<ListItem>) => {
-    const newItems = items.map((item) =>
+  const updateItem = useCallback((id: string, updates: Partial<ListItem>) => {
+    const newItems = itemsRef.current.map((item) =>
       item.id === id ? { ...item, ...updates } : item,
     );
     setItems(newItems);
     saveItems(newItems);
-  };
+  }, [saveItems]);
 
   // Split an item at cursor position - keeps text before cursor, creates new item with text after
-  const splitItem = (id: string, textBefore: string, textAfter: string) => {
-    const index = items.findIndex((item) => item.id === id);
+  const splitItem = useCallback((id: string, textBefore: string, textAfter: string) => {
+    const currentItems = itemsRef.current;
+    const index = currentItems.findIndex((item) => item.id === id);
     if (index === -1) return;
 
-    const currentItem = items[index];
+    const currentItem = currentItems[index];
     const newItem: ListItem = {
       id: `item-${Date.now()}`,
       text: textAfter,
@@ -164,30 +166,31 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     };
 
     const newItems = [
-      ...items.slice(0, index),
+      ...currentItems.slice(0, index),
       { ...currentItem, text: textBefore },
       newItem,
-      ...items.slice(index + 1),
+      ...currentItems.slice(index + 1),
     ];
 
     setItems(newItems);
     saveItems(newItems);
     setFocusedId(newItem.id);
-  };
+  }, [saveItems]);
 
   // Merge current item with the previous item (backspace at start)
-  const mergeWithPreviousItem = (id: string) => {
-    const index = items.findIndex((item) => item.id === id);
+  const mergeWithPreviousItem = useCallback((id: string) => {
+    const currentItems = itemsRef.current;
+    const index = currentItems.findIndex((item) => item.id === id);
     if (index <= 0) return;
 
-    const currentItem = items[index];
-    const prevItem = items[index - 1];
+    const currentItem = currentItems[index];
+    const prevItem = currentItems[index - 1];
     const cursorPosition = prevItem.text.length; // Where to place cursor after merge
 
     const newItems = [
-      ...items.slice(0, index - 1),
+      ...currentItems.slice(0, index - 1),
       { ...prevItem, text: prevItem.text + currentItem.text },
-      ...items.slice(index + 1),
+      ...currentItems.slice(index + 1),
     ];
 
     setItems(newItems);
@@ -202,19 +205,20 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
         textarea.selectionEnd = cursorPosition;
       }
     }, 0);
-  };
+  }, [saveItems]);
 
   // Toggle checked state - when checking, also check all children
-  const toggleChecked = (id: string) => {
-    const item = items.find((i) => i.id === id);
+  const toggleChecked = useCallback((id: string) => {
+    const currentItems = itemsRef.current;
+    const item = currentItems.find((i) => i.id === id);
     if (!item) return;
 
     const newChecked = !item.checked;
 
     if (newChecked) {
       // Checking - also check all children
-      const idsToCheck = getItemWithChildren(id, items);
-      const newItems = items.map((i) =>
+      const idsToCheck = getItemWithChildren(id, currentItems);
+      const newItems = currentItems.map((i) =>
         idsToCheck.includes(i.id) ? { ...i, checked: true } : i,
       );
       setItems(newItems);
@@ -223,11 +227,12 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
       // Unchecking - only uncheck this item
       updateItem(id, { checked: false });
     }
-  };
+  }, [getItemWithChildren, saveItems, updateItem]);
 
-  const deleteItem = (id: string) => {
-    const index = items.findIndex((item) => item.id === id);
-    const newItems = items.filter((item) => item.id !== id);
+  const deleteItem = useCallback((id: string) => {
+    const currentItems = itemsRef.current;
+    const index = currentItems.findIndex((item) => item.id === id);
+    const newItems = currentItems.filter((item) => item.id !== id);
     setItems(newItems);
     saveItems(newItems);
 
@@ -235,10 +240,10 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
       const newFocusIndex = Math.max(0, index - 1);
       setFocusedId(newItems[newFocusIndex]?.id ?? null);
     }
-  };
+  }, [saveItems]);
 
-  const indentItem = (id: string, direction: 1 | -1) => {
-    const newItems = items.map((item) => {
+  const indentItem = useCallback((id: string, direction: 1 | -1) => {
+    const newItems = itemsRef.current.map((item) => {
       if (item.id === id) {
         const newIndent = Math.max(
           0,
@@ -250,10 +255,10 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     });
     setItems(newItems);
     saveItems(newItems);
-  };
+  }, [saveItems]);
 
-  const setItemIndent = (id: string, indent: number) => {
-    const newItems = items.map((item) => {
+  const setItemIndent = useCallback((id: string, indent: number) => {
+    const newItems = itemsRef.current.map((item) => {
       if (item.id === id) {
         const newIndent = Math.max(0, Math.min(MAX_INDENT, indent));
         return { ...item, indent: newIndent };
@@ -262,10 +267,11 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     });
     setItems(newItems);
     saveItems(newItems);
-  };
+  }, [saveItems]);
 
-  const handleKeyDown = (e: React.KeyboardEvent, id: string) => {
-    const item = items.find((i) => i.id === id);
+  const handleKeyDown = useCallback((e: React.KeyboardEvent, id: string) => {
+    const currentItems = itemsRef.current;
+    const item = currentItems.find((i) => i.id === id);
     if (!item) return;
 
     // Enter key - split text at cursor and create new item (Shift+Enter for newline on desktop)
@@ -297,7 +303,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
 
       // Only handle if cursor is at the very start with no selection
       if (cursorPos === 0 && selectionEnd === 0) {
-        const index = items.findIndex((i) => i.id === id);
+        const index = currentItems.findIndex((i) => i.id === id);
 
         // If this is the first item and it's empty, just delete it
         if (index === 0) {
@@ -310,7 +316,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
 
         // Find the previous unchecked item to merge with
         // (we only show unchecked items together, so merge within that group)
-        const prevItem = items[index - 1];
+        const prevItem = currentItems[index - 1];
         if (prevItem && !prevItem.checked) {
           e.preventDefault();
           mergeWithPreviousItem(id);
@@ -351,7 +357,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
       // Only navigate to next item if we're at the very end
       if (isOnLastLine && isAtEnd) {
         // Find next unchecked item
-        const uncheckedItems = items.filter((i) => !i.checked);
+        const uncheckedItems = currentItems.filter((i) => !i.checked);
         const currentUncheckedIndex = uncheckedItems.findIndex((i) => i.id === id);
 
         if (currentUncheckedIndex < uncheckedItems.length - 1) {
@@ -384,7 +390,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
       // Only navigate to previous item if we're at the very start
       if (isOnFirstLine && isAtStart) {
         // Find previous unchecked item
-        const uncheckedItems = items.filter((i) => !i.checked);
+        const uncheckedItems = currentItems.filter((i) => !i.checked);
         const currentUncheckedIndex = uncheckedItems.findIndex((i) => i.id === id);
 
         if (currentUncheckedIndex > 0) {
@@ -414,7 +420,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
 
       if (isAtStart) {
         // Find previous unchecked item
-        const uncheckedItems = items.filter((i) => !i.checked);
+        const uncheckedItems = currentItems.filter((i) => !i.checked);
         const currentUncheckedIndex = uncheckedItems.findIndex((i) => i.id === id);
 
         if (currentUncheckedIndex > 0) {
@@ -443,7 +449,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
 
       if (isAtEnd) {
         // Find next unchecked item
-        const uncheckedItems = items.filter((i) => !i.checked);
+        const uncheckedItems = currentItems.filter((i) => !i.checked);
         const currentUncheckedIndex = uncheckedItems.findIndex((i) => i.id === id);
 
         if (currentUncheckedIndex < uncheckedItems.length - 1) {
@@ -461,10 +467,10 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
         }
       }
     }
-  };
+  }, [splitItem, deleteItem, mergeWithPreviousItem, indentItem]);
 
   // Handle text changes - also catches mobile Enter key as fallback
-  const handleTextChange = (id: string, newText: string, oldText: string) => {
+  const handleTextChange = useCallback((id: string, newText: string, oldText: string) => {
     // Check if Shift+Enter was pressed (allow newline on desktop)
     if (shiftEnterPressedRef.current) {
       shiftEnterPressedRef.current = false;
@@ -501,11 +507,12 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     }
 
     updateItem(id, { text: newText });
-  };
+  }, [updateItem, splitItem]);
 
   // Insert a newline at cursor position (for mobile)
-  const insertNewline = (id: string, cursorPos: number) => {
-    const item = items.find((i) => i.id === id);
+  const insertNewline = useCallback((id: string, cursorPos: number) => {
+    const currentItems = itemsRef.current;
+    const item = currentItems.find((i) => i.id === id);
     if (!item) return;
 
     const newText =
@@ -520,7 +527,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
         textarea.selectionEnd = cursorPos + 1;
       }
     }, 0);
-  };
+  }, [updateItem]);
 
   // Calculate drop target based on Y position (only considers unchecked items)
   const calculateDropTarget = useCallback((clientY: number): number => {

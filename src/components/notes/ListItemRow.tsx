@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, memo } from "react";
 import { GripVertical, X, Check, CornerDownLeft } from "lucide-react";
 import type { ListItem } from "@/types";
 
@@ -20,7 +20,7 @@ export interface ListItemRowProps {
   onGripTouchStart: (e: React.TouchEvent) => void;
 }
 
-export function ListItemRow({
+export const ListItemRow = memo(function ListItemRow({
   item,
   rowRef,
   inputRef,
@@ -134,4 +134,14 @@ export function ListItemRow({
       </button>
     </div>
   );
-}
+}, (prev, next) => {
+  // Only re-render when the item data or drag state actually changes.
+  // Callback props change every render due to inline closures in the parent,
+  // but they close over refs and are safe to use "stale" — the item being
+  // interacted with will have its `item` reference change, triggering re-render.
+  return (
+    prev.item === next.item &&
+    prev.isDragging === next.isDragging &&
+    prev.swipeOffset === next.swipeOffset
+  );
+});
