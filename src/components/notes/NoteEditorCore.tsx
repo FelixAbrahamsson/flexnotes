@@ -246,8 +246,16 @@ export function NoteEditorCore({
       } catch {
         // Keep as-is
       }
-      // If converting to markdown, append any missing images
-      if (newType === "markdown") {
+      if (newType === "markdown" && newContent.trim()) {
+        // Convert plain text lines to HTML paragraphs for TipTap
+        const escaped = newContent
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        newContent = escaped
+          .split("\n")
+          .map((line) => `<p>${line || "<br>"}</p>`)
+          .join("");
         newContent = appendMissingImages(newContent);
       }
     } else if (note.note_type !== "list" && newType === "list") {
@@ -260,10 +268,33 @@ export function NoteEditorCore({
           checked: false,
         })),
       });
+    } else if (note.note_type === "markdown" && newType === "text") {
+      // Markdown to text - convert HTML to plain text preserving line structure
+      newContent = content
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>\s*<p[^>]*>/gi, "\n")
+        .replace(/<\/li>\s*<li[^>]*>/gi, "\n")
+        .replace(/<[^>]*>/g, "")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+        .trim();
     } else if (note.note_type === "text" && newType === "markdown") {
-      // Text to markdown - remove orphaned img tags, then append missing images
-      newContent = removeOrphanedImgTags(content);
-      newContent = appendMissingImages(newContent);
+      // Text to markdown - convert plain text to HTML paragraphs for TipTap
+      if (content.trim()) {
+        const escaped = content
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        newContent = escaped
+          .split("\n")
+          .map((line) => `<p>${line || "<br>"}</p>`)
+          .join("");
+        newContent = removeOrphanedImgTags(newContent);
+        newContent = appendMissingImages(newContent);
+      }
     }
 
     updateNote(note.id, { note_type: newType, content: newContent });

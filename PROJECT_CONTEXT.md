@@ -1,12 +1,14 @@
 # Project Context for AI Agents
 
 This document provides context for AI agents working on the FlexNotes codebase. It explains the architecture, patterns, and conventions used throughout the project.
+C
 
 ## Overview
 
 FlexNotes is a note-taking application built as a Google Keep alternative. It's a local-first Progressive Web App (PWA) that syncs to Supabase when online. The app supports multiple note types, dual organization (tags and folders), image attachments, sharing, and works offline.
 
 **Key characteristics:**
+
 - Local-first: All data operations happen on IndexedDB first, then sync to server
 - Offline-capable: Full functionality without internet connection
 - Real-time sync: Uses Supabase Realtime for cross-device updates
@@ -15,18 +17,18 @@ FlexNotes is a note-taking application built as a Google Keep alternative. It's 
 
 ## Tech Stack
 
-| Layer | Technology | Purpose |
-|-------|------------|---------|
-| UI Framework | React 19 | Component-based UI |
-| Language | TypeScript | Type safety |
-| Build Tool | Vite | Fast dev server and bundling |
-| Styling | Tailwind CSS | Utility-first CSS with dark mode |
-| State | Zustand | Lightweight state management |
-| Rich Text | TipTap | ProseMirror-based WYSIWYG editor |
-| Local DB | Dexie.js | IndexedDB wrapper |
-| Backend | Supabase | Auth, PostgreSQL, Storage, Realtime |
-| Mobile | Capacitor | Native iOS/Android wrapper |
-| PWA | Workbox | Service worker and caching |
+| Layer        | Technology   | Purpose                             |
+| ------------ | ------------ | ----------------------------------- |
+| UI Framework | React 19     | Component-based UI                  |
+| Language     | TypeScript   | Type safety                         |
+| Build Tool   | Vite         | Fast dev server and bundling        |
+| Styling      | Tailwind CSS | Utility-first CSS with dark mode    |
+| State        | Zustand      | Lightweight state management        |
+| Rich Text    | TipTap       | ProseMirror-based WYSIWYG editor    |
+| Local DB     | Dexie.js     | IndexedDB wrapper                   |
+| Backend      | Supabase     | Auth, PostgreSQL, Storage, Realtime |
+| Mobile       | Capacitor    | Native iOS/Android wrapper          |
+| PWA          | Workbox      | Service worker and caching          |
 
 ## Architecture
 
@@ -144,14 +146,18 @@ src/
 ## Key Files Explained
 
 ### `src/services/db.ts`
+
 Dexie.js database setup. Defines:
+
 - `LocalNote`, `LocalTag`, `LocalNoteTag` types (with sync metadata)
 - `PendingChange` type for sync queue
 - Database schema and migrations
 - Helper functions: `generateLocalId()`, `getCurrentTimestamp()`
 
 ### `src/services/sync.ts`
+
 Handles syncing between local and server:
+
 - `queueChange()` - Add operation to sync queue
 - `processPendingChanges()` - Push local changes to server
 - `fullSync()` / `incrementalSync()` - Pull changes from server
@@ -159,14 +165,18 @@ Handles syncing between local and server:
 - Handles edge case where note exists locally but not on server (creates instead of updates)
 
 ### `src/services/googleKeepImport.ts`
+
 Parses Google Keep Takeout exports:
+
 - `parseGoogleKeepZip()` - Extracts and parses notes from ZIP
 - `parseKeepJSON()` - Parses current JSON format with `textContent`, `listContent`, `labels`
 - `parseKeepHTML()` - Parses legacy HTML format
 - `convertImportedNote()` - Converts to app's note format, preserving list items
 
 ### `src/stores/noteStore.ts`
+
 Main note operations:
+
 - CRUD operations with optimistic updates
 - Trash/restore/permanent delete
 - Filters: archived, trash, shared, search, tags
@@ -180,7 +190,9 @@ Main note operations:
 - `setSharedTab()` - Switch between "Shared by me" and "Shared with me" tabs
 
 ### `src/stores/folderStore.ts`
+
 Folder management:
+
 - CRUD operations for folders with optimistic updates
 - Hierarchical support via `parent_folder_id`
 - `selectedFolderId` - Currently viewed folder in folder view
@@ -189,7 +201,9 @@ Folder management:
 - Syncs to Supabase with realtime updates
 
 ### `src/stores/preferencesStore.ts`
+
 User preferences with persistence:
+
 - Theme: 'light' | 'dark' | 'system'
 - Layout: notes per row (1, 2, or 3)
 - View mode: 'list' | 'folder'
@@ -199,7 +213,9 @@ User preferences with persistence:
 - `applyTheme()` updates document class
 
 ### `src/components/notes/NoteEditor.tsx`
+
 Modal for editing a note:
+
 - Title input
 - Tag picker (rendered via portal to avoid overflow clipping)
 - Type switcher (text/list/markdown)
@@ -211,7 +227,9 @@ Modal for editing a note:
 - Fullscreen mode: content column rendered on distinct background, resizable width
 
 ### `src/components/notes/ListEditor.tsx`
+
 List/checklist editor with mobile-friendly interactions:
+
 - Touch and mouse drag support for reordering
 - Swipe gestures for indentation changes
 - Uses refs (`itemsRef`, `dragStateRef`, `dropTargetRef`) to avoid stale closures
@@ -228,13 +246,18 @@ List/checklist editor with mobile-friendly interactions:
 - Drop indicator: Only shows for unchecked items, uses index within unchecked array for accurate positioning
 
 ### `src/components/notes/MarkdownEditor.tsx`
+
 TipTap-based rich text editor:
+
 - Toolbar with formatting buttons
 - Image drag & drop and paste handling
 - Exposes `insertImage()` via ref
+- Custom `clipboardTextSerializer`: copies paragraphs with single newlines (not double)
 
 ### `src/components/ui/ConfirmDialog.tsx`
+
 Context-based confirmation dialog system:
+
 - `ConfirmProvider` wraps app to provide `useConfirm()` hook
 - `useConfirm()` returns async function that resolves to boolean
 - Supports variants: 'danger' (red), 'warning' (yellow), 'default' (primary)
@@ -242,14 +265,18 @@ Context-based confirmation dialog system:
 - Replaces browser's `window.confirm()` with themed dialogs
 
 ### `src/components/tags/TagManager.tsx`
+
 Tag management in settings:
+
 - Drag-to-reorder tags using dnd-kit
 - Edit tag name and color
 - Custom color picker with presets and color wheel
 - `getTagColor()` generates consistent color from tag name when no color set
 
 ### `src/components/folders/FolderTreeView.tsx`
+
 Tree-based file browser for folder view:
+
 - Hierarchical display of folders and notes
 - Expandable/collapsible folders
 - Drag-drop notes onto folders to move them
@@ -259,14 +286,18 @@ Tree-based file browser for folder view:
 - Selected note highlighting
 
 ### `src/components/notes/NoteEditorPane.tsx`
+
 Inline note editor for split-pane layout (desktop folder view):
+
 - Similar to NoteEditor but without modal wrapper
 - Displays empty state when no note selected
 - `hideTags` prop to hide tag management in folder view
 - Auto-save with debouncing
 
 ### `src/components/ui/ViewSwitcher.tsx`
+
 Dropdown menu for view switching:
+
 - Switch between list view and folder view
 - Access archive, trash, and shared views
 - Trash count and shared count badges shown in dropdown
@@ -279,27 +310,27 @@ Dropdown menu for view switching:
 ```typescript
 // Notes with sync metadata
 interface LocalNote extends Note {
-  _syncStatus: 'synced' | 'pending' | 'conflict'
-  _localUpdatedAt: string
-  _serverUpdatedAt?: string
+  _syncStatus: "synced" | "pending" | "conflict";
+  _localUpdatedAt: string;
+  _serverUpdatedAt?: string;
 }
 
 // Folders with sync metadata
 interface LocalFolder extends Folder {
-  _syncStatus: 'synced' | 'pending' | 'conflict'
-  _localUpdatedAt: string
-  _serverUpdatedAt?: string
+  _syncStatus: "synced" | "pending" | "conflict";
+  _localUpdatedAt: string;
+  _serverUpdatedAt?: string;
 }
 
 // Sync queue
 interface PendingChange {
-  id: string
-  entityType: 'note' | 'tag' | 'noteTag' | 'folder'
-  entityId: string
-  operation: 'create' | 'update' | 'delete'
-  data?: Record<string, unknown>
-  timestamp: string
-  retryCount: number
+  id: string;
+  entityType: "note" | "tag" | "noteTag" | "folder";
+  entityId: string;
+  operation: "create" | "update" | "delete";
+  data?: Record<string, unknown>;
+  timestamp: string;
+  retryCount: number;
 }
 ```
 
@@ -322,39 +353,51 @@ profiles (id, email, display_name, created_at)
 ## Patterns & Conventions
 
 ### Optimistic Updates
+
 All mutations update UI immediately, then persist:
+
 ```typescript
 // 1. Update UI state
-set(state => ({ items: [...state.items, newItem] }))
+set((state) => ({ items: [...state.items, newItem] }));
 
 // 2. Persist to IndexedDB
-await db.items.add(newItem)
+await db.items.add(newItem);
 
 // 3. Queue for sync
-await queueChange('item', id, 'create')
+await queueChange("item", id, "create");
 ```
 
 ### Dark Mode
+
 Uses Tailwind's class-based dark mode:
+
 ```tsx
 <div className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
 ```
+
 Theme is applied by adding/removing `dark` class on `<html>`.
 
 ### Modal Dismissal
+
 All modals support:
+
 - ESC key to close
 - Click outside (backdrop) to close
 - Nested modals close innermost first
 
 ### Local-Only Fields
+
 Fields prefixed with `_` or specific fields like `is_deleted` are local-only:
+
 ```typescript
-const { _syncStatus, _localUpdatedAt, is_deleted, deleted_at, ...serverData } = localNote
+const { _syncStatus, _localUpdatedAt, is_deleted, deleted_at, ...serverData } =
+  localNote;
 ```
 
 ### ID Generation
+
 Local IDs use UUID v4 via `crypto.randomUUID()` with a fallback for non-HTTPS contexts:
+
 ```typescript
 export function generateLocalId(): string {
   if (typeof crypto.randomUUID === 'function') {
@@ -366,13 +409,17 @@ export function generateLocalId(): string {
 ```
 
 ### Avoiding Stale Closures in Event Handlers
+
 When attaching event handlers to `document` (e.g., for drag/drop), use refs to access current state:
+
 ```typescript
-const itemsRef = useRef(items)
-useEffect(() => { itemsRef.current = items }, [items])
+const itemsRef = useRef(items);
+useEffect(() => {
+  itemsRef.current = items;
+}, [items]);
 
 // In event handler attached to document:
-const currentItems = itemsRef.current // Always current
+const currentItems = itemsRef.current; // Always current
 ```
 
 ## Common Tasks
@@ -395,6 +442,7 @@ const currentItems = itemsRef.current // Always current
 ### Adding Dark Mode to a Component
 
 Add `dark:` variants for all color classes:
+
 ```tsx
 // Before
 <div className="bg-white text-gray-900 border-gray-200">
@@ -406,12 +454,14 @@ Add `dark:` variants for all color classes:
 ### Handling Images
 
 Images flow through:
+
 1. `imageProcessor.ts` - Compression, WebP conversion, dimension extraction
 2. `imageStore.ts` - Upload to Supabase Storage, track in `note_images`
 3. `MarkdownEditor` - Insert at cursor position via `insertImage()`
 4. `ImageGallery` - Display attached images (text notes only, not markdown)
 
 Image cleanup:
+
 - `cleanupOrphanedImages()` - Deletes images from storage that are no longer referenced in markdown content
 - Called when converting from markdown to other types to remove deleted images
 - `isNoteEmpty()` checks for attached images before deleting empty notes
@@ -491,3 +541,4 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 34. **Resizable note modal**: NoteEditor has drag handles on left/right edges for resizing. In normal mode they control modal width, in fullscreen they control the inner content column width. Both use `× 2` delta since the content is centered. Handles are positioned with `calc(50% - width/2)` in fullscreen.
 35. **Fullscreen content distinction**: In fullscreen mode, the scroll area gets `bg-gray-50 dark:bg-gray-900` while the content column stays `bg-white dark:bg-gray-800` with `rounded-lg` and `shadow-sm`, making the editable area visually distinct.
 36. **ListItemRow memo pattern**: `ListItemRow` uses `React.memo` with a custom comparator that deliberately skips callback props. This is safe because all callbacks use `useCallback` + `itemsRef.current` (not `items` state), so stale callbacks still read current data via refs. If you add new data props to `ListItemRow`, you must add them to the comparator.
+37. **Note type conversion**: `handleChangeType` in NoteEditorCore converts content between types: text→markdown wraps each line in `<p>` tags (with HTML escaping), markdown→text strips HTML via regex preserving newlines between `</p><p>` and `<br>`, list→text/markdown joins item texts with `\n`. Empty content is left as-is to avoid spurious `<p><br></p>`. Round-trip text→markdown→text preserves content.

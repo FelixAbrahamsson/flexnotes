@@ -114,6 +114,14 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
         }
         return false // Let TipTap handle it
       },
+      // Use single newlines between paragraphs when copying as plain text
+      clipboardTextSerializer: (slice) => {
+        const parts: string[] = []
+        slice.content.forEach((node) => {
+          parts.push(node.textContent)
+        })
+        return parts.join("\n")
+      },
       handleKeyDown: (view, event) => {
         if (!editor?.isActive('codeBlock')) return false
 
