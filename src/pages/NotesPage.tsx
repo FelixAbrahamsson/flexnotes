@@ -10,18 +10,10 @@ import {
   Share2,
   Users,
 } from "lucide-react";
-import {
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type DragStartEvent,
-} from "@dnd-kit/core";
-import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { DndContext } from "@dnd-kit/core";
 import { hapticLight } from "@/hooks/useCapacitor";
+import { useNoteEditorLifecycle } from "@/hooks/useNoteEditorLifecycle";
+import { useNoteDragAndDrop } from "@/hooks/useNoteDragAndDrop";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useResizableSidebar } from "@/hooks/useResizableSidebar";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -47,8 +39,6 @@ import { FolderPicker } from "@/components/folders/FolderPicker";
 import { FolderManager } from "@/components/folders/FolderManager";
 import { removeSavedShare } from "@/services/share";
 
-type ModalType = "settings" | "note";
-
 export function NotesPage() {
   // Data store
   const {
@@ -69,8 +59,6 @@ export function NotesPage() {
     fetchSharedWithMeNotes,
     removeSharedWithMeNote,
     getTrashCount,
-    deleteNoteIfEmpty,
-    reorderNotes,
     getNotesInFolder,
   } = useNoteStore();
 
@@ -96,7 +84,7 @@ export function NotesPage() {
 
   const { tags, fetchTags, fetchNoteTags, getTagsForNote, addTagToNote } =
     useTagStore();
-  const { subscribeToChanges, refreshPendingCount, pendingCount, sync } = useSyncStore();
+  const { subscribeToChanges, refreshPendingCount, sync } = useSyncStore();
   const { notesPerRow, viewMode, setViewMode } = usePreferencesStore();
   const { selectedFolderId, fetchFolders, getFolderById } = useFolderStore();
   const confirm = useConfirm();
@@ -109,22 +97,20 @@ export function NotesPage() {
   }, [activeNoteId, notes]);
   useDocumentTitle(activeNoteTitle);
 
-  // Track modal stack for back button handling
-  const modalStackRef = useRef<ModalType[]>([]);
-
-  // Track activeNoteId in ref for popstate handler (avoids stale closure)
-  const activeNoteIdRef = useRef(activeNoteId);
+  // Track if we're on mobile for folder view behavior
+  // Defined early so it can be shared between hooks
+  const isMobileRef = useRef(false);
+  const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
-    activeNoteIdRef.current = activeNoteId;
-  }, [activeNoteId]);
-
-  // Ref to flush pending editor saves before close/cleanup
-  const editorFlushSaveRef = useRef<() => void>(() => {});
-  // Ref tracking whether the editor has unsaved local changes
-  const editorDirtyRef = useRef(false);
-  // Same refs for the folder view editor pane
-  const paneFlushSaveRef = useRef<() => void>(() => {});
-  const paneDirtyRef = useRef(false);
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      isMobileRef.current = mobile;
+      setIsMobile(mobile);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // Sync open note with URL (allows each tab to remember its own note)
   const { noteIdFromUrl, setNoteInUrl, clearNoteFromUrl } = useNoteFromUrl({
@@ -149,7 +135,6 @@ export function NotesPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [shareNoteId, setShareNoteId] = useState<string | null>(null);
   const [reorderMode, setReorderMode] = useState(false);
-  const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
   const [folderPickerNoteId, setFolderPickerNoteId] = useState<string | null>(
     null,
   );
@@ -157,21 +142,6 @@ export function NotesPage() {
   const [folderViewSelectedNoteId, setFolderViewSelectedNoteId] = useState<
     string | null
   >(null);
-
-  // Track if we're on mobile for folder view behavior
-  // Use ref to avoid stale closure in useNoteFromUrl callback
-  const isMobileRef = useRef(false);
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const checkMobile = () => {
-      const mobile = window.innerWidth < 768;
-      isMobileRef.current = mobile;
-      setIsMobile(mobile);
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
 
   // Resizable sidebar
   const { width: sidebarWidth, handleResizeStart } = useResizableSidebar({
@@ -197,78 +167,38 @@ export function NotesPage() {
     disabled: reorderMode,
   });
 
-  // Push modal to history stack (for non-note modals like settings)
-  const openModal = useCallback((modalType: ModalType) => {
-    modalStackRef.current.push(modalType);
-    window.history.pushState({ modal: modalType }, "");
-  }, []);
-
-  // Close modal and clean up history (when closing via UI, not back button)
-  const closeModalNormally = useCallback((modalType: ModalType) => {
-    const index = modalStackRef.current.lastIndexOf(modalType);
-    if (index !== -1) {
-      modalStackRef.current.splice(index, 1);
-      window.history.back();
-    }
-  }, []);
+  // Editor lifecycle: modal stack, popstate, beforeunload, close handling
+  const {
+    modalStackRef,
+    activeNoteIdRef,
+    editorFlushSaveRef,
+    editorDirtyRef,
+    paneFlushSaveRef,
+    paneDirtyRef,
+    openModal,
+    closeModalNormally,
+    handleCloseEditor,
+  } = useNoteEditorLifecycle({
+    clearNoteFromUrl,
+    onCloseSettings: useCallback(() => setShowSettings(false), []),
+    isMobileRef,
+  });
 
   // Track previous noteIdFromUrl to detect back navigation
   const prevNoteIdFromUrlRef = useRef(noteIdFromUrl);
 
   // Safety net: if URL changes from having a note ID to not having one,
   // but note is still open on mobile, close it.
-  // This handles edge cases where popstate doesn't properly close the note.
   useEffect(() => {
     const hadNoteId = prevNoteIdFromUrlRef.current;
     const hasNoteId = noteIdFromUrl;
 
-    // Only close if URL HAD a note ID and now doesn't (back navigation)
-    // Don't close if URL was never set (initial note open - URL update is async)
     if (hadNoteId && !hasNoteId && activeNoteId && isMobileRef.current) {
       setActiveNote(null);
     }
 
     prevNoteIdFromUrlRef.current = noteIdFromUrl;
   }, [noteIdFromUrl, activeNoteId, setActiveNote]);
-
-  // Handle back button / swipe back for modals (settings, notes)
-  useEffect(() => {
-    const handlePopState = () => {
-      const topModal = modalStackRef.current.pop();
-      if (topModal === "settings") {
-        setShowSettings(false);
-      } else if (topModal === "note") {
-        // Close note without triggering another history.back()
-        // Flush pending save so store has latest content before empty check
-        editorFlushSaveRef.current();
-        const noteId = activeNoteIdRef.current;
-        if (noteId) {
-          deleteNoteIfEmpty(noteId);
-        }
-        setActiveNote(null);
-        clearNoteFromUrl();
-      }
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [deleteNoteIfEmpty, setActiveNote, clearNoteFromUrl]);
-
-  // Warn user before closing tab if there are unsaved or unsynced changes
-  const pendingCountRef = useRef(pendingCount);
-  useEffect(() => { pendingCountRef.current = pendingCount; }, [pendingCount]);
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      // Flush any debounced editor saves (modal and pane)
-      editorFlushSaveRef.current();
-      paneFlushSaveRef.current();
-      if (editorDirtyRef.current || paneDirtyRef.current || pendingCountRef.current > 0) {
-        e.preventDefault();
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, []);
 
   // Initialize data and subscriptions
   useEffect(() => {
@@ -338,83 +268,20 @@ export function NotesPage() {
   const trashCount = getTrashCount();
   const canLoadMore = viewMode === "list" && hasMoreNotes(notes, sharedNoteIds);
 
-  // Drag and drop sensors (used by folder view)
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8, // 8px movement required before drag starts
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 150, // Short delay since user explicitly enabled reorder mode
-        tolerance: 5,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  );
-
-  // Exit reorder mode when switching views
-  useEffect(() => {
-    if (showArchived || showTrash || showShared) {
-      setReorderMode(false);
-    }
-  }, [showArchived, showTrash, showShared]);
-
-  // Handle drag start - give haptic feedback and track dragging state
-  const handleDragStart = useCallback(
-    (event: DragStartEvent) => {
-      // Check if dragging is disabled
-      const isDragDisabled =
-        showTrash || searchQuery.length > 0 || selectedTagIds.length > 0;
-      if (isDragDisabled) return;
-
-      // On mobile (below sm breakpoint), only allow dragging in reorder mode
-      const isMobile = window.matchMedia("(max-width: 639px)").matches;
-      if (isMobile && !reorderMode) return;
-
-      hapticLight();
-      setDraggingNoteId(event.active.id as string);
-    },
-    [showTrash, searchQuery, selectedTagIds, reorderMode],
-  );
-
-  // Handle drag end
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event;
-      const noteId = active.id as string;
-
-      setDraggingNoteId(null);
-
-      if (!over) return;
-
-      // Handle drop on action zones
-      if (over.id === "drop-archive") {
-        hapticLight();
-        const note = getPaginatedNotes(notes, sharedNoteIds).find((n: { id: string }) => n.id === noteId);
-        if (note) {
-          updateNote(noteId, { is_archived: !note.is_archived });
-        }
-        return;
-      }
-
-      if (over.id === "drop-trash") {
-        hapticLight();
-        trashNote(noteId);
-        return;
-      }
-
-      // Handle reordering
-      if (active.id !== over.id) {
-        hapticLight();
-        reorderNotes(noteId, over.id as string, showArchived, showTrash);
-      }
-    },
-    [reorderNotes, getPaginatedNotes, updateNote, trashNote, notes, sharedNoteIds, showArchived, showTrash],
-  );
+  // Drag and drop
+  const { sensors, draggingNoteId, handleDragStart, handleDragEnd } =
+    useNoteDragAndDrop({
+      showArchived,
+      showTrash,
+      showShared,
+      searchQuery,
+      selectedTagIds,
+      reorderMode,
+      setReorderMode,
+      getPaginatedNotes,
+      notes,
+      sharedNoteIds,
+    });
 
   const handleCreateNote = useCallback(async () => {
     hapticLight();
@@ -445,33 +312,6 @@ export function NotesPage() {
     selectedFolderId,
     setNoteInUrl,
   ]);
-
-  const handleCloseEditor = useCallback(async () => {
-    // Flush pending save so store has latest content before empty check
-    editorFlushSaveRef.current();
-    const noteId = activeNoteIdRef.current;
-    // On mobile, use history.back() to trigger popstate handler
-    // This ensures proper cleanup of history stack
-    if (isMobileRef.current && modalStackRef.current.includes("note")) {
-      const index = modalStackRef.current.lastIndexOf("note");
-      if (index !== -1) {
-        modalStackRef.current.splice(index, 1);
-      }
-      if (noteId) {
-        await deleteNoteIfEmpty(noteId);
-      }
-      setActiveNote(null);
-      clearNoteFromUrl();
-      window.history.back();
-    } else {
-      // On desktop or when history was already handled, just close directly
-      if (noteId) {
-        await deleteNoteIfEmpty(noteId);
-      }
-      setActiveNote(null);
-      clearNoteFromUrl();
-    }
-  }, [deleteNoteIfEmpty, setActiveNote, clearNoteFromUrl]);
 
   const handleArchive = useCallback(
     (noteId: string, isArchived: boolean) => {
