@@ -100,7 +100,7 @@ src/
 │   ├── notes/           # NoteCard, NoteEditor, NoteEditorPane, TextEditor, ListEditor, MarkdownEditor
 │   ├── sharing/         # ShareModal
 │   ├── tags/            # TagBadge, TagFilter, TagPicker
-│   ├── ui/              # Reusable UI (ConfirmDialog, DropdownMenu, ViewSwitcher)
+│   ├── ui/              # Reusable UI (ConfirmDialog, DropdownMenu, Toast, ViewSwitcher)
 │   ├── SettingsModal.tsx  # Theme, layout, tags, folders, import, password, logout
 │   └── SyncStatus.tsx
 │
@@ -258,6 +258,7 @@ TipTap-based rich text editor:
 - Image drag & drop and paste handling
 - Exposes `insertImage()` via ref
 - Custom `clipboardTextSerializer`: copies paragraphs with single newlines (not double)
+- Checkbox blur: after toggling a task item checkbox, the editor is blurred to prevent mobile keyboard from appearing
 
 ### `src/components/ui/ConfirmDialog.tsx`
 
@@ -268,6 +269,17 @@ Context-based confirmation dialog system:
 - Supports variants: 'danger' (red), 'warning' (yellow), 'default' (primary)
 - Customizable title, message, and button text
 - Replaces browser's `window.confirm()` with themed dialogs
+
+### `src/components/ui/Toast.tsx`
+
+Context-based toast notification system:
+
+- `ToastProvider` wraps app to provide `useToast()` hook
+- `useToast()` returns `showToast()` function that accepts message, optional `onUndo` callback, and duration
+- Auto-dismisses after 5 seconds (configurable)
+- Supports multiple stacked toasts
+- Entry/exit animations
+- Used for delete (trash) and archive actions with undo support
 
 ### `src/components/folders/FolderTreeView.tsx`
 
@@ -280,6 +292,7 @@ Tree-based file browser for folder view:
 - Folder CRUD: create, rename, delete, color picker
 - `NoteTreeItem` (separate file): draggable note with context menu (pin, share, duplicate, move, archive, delete)
 - `FolderTreeItem` (separate file): folder node with expand/collapse, drag+drop, rename, color picker, subfolder creation
+- Delete and archive actions are routed via callbacks (`onDeleteNote`, `onArchiveNote`) to the parent for toast notifications
 
 ### `src/components/notes/NoteEditorPane.tsx`
 
@@ -538,3 +551,6 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 35. **Fullscreen content distinction**: In fullscreen mode, the scroll area gets `bg-gray-50 dark:bg-gray-900` while the content column stays `bg-white dark:bg-gray-800` with `rounded-lg` and `shadow-sm`, making the editable area visually distinct.
 36. **ListItemRow memo pattern**: `ListItemRow` uses `React.memo` with a custom comparator that deliberately skips callback props. This is safe because all callbacks use `useCallback` + `itemsRef.current` (not `items` state), so stale callbacks still read current data via refs. If you add new data props to `ListItemRow`, you must add them to the comparator.
 37. **Note type conversion**: `convertNoteContent()` in `utils/noteContentConverter.ts` handles conversion between types: text→markdown wraps each line in `<p>` tags (with HTML escaping), markdown→text strips HTML via `htmlToPlainText()` preserving newlines between `</p><p>` and `<br>`, list→text/markdown joins item texts with `\n`. Empty content is left as-is to avoid spurious `<p><br></p>`. Round-trip text→markdown→text preserves content. `htmlToPlainText` is also re-exported as `stripHtml` from `formatters.ts`.
+38. **Toast notifications**: Use `useToast()` hook (from `ToastProvider`) instead of alerts. Used for trash and archive actions with undo support. Must be used within `ToastProvider`.
+39. **Swipe-to-action on mobile**: `SortableNoteCard` implements touch swipe gestures: swipe right to archive, swipe left to trash. Direction is locked after first 10px of movement. Swipe distance is capped at 150px. On mobile outside reorder mode, `useSortable` is disabled entirely so @dnd-kit doesn't interfere with swipe gestures. Desktop drag-to-reorder is unaffected.
+40. **Markdown checkbox on mobile**: Clicking a TipTap task item checkbox would focus the editor and show the keyboard. `MarkdownEditor` listens for checkbox clicks and calls `editor.commands.blur()` on the next frame to prevent this.

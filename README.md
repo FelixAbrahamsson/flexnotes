@@ -15,7 +15,9 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 - **Trash Bin**: Deleted notes go to trash with 30-day retention before permanent deletion
 - **Quick Actions**: Pin, archive, delete, share, duplicate, or move to folder from note card menus, folder tree, and note editor
 - **Duplicate Notes**: Create a copy of any note with all its content and tags preserved
-- **Drag-to-Archive/Trash**: When dragging notes, drop zones appear to quickly archive or trash
+- **Drag-to-Archive/Trash**: On desktop, drop zones appear when dragging notes to quickly archive or trash
+- **Swipe-to-Archive/Trash**: On mobile, swipe a note right to archive or left to trash
+- **Undo Toast**: After archiving or deleting a note, a toast notification appears with an undo button
 - **Auto-Cleanup**: Empty notes are automatically deleted when closed
 - **Search**: Full-text search works in both list and folder views
 - **Drag-to-Reorder**: Drag notes to reorder them (desktop: drag directly, mobile: tap reorder button first)
@@ -160,7 +162,7 @@ src/
 │   ├── notes/          # Note editors (text, list, markdown, editor pane)
 │   ├── sharing/        # Share modal
 │   ├── tags/           # Tag picker and filter
-│   └── ui/             # Reusable UI (dropdown menu, confirm dialog, view switcher)
+│   └── ui/             # Reusable UI (dropdown menu, confirm dialog, toast, view switcher)
 ├── hooks/              # Custom React hooks
 ├── pages/              # Page components
 ├── services/           # API and business logic
