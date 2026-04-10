@@ -24,6 +24,8 @@ interface UseNoteDragAndDropOptions {
   getPaginatedNotes: (notes: Note[], sharedNoteIds: Set<string>) => Note[];
   notes: Note[];
   sharedNoteIds: Set<string>;
+  onArchive: (noteId: string, isArchived: boolean) => void;
+  onDelete: (noteId: string) => void;
 }
 
 export function useNoteDragAndDrop({
@@ -37,8 +39,10 @@ export function useNoteDragAndDrop({
   getPaginatedNotes,
   notes,
   sharedNoteIds,
+  onArchive,
+  onDelete,
 }: UseNoteDragAndDropOptions) {
-  const { updateNote, trashNote, reorderNotes } = useNoteStore();
+  const { reorderNotes } = useNoteStore();
   const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
 
   const sensors = useSensors(
@@ -90,14 +94,14 @@ export function useNoteDragAndDrop({
           (n: { id: string }) => n.id === noteId,
         );
         if (note) {
-          updateNote(noteId, { is_archived: !note.is_archived });
+          onArchive(noteId, note.is_archived);
         }
         return;
       }
 
       if (over.id === "drop-trash") {
         hapticLight();
-        trashNote(noteId);
+        onDelete(noteId);
         return;
       }
 
@@ -109,8 +113,8 @@ export function useNoteDragAndDrop({
     [
       reorderNotes,
       getPaginatedNotes,
-      updateNote,
-      trashNote,
+      onArchive,
+      onDelete,
       notes,
       sharedNoteIds,
       showArchived,

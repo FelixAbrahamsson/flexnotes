@@ -21,6 +21,7 @@ interface FolderTreeViewProps {
   onMoveNote: (noteId: string) => void
   onShareNote: (noteId: string) => void
   onArchiveNote: (noteId: string) => void
+  onDeleteNote: (noteId: string) => void
   onPinNote: (noteId: string) => void
   onDuplicateNote: (noteId: string) => void
 }
@@ -34,6 +35,7 @@ export function FolderTreeView({
   onMoveNote,
   onShareNote,
   onArchiveNote,
+  onDeleteNote,
   onPinNote,
   onDuplicateNote,
 }: FolderTreeViewProps) {
@@ -283,6 +285,7 @@ export function FolderTreeView({
             onMoveNote={onMoveNote}
             onShareNote={onShareNote}
             onArchiveNote={onArchiveNote}
+            onDeleteNote={onDeleteNote}
             onPinNote={onPinNote}
             onDuplicateNote={onDuplicateNote}
           />
@@ -308,7 +311,7 @@ export function FolderTreeView({
                 reorderMode={reorderMode}
                 onSelect={() => onSelectNote(note.id)}
                 onMove={() => onMoveNote(note.id)}
-                onDelete={() => useNoteStore.getState().trashNote(note.id)}
+                onDelete={() => onDeleteNote(note.id)}
                 onShare={() => onShareNote(note.id)}
                 onArchive={() => onArchiveNote(note.id)}
                 onPin={() => onPinNote(note.id)}

@@ -19,6 +19,7 @@ import { useTagStore } from "@/stores/tagStore";
 import { useImageStore } from "@/stores/imageStore";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/Toast";
 import { TextEditor } from "./TextEditor";
 import { ListEditor } from "./ListEditor";
 import { MarkdownEditor, type MarkdownEditorHandle } from "./MarkdownEditor";
@@ -75,10 +76,11 @@ export function NoteEditorCore({
   flushSaveRef,
   dirtyRef,
 }: NoteEditorCoreProps) {
-  const { updateNote, deleteNote, trashNote, duplicateNote } = useNoteStore();
+  const { updateNote, deleteNote, trashNote, restoreNote, duplicateNote } = useNoteStore();
   const { getTagsForNote, removeTagFromNote } = useTagStore();
   const { fetchImagesForNote } = useImageStore();
   const confirm = useConfirm();
+  const showToast = useToast();
 
   const [title, setTitle] = useState(note.title || "");
   const [content, setContent] = useState(note.content);
@@ -169,6 +171,12 @@ export function NoteEditorCore({
 
   const handleToggleArchive = () => {
     updateNote(note.id, { is_archived: !note.is_archived });
+    if (!note.is_archived) {
+      showToast({
+        message: "Note archived",
+        onUndo: () => updateNote(note.id, { is_archived: false }),
+      });
+    }
     onAfterArchive?.();
   };
 
@@ -185,6 +193,10 @@ export function NoteEditorCore({
     if (confirmed) {
       if (isTrash) {
         trashNote(note.id);
+        showToast({
+          message: "Note moved to trash. Deleted notes are stored for 30 days.",
+          onUndo: () => restoreNote(note.id),
+        });
       } else {
         deleteNote(note.id);
       }

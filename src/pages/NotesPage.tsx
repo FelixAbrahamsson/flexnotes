@@ -25,6 +25,7 @@ import { useSyncStore } from "@/stores/syncStore";
 import { usePreferencesStore } from "@/stores/preferencesStore";
 import { useFolderStore } from "@/stores/folderStore";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/Toast";
 import { NoteEditor } from "@/components/notes/NoteEditor";
 import { NoteEditorPane } from "@/components/notes/NoteEditorPane";
 import { NoteGrid } from "@/components/notes/NoteGrid";
@@ -88,6 +89,7 @@ export function NotesPage() {
   const { notesPerRow, viewMode, setViewMode } = usePreferencesStore();
   const { selectedFolderId, fetchFolders, getFolderById } = useFolderStore();
   const confirm = useConfirm();
+  const showToast = useToast();
 
   // Update browser tab title based on active note
   const activeNoteTitle = useMemo(() => {
@@ -267,21 +269,6 @@ export function NotesPage() {
   const trashCount = getTrashCount();
   const canLoadMore = viewMode === "list" && hasMoreNotes(notes, sharedNoteIds);
 
-  // Drag and drop
-  const { sensors, draggingNoteId, handleDragStart, handleDragEnd } =
-    useNoteDragAndDrop({
-      showArchived,
-      showTrash,
-      showShared,
-      searchQuery,
-      selectedTagIds,
-      reorderMode,
-      setReorderMode,
-      getPaginatedNotes,
-      notes,
-      sharedNoteIds,
-    });
-
   const handleCreateNote = useCallback(async () => {
     hapticLight();
     // In folder view, create note in selected folder
@@ -316,8 +303,14 @@ export function NotesPage() {
     (noteId: string, isArchived: boolean) => {
       hapticLight();
       updateNote(noteId, { is_archived: !isArchived });
+      if (!isArchived) {
+        showToast({
+          message: "Note archived",
+          onUndo: () => updateNote(noteId, { is_archived: false }),
+        });
+      }
     },
-    [updateNote],
+    [updateNote, showToast],
   );
 
   const handlePin = useCallback(
@@ -332,9 +325,30 @@ export function NotesPage() {
     (noteId: string) => {
       hapticLight();
       trashNote(noteId);
+      showToast({
+        message: "Note moved to trash. Deleted notes are stored for 30 days.",
+        onUndo: () => restoreNote(noteId),
+      });
     },
-    [trashNote],
+    [trashNote, restoreNote, showToast],
   );
+
+  // Drag and drop
+  const { sensors, draggingNoteId, handleDragStart, handleDragEnd } =
+    useNoteDragAndDrop({
+      showArchived,
+      showTrash,
+      showShared,
+      searchQuery,
+      selectedTagIds,
+      reorderMode,
+      setReorderMode,
+      getPaginatedNotes,
+      notes,
+      sharedNoteIds,
+      onArchive: handleArchive,
+      onDelete: handleDelete,
+    });
 
   const handleRestore = useCallback(
     (noteId: string) => {
@@ -653,10 +667,22 @@ export function NotesPage() {
                   setShareNoteId(noteId);
                 }}
                 onArchiveNote={(noteId) => {
+                  const isArchived = notes.find((n) => n.id === noteId)?.is_archived;
                   hapticLight();
-                  updateNote(noteId, {
-                    is_archived: !notes.find((n) => n.id === noteId)
-                      ?.is_archived,
+                  updateNote(noteId, { is_archived: !isArchived });
+                  if (!isArchived) {
+                    showToast({
+                      message: "Note archived",
+                      onUndo: () => updateNote(noteId, { is_archived: false }),
+                    });
+                  }
+                }}
+                onDeleteNote={(noteId) => {
+                  hapticLight();
+                  trashNote(noteId);
+                  showToast({
+                    message: "Note moved to trash. Deleted notes are stored for 30 days.",
+                    onUndo: () => restoreNote(noteId),
                   });
                 }}
                 onPinNote={(noteId) => {

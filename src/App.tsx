@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { useCapacitorInit } from '@/hooks/useCapacitor'
 import { ConfirmProvider } from '@/components/ui/ConfirmDialog'
+import { ToastProvider } from '@/components/ui/Toast'
 import { LoginPage } from '@/pages/LoginPage'
 import { SignupPage } from '@/pages/SignupPage'
 import { NotesPage } from '@/pages/NotesPage'
@@ -56,6 +57,7 @@ export default function App() {
 
   return (
     <ConfirmProvider>
+    <ToastProvider>
       <Routes>
         <Route
           path="/login"
@@ -83,6 +85,7 @@ export default function App() {
         />
         <Route path="/shared/:token" element={<SharedNotePage />} />
       </Routes>
+    </ToastProvider>
     </ConfirmProvider>
   )
 }

@@ -12,7 +12,6 @@ import {
   Palette,
 } from 'lucide-react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
-import { useNoteStore } from '@/stores/noteStore'
 import { DropdownMenu, DropdownMenuItem } from '@/components/ui/DropdownMenu'
 import { NoteTreeItem } from './NoteTreeItem'
 import { getFolderColor, DEFAULT_COLORS } from './FolderBadge'
@@ -49,6 +48,7 @@ export interface FolderTreeItemProps {
   onMoveNote: (noteId: string) => void
   onShareNote: (noteId: string) => void
   onArchiveNote: (noteId: string) => void
+  onDeleteNote: (noteId: string) => void
   onPinNote: (noteId: string) => void
   onDuplicateNote: (noteId: string) => void
 }
@@ -84,6 +84,7 @@ export function FolderTreeItem({
   onMoveNote,
   onShareNote,
   onArchiveNote,
+  onDeleteNote,
   onPinNote,
   onDuplicateNote,
 }: FolderTreeItemProps) {
@@ -384,6 +385,7 @@ export function FolderTreeItem({
               onMoveNote={onMoveNote}
               onShareNote={onShareNote}
               onArchiveNote={onArchiveNote}
+              onDeleteNote={onDeleteNote}
               onPinNote={onPinNote}
               onDuplicateNote={onDuplicateNote}
             />
@@ -399,7 +401,7 @@ export function FolderTreeItem({
               reorderMode={reorderMode}
               onSelect={() => onSelectNote(note.id)}
               onMove={() => onMoveNote(note.id)}
-              onDelete={() => useNoteStore.getState().trashNote(note.id)}
+              onDelete={() => onDeleteNote(note.id)}
               onShare={() => onShareNote(note.id)}
               onArchive={() => onArchiveNote(note.id)}
               onPin={() => onPinNote(note.id)}
