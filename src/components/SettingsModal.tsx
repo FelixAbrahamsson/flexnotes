@@ -4,6 +4,7 @@ import { usePreferencesStore } from '@/stores/preferencesStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { GoogleKeepImport } from '@/components/import/GoogleKeepImport'
+import { NotesExportImport } from '@/components/import/NotesExportImport'
 import { supabase } from '@/services/supabase'
 
 interface SettingsModalProps {
@@ -169,6 +170,14 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                 </span>
               </button>
             </div>
+          </div>
+
+          {/* Export & Import */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              Export & Import
+            </label>
+            <NotesExportImport />
           </div>
 
           {/* Import from Google Keep */}
