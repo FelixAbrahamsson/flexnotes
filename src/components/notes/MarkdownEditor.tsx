@@ -177,6 +177,25 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
     }
   }, [editor])
 
+  // Blur editor after checkbox click to prevent mobile keyboard from appearing
+  useEffect(() => {
+    if (!editor) return
+
+    const handleCheckboxClick = (e: Event) => {
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' && target.getAttribute('type') === 'checkbox') {
+        requestAnimationFrame(() => {
+          editor.commands.blur()
+        })
+      }
+    }
+
+    editor.view.dom.addEventListener('click', handleCheckboxClick)
+    return () => {
+      editor.view.dom.removeEventListener('click', handleCheckboxClick)
+    }
+  }, [editor])
+
   // Expose insertImage method via ref
   const insertImage = useCallback((url: string) => {
     if (editor) {
