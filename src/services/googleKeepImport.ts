@@ -110,13 +110,8 @@ function parseKeepHTML(html: string, fileName: string): ImportedNote | null {
     const contentEl = doc.querySelector('.content')
     let content = ''
     if (contentEl) {
-      // Convert HTML content to our format
-      // Keep paragraphs and line breaks
-      content = contentEl.innerHTML
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<\/p>/gi, '\n')
-        .replace(/<[^>]*>/g, '')
-        .trim()
+      // Use textContent to safely extract plain text (avoids XSS from malicious HTML)
+      content = (contentEl.textContent || '').trim()
     }
 
     // Get labels/tags

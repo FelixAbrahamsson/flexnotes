@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, AlertCircle, Eye, Edit3 } from 'lucide-react'
+import DOMPurify from 'dompurify'
 import { getSharedNote, updateSharedNote, saveSharedNote } from '@/services/share'
 import { useAuthStore } from '@/stores/authStore'
 import { useNoteUIStore } from '@/stores/noteUIStore'
@@ -259,10 +260,15 @@ function SharedNoteContent({ note }: { note: Note }) {
   }
 
   // Text and markdown notes both store HTML content
+  const sanitized = DOMPurify.sanitize(note.content, {
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'a', 'img', 'code', 'pre', 'blockquote', 'hr', 'span', 'sub', 'sup', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'input', 'label'],
+    ALLOWED_ATTR: ['href', 'title', 'target', 'rel', 'src', 'alt', 'class', 'type', 'checked', 'disabled', 'data-type', 'data-checked'],
+    ALLOW_DATA_ATTR: false,
+  })
   return (
     <div
       className="prose prose-sm dark:prose-invert max-w-none"
-      dangerouslySetInnerHTML={{ __html: note.content }}
+      dangerouslySetInnerHTML={{ __html: sanitized }}
     />
   )
 }

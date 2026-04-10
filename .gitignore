@@ -32,3 +32,6 @@ dist-ssr
 # Capacitor native projects
 android/
 ios/
+
+# Supabase CLI
+supabase/.temp/
