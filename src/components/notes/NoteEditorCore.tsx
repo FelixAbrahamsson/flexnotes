@@ -90,6 +90,11 @@ export function NoteEditorCore({
   const [showShareModal, setShowShareModal] = useState(false);
   const [viewingImage, setViewingImage] = useState<string | null>(null);
 
+  // Track the last values synced from/to the store.
+  // Used to distinguish "user edited locally" from "store updated via sync".
+  const lastSyncedTitleRef = useRef(note.title || "");
+  const lastSyncedContentRef = useRef(note.content);
+
   const markdownEditorRef = useRef<MarkdownEditorHandle>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -117,7 +122,31 @@ export function NoteEditorCore({
       setTitle(note.title || "");
       setContent(note.content);
       setLastNoteId(note.id);
+      lastSyncedTitleRef.current = note.title || "";
+      lastSyncedContentRef.current = note.content;
     }
+  }, [note, lastNoteId]);
+
+  // Accept store updates (e.g. from sync) when user hasn't made local edits.
+  // Without this, auto-save would write back stale content after another
+  // device's changes are pulled in, causing data loss.
+  useEffect(() => {
+    if (note.id !== lastNoteId) return;
+
+    const storeTitle = note.title || "";
+    const storeContent = note.content;
+    const hasLocalTitleEdits = title !== lastSyncedTitleRef.current;
+    const hasLocalContentEdits = content !== lastSyncedContentRef.current;
+
+    if (!hasLocalTitleEdits && storeTitle !== lastSyncedTitleRef.current) {
+      setTitle(storeTitle);
+      lastSyncedTitleRef.current = storeTitle;
+    }
+    if (!hasLocalContentEdits && storeContent !== lastSyncedContentRef.current) {
+      setContent(storeContent);
+      lastSyncedContentRef.current = storeContent;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note, lastNoteId]);
 
   // Notify parent of content changes
@@ -143,6 +172,9 @@ export function NoteEditorCore({
     if (Object.keys(updates).length > 0) {
       updateNote(note.id, updates);
     }
+    // Update synced refs so future sync updates are correctly accepted
+    lastSyncedTitleRef.current = title;
+    lastSyncedContentRef.current = content;
   }, [note, title, content, updateNote]);
 
   // Track whether editor has unsaved local changes
