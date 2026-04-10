@@ -58,6 +58,7 @@ export interface NoteGridProps {
   getFolderById: (folderId: string) => Folder | undefined;
   onDragStart: (event: DragStartEvent) => void;
   onDragEnd: (event: DragEndEvent) => void;
+  onDragCancel?: () => void;
   onOpenNote: (noteId: string) => void;
   onPin: (noteId: string, isPinned: boolean) => void;
   onArchive: (noteId: string, isArchived: boolean) => void;
@@ -90,6 +91,7 @@ export function NoteGrid({
   getFolderById,
   onDragStart,
   onDragEnd,
+  onDragCancel,
   onOpenNote,
   onPin,
   onArchive,
@@ -143,6 +145,7 @@ export function NoteGrid({
       collisionDetection={customCollisionDetection}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      onDragCancel={onDragCancel}
     >
       <div className="space-y-6">
         {/* Pinned notes */}

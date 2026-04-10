@@ -334,7 +334,7 @@ export function NotesPage() {
   );
 
   // Drag and drop
-  const { sensors, draggingNoteId, handleDragStart, handleDragEnd } =
+  const { sensors, draggingNoteId, handleDragStart, handleDragEnd, handleDragCancel } =
     useNoteDragAndDrop({
       showArchived,
       showTrash,
@@ -863,6 +863,7 @@ export function NotesPage() {
                 getFolderById={getFolderById}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
+                onDragCancel={handleDragCancel}
                 onOpenNote={handleOpenNote}
                 onPin={handlePin}
                 onArchive={handleArchive}

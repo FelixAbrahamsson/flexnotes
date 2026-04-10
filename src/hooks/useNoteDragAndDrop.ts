@@ -122,10 +122,15 @@ export function useNoteDragAndDrop({
     ],
   );
 
+  const handleDragCancel = useCallback(() => {
+    setDraggingNoteId(null);
+  }, []);
+
   return {
     sensors,
     draggingNoteId,
     handleDragStart,
     handleDragEnd,
+    handleDragCancel,
   };
 }
