@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import {
   Archive,
   Trash2,
@@ -183,9 +183,11 @@ export function NoteEditorCore({
     if (dirtyRef) dirtyRef.current = isDirty;
   }, [isDirty, dirtyRef]);
 
-  // Keep a ref to the latest save function for unmount flush
+  // Keep a ref to the latest save function for unmount flush.
+  // useLayoutEffect ensures the ref is updated synchronously before paint,
+  // so closing the editor immediately after clearing content uses the latest save.
   const handleSaveRef = useRef(handleSave);
-  useEffect(() => {
+  useLayoutEffect(() => {
     handleSaveRef.current = handleSave;
     if (flushSaveRef) flushSaveRef.current = handleSave;
   }, [handleSave, flushSaveRef]);
