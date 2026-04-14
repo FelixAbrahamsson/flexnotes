@@ -299,6 +299,20 @@ export function NotesPage() {
     setNoteInUrl,
   ]);
 
+  // Keyboard shortcut: "n" to create a new note (only when nothing is open)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "n" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable) return;
+      if (activeNoteId || showSettings || shareNoteId || folderPickerNoteId) return;
+      e.preventDefault();
+      handleCreateNote();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [activeNoteId, showSettings, shareNoteId, folderPickerNoteId, handleCreateNote]);
+
   const handleArchive = useCallback(
     (noteId: string, isArchived: boolean) => {
       hapticLight();
