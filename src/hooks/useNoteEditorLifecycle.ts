@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import { useNoteStore } from "@/stores/noteStore";
 import { useNoteUIStore } from "@/stores/noteUIStore";
 import { useSyncStore } from "@/stores/syncStore";
@@ -22,7 +22,7 @@ export function useNoteEditorLifecycle({
 
   const modalStackRef = useRef<ModalType[]>([]);
   const activeNoteIdRef = useRef(activeNoteId);
-  useEffect(() => {
+  useLayoutEffect(() => {
     activeNoteIdRef.current = activeNoteId;
   }, [activeNoteId]);
 

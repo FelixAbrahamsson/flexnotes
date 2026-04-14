@@ -265,21 +265,22 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       // Save to local DB first
       await db.notes.add(newNote)
 
-      // Queue for sync
-      await queueChange('note', id, 'create')
+      // Don't queue for sync yet - wait until the first edit (updateNote).
+      // This prevents a race where the user closes an empty note immediately:
+      // without this, the sync would push the empty note to the server and
+      // Realtime would re-add it after deleteNoteIfEmpty cleaned up locally.
+      // The sync service handles the "exists locally but not on server" case
+      // by creating the note on the first update push.
 
       // Update UI state
       const uiNote: Note = {
         ...newNote,
-        _pendingSync: true,
+        _pendingSync: false,
       }
 
       set(state => ({
         notes: [uiNote, ...state.notes],
       }))
-
-      // Try to sync immediately if online
-      triggerSyncIfOnline()
 
       return uiNote
     } catch (error) {
