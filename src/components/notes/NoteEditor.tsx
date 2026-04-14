@@ -21,7 +21,7 @@ interface NoteEditorProps {
  * Uses NoteEditorCore for the actual editing functionality.
  */
 export function NoteEditor({
-  noteId: _noteId,
+  noteId,
   onClose,
   hideTags = false,
   flushSaveRef: parentFlushSaveRef,
@@ -32,8 +32,26 @@ export function NoteEditor({
   const note = getActiveNote(notes);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [modalWidth, setModalWidth] = useState<number | null>(null);
+  const [modalWidth, setModalWidth] = useState<number | null>(() => {
+    try {
+      const saved = localStorage.getItem(`note-width:${noteId}`);
+      return saved ? Number(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [fullscreenContentWidth, setFullscreenContentWidth] = useState<number | null>(null);
+
+  // Save modal width to localStorage on unmount so it's restored next time
+  const modalWidthRef = useRef(modalWidth);
+  useEffect(() => { modalWidthRef.current = modalWidth; }, [modalWidth]);
+  useEffect(() => {
+    return () => {
+      if (modalWidthRef.current !== null) {
+        try { localStorage.setItem(`note-width:${noteId}`, String(Math.round(modalWidthRef.current))); } catch {}
+      }
+    };
+  }, [noteId]);
   const { contentRef, flushSaveRef, dirtyRef, setContent } = useNoteEditorContent();
 
   // Resize handling for desktop modal / fullscreen content width
