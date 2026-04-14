@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, type MutableRefObject } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, type MutableRefObject } from "react";
 import { X, Maximize2, Minimize2 } from "lucide-react";
 import { useNoteStore } from "@/stores/noteStore";
 import { useNoteUIStore } from "@/stores/noteUIStore";
@@ -108,8 +108,10 @@ export function NoteEditor({
     };
   }, []);
 
-  // Keep parent refs in sync so external close paths (e.g. popstate) can flush
-  useEffect(() => {
+  // Keep parent refs in sync so external close paths (e.g. popstate) can flush.
+  // useLayoutEffect ensures refs are updated before paint, preventing stale
+  // flushes when the user closes immediately after content changes.
+  useLayoutEffect(() => {
     if (parentFlushSaveRef) parentFlushSaveRef.current = flushSaveRef.current;
     if (parentDirtyRef) parentDirtyRef.current = dirtyRef.current;
     return () => {

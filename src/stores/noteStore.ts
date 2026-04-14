@@ -634,9 +634,11 @@ export const useNoteStore = create<NoteState>((set, get) => ({
         // If note was synced to server, queue a delete operation
         if (wasSynced) {
           await queueChange('note', id, 'delete')
-          await useSyncStore.getState().refreshPendingCount()
           triggerSyncIfOnline()
         }
+
+        // Always refresh pending count (the create change was deleted above)
+        await useSyncStore.getState().refreshPendingCount()
 
         return true
       } catch (error) {
