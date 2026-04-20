@@ -111,4 +111,21 @@ if (typeof window !== 'undefined') {
   } catch {
     // Ignore errors, theme will be applied when store hydrates
   }
+
+  // Sync preferences across tabs: `storage` fires in OTHER tabs when localStorage changes
+  window.addEventListener('storage', (e) => {
+    if (e.key !== 'flexnotes-preferences' || !e.newValue) return
+    try {
+      const parsed = JSON.parse(e.newValue)
+      const next = parsed.state
+      if (!next) return
+      const current = usePreferencesStore.getState()
+      usePreferencesStore.setState(next)
+      if (next.theme !== current.theme) {
+        applyTheme(next.theme)
+      }
+    } catch {
+      // Ignore malformed storage payloads
+    }
+  })
 }
