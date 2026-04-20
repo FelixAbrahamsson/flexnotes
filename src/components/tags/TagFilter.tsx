@@ -59,7 +59,9 @@ function SortableTag({
     transition,
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 1 : 0,
-    touchAction: 'none' as const, // Allow dnd-kit to capture touch events for dragging
+    // pan-x lets the browser handle horizontal touch-scrolling of the tag strip;
+    // dnd-kit still captures press-and-hold (250ms) to start a reorder drag.
+    touchAction: 'pan-x' as const,
   }
 
   // Intercept pointer down to prevent dnd-kit from capturing right-clicks
