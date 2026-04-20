@@ -216,6 +216,7 @@ User preferences with persistence:
 - `lastFolderViewNoteId` - Remembers the note selected in folder view pane (desktop)
 - Persisted to localStorage
 - `applyTheme()` updates document class
+- Cross-tab sync: a `storage` event listener rehydrates the store and re-applies the theme when another tab writes to `flexnotes-preferences`, so theme/layout/view changes propagate live without a reload
 
 ### `src/components/notes/NoteEditor.tsx`
 
@@ -516,7 +517,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 
 1. **Sync fields**: Never send `_syncStatus`, `_localUpdatedAt`, `is_deleted`, `deleted_at` to Supabase
 2. **TipTap drops**: Use `editorProps.handleDrop`, not React `onDrop` (TipTap intercepts events)
-3. **Theme persistence**: Theme is read from localStorage before React hydrates to prevent flash
+3. **Theme persistence**: Theme is read from localStorage before React hydrates to prevent flash. A `storage` event listener in `preferencesStore.ts` propagates theme/layout/view changes to other open tabs live.
 4. **Empty notes**: Auto-deleted on close - check `isNoteEmpty()` in noteStore. Deletion also syncs to server if note was previously synced.
 5. **Trash**: Local-only feature. Trashed notes are deleted from server immediately
 6. **Sync race conditions**: NoteEditor and ListEditor track their own state to prevent `loadFromLocal()` from overwriting user edits during sync

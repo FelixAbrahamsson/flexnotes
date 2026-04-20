@@ -66,7 +66,7 @@ A modern, cross-platform note-taking app with offline support and real-time sync
 - **Cross-Device Sharing**: Shared notes sync across all your devices when logged in
 
 ### User Experience
-- **Dark/Light Theme**: Toggle between dark, light, or system-based theme
+- **Dark/Light Theme**: Toggle between dark, light, or system-based theme (changes sync across open tabs live)
 - **Themed Dialogs**: Custom confirmation dialogs that match the app theme
 - **Configurable Layout**: Choose 1, 2, or 3 notes per row in the grid view
 - **View Switcher**: Quick dropdown to switch between list/folder view and access archive/trash
