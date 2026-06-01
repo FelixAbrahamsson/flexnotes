@@ -78,6 +78,7 @@ export function NotesPage() {
     setShowShared,
     setSharedTab,
     setSearchQuery,
+    displayLimit,
     loadMoreNotes,
     getPaginatedNotes,
     hasMoreNotes,
@@ -262,6 +263,7 @@ export function NotesPage() {
     getNotesInFolder,
     notes,
     sharedNoteIds,
+    displayLimit,
   ]);
 
   const pinnedNotes = displayedNotes.filter((n: { is_pinned: boolean }) => n.is_pinned && !showTrash);
