@@ -640,11 +640,21 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
         (item) => !draggedItemIds.includes(item.id),
       );
 
-      // Find where to insert in the full array
-      // targetIdx is the position in unchecked items (after removing dragged)
-      // We need to find the corresponding position in the remaining array
+      // `targetIdx` is expressed in the uncheckedItems index space, which still
+      // includes the dragged items (this is what the drop indicator renders
+      // against). Convert it to the uncheckedExcludingDragged space by removing
+      // any dragged items that sit above the target. Without this, dragging an
+      // item downward lands it one slot too far (the dragged item's vacated slot
+      // above the target inflates the index).
+      const draggedAboveTarget = uncheckedItems
+        .slice(0, targetIdx)
+        .filter((item) => draggedItemIds.includes(item.id)).length;
+      const adjustedIdx = targetIdx - draggedAboveTarget;
+
+      // Find where to insert in the full array. `adjustedIdx` is the position in
+      // uncheckedExcludingDragged; map it back to an index in the remaining array.
       let insertAt: number;
-      if (targetIdx >= uncheckedExcludingDragged.length) {
+      if (adjustedIdx >= uncheckedExcludingDragged.length) {
         // Insert after all unchecked items - find last unchecked item in remaining
         let lastUncheckedIdx = -1;
         for (let i = remaining.length - 1; i >= 0; i--) {
@@ -655,8 +665,8 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
         }
         insertAt = lastUncheckedIdx === -1 ? 0 : lastUncheckedIdx + 1;
       } else {
-        // Find the item at targetIdx in uncheckedExcludingDragged
-        const targetItem = uncheckedExcludingDragged[targetIdx];
+        // Find the item at adjustedIdx in uncheckedExcludingDragged
+        const targetItem = uncheckedExcludingDragged[adjustedIdx];
         insertAt = remaining.findIndex((item) => item.id === targetItem.id);
       }
 
