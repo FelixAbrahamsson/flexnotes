@@ -143,6 +143,7 @@ export function NoteGrid({
     <DndContext
       sensors={sensors}
       collisionDetection={customCollisionDetection}
+      autoScroll={false}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onDragCancel={onDragCancel}
