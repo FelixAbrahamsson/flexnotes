@@ -66,9 +66,10 @@ export function useNoteDragAndDrop({
 
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
-      const isDragDisabled =
-        showTrash || searchQuery.length > 0 || selectedTagIds.length > 0;
-      if (isDragDisabled) return;
+      // Dragging is still allowed while a search/tag filter is active so notes
+      // can be dropped on the archive/trash zones; only reordering is blocked
+      // (handled in handleDragEnd). Trash has no drop zones, so disable there.
+      if (showTrash) return;
 
       const isMobile = window.matchMedia("(max-width: 639px)").matches;
       if (isMobile && !reorderMode) return;
@@ -76,7 +77,7 @@ export function useNoteDragAndDrop({
       hapticLight();
       setDraggingNoteId(event.active.id as string);
     },
-    [showTrash, searchQuery, selectedTagIds, reorderMode],
+    [showTrash, reorderMode],
   );
 
   const handleDragEnd = useCallback(
@@ -105,7 +106,12 @@ export function useNoteDragAndDrop({
         return;
       }
 
-      if (active.id !== over.id) {
+      // Reordering doesn't apply to a filtered/searched view (sort order is
+      // ambiguous when only a subset of notes is shown), so only persist a
+      // reorder when no filter is active.
+      const reorderDisabled =
+        searchQuery.length > 0 || selectedTagIds.length > 0;
+      if (!reorderDisabled && active.id !== over.id) {
         hapticLight();
         reorderNotes(noteId, over.id as string, showArchived, showTrash);
       }
@@ -119,6 +125,8 @@ export function useNoteDragAndDrop({
       sharedNoteIds,
       showArchived,
       showTrash,
+      searchQuery,
+      selectedTagIds,
     ],
   );
 

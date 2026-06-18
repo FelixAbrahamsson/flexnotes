@@ -869,8 +869,6 @@ export function NotesPage() {
                 showTrash={showTrash}
                 showArchived={showArchived}
                 reorderMode={reorderMode}
-                searchQuery={searchQuery}
-                selectedTagIds={selectedTagIds}
                 viewMode={viewMode}
                 draggingNoteId={draggingNoteId}
                 canLoadMore={canLoadMore}

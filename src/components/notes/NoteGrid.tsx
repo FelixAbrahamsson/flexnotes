@@ -48,8 +48,6 @@ export interface NoteGridProps {
   showTrash: boolean;
   showArchived: boolean;
   reorderMode: boolean;
-  searchQuery: string;
-  selectedTagIds: string[];
   viewMode: "list" | "folder";
   draggingNoteId: string | null;
   canLoadMore: boolean;
@@ -81,8 +79,6 @@ export function NoteGrid({
   showTrash,
   showArchived,
   reorderMode,
-  searchQuery,
-  selectedTagIds,
   viewMode,
   draggingNoteId,
   canLoadMore,
@@ -136,8 +132,10 @@ export function NoteGrid({
     return () => observer.disconnect();
   }, [canLoadMore, loading, onLoadMore]);
 
-  const isDragDisabled =
-    showTrash || searchQuery.length > 0 || selectedTagIds.length > 0;
+  // Dragging (to archive/trash zones) and mobile swipe stay enabled while a
+  // search/tag filter is active — only reordering is suppressed (in the drag
+  // end handler). Trash has no drop zones, so disable all drag there.
+  const isDragDisabled = showTrash;
 
   return (
     <DndContext
