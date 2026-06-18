@@ -257,6 +257,11 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     const newChecked = !item.checked;
 
     if (newChecked) {
+      // Blur the item's textarea before it moves into the completed section,
+      // otherwise focus (and the caret) follows the item down to the bottom.
+      inputRefs.current.get(id)?.blur();
+      setFocusedId((current) => (current === id ? null : current));
+
       // Checking - also check all children
       const idsToCheck = getItemWithChildren(id, currentItems);
       const newItems = currentItems.map((i) =>
