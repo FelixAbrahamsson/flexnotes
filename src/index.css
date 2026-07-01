@@ -94,6 +94,37 @@
   @apply dark:text-gray-500;
 }
 
+/* Tables (markdown editor + rendered prose) */
+.tiptap .tableWrapper {
+  @apply overflow-x-auto my-4;
+}
+
+.tiptap table,
+.prose table {
+  @apply w-full my-4 border-collapse text-sm;
+}
+
+.tiptap th,
+.tiptap td,
+.prose th,
+.prose td {
+  @apply border border-gray-300 px-3 py-1.5 align-top text-left;
+  @apply dark:border-gray-600;
+}
+
+.tiptap th,
+.prose th {
+  @apply bg-gray-100 font-semibold;
+  @apply dark:bg-gray-800;
+}
+
+.tiptap th > p,
+.tiptap td > p,
+.prose th > p,
+.prose td > p {
+  @apply my-0; /* Remove paragraph margins inside cells */
+}
+
 /* Prose styling for markdown content */
 .prose {
   @apply text-gray-900;

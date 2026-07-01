@@ -260,6 +260,8 @@ TipTap-based rich text editor:
 - Exposes `insertImage()` via ref
 - Custom `clipboardTextSerializer`: copies paragraphs with single newlines (not double)
 - Checkbox blur: after toggling a task item checkbox, the editor is blurred to prevent mobile keyboard from appearing
+- Table support via `@tiptap/extension-table` (+ row/header/cell); styled in `index.css` since there is no typography plugin
+- Markdown paste: TipTap has no Markdown parser, so `handlePaste` detects Markdown in pasted plain text (`utils/markdown.ts`) and converts it to sanitized HTML. GFM task lists are remapped to TipTap's `taskList`/`taskItem` shape. Rich HTML pastes are left to TipTap's normal handling.
 
 ### `src/components/ui/ConfirmDialog.tsx`
 
@@ -505,7 +507,10 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 
 - `@tiptap/react` - Rich text editor
 - `@tiptap/extension-code-block-lowlight` - Syntax highlighting for code blocks
+- `@tiptap/extension-table` (+ table-row/table-header/table-cell) - Tables in markdown notes
 - `lowlight` - Syntax highlighting engine
+- `marked` - Markdown → HTML parsing for paste conversion
+- `dompurify` - Sanitizes converted markdown HTML before insertion
 - `@dnd-kit/core`, `@dnd-kit/sortable` - Drag-and-drop for note reordering
 - `dexie` - IndexedDB wrapper
 - `zustand` - State management
