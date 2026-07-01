@@ -262,6 +262,7 @@ TipTap-based rich text editor:
 - Checkbox blur: after toggling a task item checkbox, the editor is blurred to prevent mobile keyboard from appearing
 - Table support via `@tiptap/extension-table` (+ row/header/cell); styled in `index.css` since there is no typography plugin
 - Markdown paste: TipTap has no Markdown parser, so `handlePaste` detects Markdown in pasted plain text (`utils/markdown.ts`) and converts it to sanitized HTML. GFM task lists are remapped to TipTap's `taskList`/`taskItem` shape. Rich HTML pastes are left to TipTap's normal handling.
+- Raw paste: Ctrl/Cmd+Shift+V inserts unformatted text (skips markdown conversion). Since paste events carry no modifier keys, `handleKeyDown` sets a `plainPasteRef` flag (auto-cleared next frame) that `handlePaste` reads and clears.
 
 ### `src/components/ui/ConfirmDialog.tsx`
 

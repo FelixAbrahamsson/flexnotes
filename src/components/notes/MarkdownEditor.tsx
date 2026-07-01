@@ -34,6 +34,9 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
   function MarkdownEditor({ content, onChange, onImageDrop, placeholder }, ref) {
   const [isDragging, setIsDragging] = useState(false)
   const onImageDropRef = useRef(onImageDrop)
+  // Set when Ctrl/Cmd+Shift+V is pressed so the next paste skips markdown
+  // conversion and inserts raw text instead.
+  const plainPasteRef = useRef(false)
 
   // Keep ref updated
   useEffect(() => {
@@ -124,6 +127,13 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
           }
         }
 
+        // Ctrl/Cmd+Shift+V requests a raw paste: skip markdown conversion and
+        // let TipTap insert the plain text as-is.
+        if (plainPasteRef.current) {
+          plainPasteRef.current = false
+          return false
+        }
+
         // Render pasted Markdown text instead of inserting it verbatim.
         // TipTap has no Markdown parser, so we detect Markdown in the plain
         // text payload and convert it to HTML before inserting. Rich HTML
@@ -148,6 +158,22 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
         return parts.join("\n")
       },
       handleKeyDown: (view, event) => {
+        // Flag Ctrl/Cmd+Shift+V so the ensuing paste inserts raw text
+        // without markdown conversion.
+        if (
+          (event.ctrlKey || event.metaKey) &&
+          event.shiftKey &&
+          (event.key === 'v' || event.key === 'V')
+        ) {
+          plainPasteRef.current = true
+          // Fallback: if no paste consumes the flag (e.g. paste blocked),
+          // clear it so a later normal paste still converts markdown.
+          requestAnimationFrame(() => {
+            plainPasteRef.current = false
+          })
+          return false
+        }
+
         if (!editor?.isActive('codeBlock')) return false
 
         // Insert 2 spaces when Tab is pressed inside a code block
