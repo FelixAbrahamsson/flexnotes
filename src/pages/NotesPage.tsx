@@ -3,12 +3,9 @@ import {
   Plus,
   Search,
   Settings,
-  Trash,
   ArrowUpDown,
   RefreshCw,
   X,
-  Share2,
-  Users,
 } from "lucide-react";
 import { DndContext } from "@dnd-kit/core";
 import { hapticLight } from "@/hooks/useCapacitor";
@@ -19,7 +16,6 @@ import { useResizableSidebar } from "@/hooks/useResizableSidebar";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useNoteFromUrl } from "@/hooks/useNoteFromUrl";
 import { MESSAGES } from "@/constants";
-import { getEmptyStateMessage } from "@/utils/notesEmptyState";
 import { useNoteStore } from "@/stores/noteStore";
 import { useNoteUIStore } from "@/stores/noteUIStore";
 import { useTagStore } from "@/stores/tagStore";
@@ -30,8 +26,7 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import { NoteEditor } from "@/components/notes/NoteEditor";
 import { NoteEditorPane } from "@/components/notes/NoteEditorPane";
-import { NoteGrid } from "@/components/notes/NoteGrid";
-import { SharedWithMeView } from "@/components/notes/SharedWithMeView";
+import { ListViewContent } from "@/components/notes/ListViewContent";
 import { TagFilter } from "@/components/tags/TagFilter";
 import { SyncStatus } from "@/components/SyncStatus";
 import { SettingsModal } from "@/components/SettingsModal";
@@ -745,149 +740,47 @@ export function NotesPage() {
         </main>
       ) : (
         /* List View and Archive/Trash */
-        <main className="max-w-4xl mx-auto px-4 py-6">
-          <div className="flex-1 min-w-0">
-            {/* Reorder mode banner */}
-            {reorderMode && (
-              <div className="flex items-center justify-between mb-4 p-3 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg">
-                <p className="text-sm text-primary-800 dark:text-primary-200">
-                  Drag notes to reorder them
-                </p>
-                <button
-                  onClick={() => setReorderMode(false)}
-                  className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
-                >
-                  Done
-                </button>
-              </div>
-            )}
-
-            {/* Trash header */}
-            {showTrash && trashCount > 0 && (
-              <div className="flex items-center justify-between mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  {MESSAGES.trashAutoDeleteNotice}
-                </p>
-                <button
-                  onClick={handleEmptyTrash}
-                  className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium"
-                >
-                  Empty trash
-                </button>
-              </div>
-            )}
-
-            {/* Shared tabs */}
-            {showShared && (
-              <div className="flex gap-1 mb-4 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                <button
-                  onClick={() => setSharedTab('with_me')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                    sharedTab === 'with_me'
-                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-                  }`}
-                >
-                  <Users className="w-4 h-4" />
-                  Shared with me
-                </button>
-                <button
-                  onClick={() => setSharedTab('by_me')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                    sharedTab === 'by_me'
-                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-                  }`}
-                >
-                  <Share2 className="w-4 h-4" />
-                  Shared by me
-                </button>
-              </div>
-            )}
-
-            {/* Shared with me content */}
-            {showShared && sharedTab === 'with_me' ? (
-              <SharedWithMeView
-                notes={sharedWithMeNotes}
-                loading={sharedWithMeLoading}
-                gridClasses={gridClasses}
-                onRemove={handleRemoveSharedWithMe}
-              />
-            ) : loading && displayedNotes.length === 0 ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
-              </div>
-            ) : displayedNotes.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="mb-4">
-                  {showTrash ? (
-                    <Trash className="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600" />
-                  ) : showShared ? (
-                    <Share2 className="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600" />
-                  ) : null}
-                </div>
-                <p className="text-gray-500 dark:text-gray-400 mb-4">
-                  {getEmptyStateMessage({
-                    showTrash,
-                    showArchived,
-                    showShared,
-                    searchQuery,
-                    hasSelectedTags: selectedTagIds.length > 0,
-                    viewMode,
-                    hasSelectedFolder: !!selectedFolderId,
-                  })}
-                </p>
-                {showShared && sharedTab === 'by_me' && (
-                  <p className="text-sm text-gray-400 dark:text-gray-500">
-                    Share a note to see it here
-                  </p>
-                )}
-                {!showArchived &&
-                  !showTrash &&
-                  !showShared &&
-                  !searchQuery &&
-                  selectedTagIds.length === 0 && (
-                    <button
-                      onClick={handleCreateNote}
-                      className="btn btn-primary"
-                    >
-                      {viewMode === "folder" && selectedFolderId
-                        ? "Create note in this folder"
-                        : "Create your first note"}
-                    </button>
-                  )}
-              </div>
-            ) : (
-              <NoteGrid
-                pinnedNotes={pinnedNotes}
-                unpinnedNotes={unpinnedNotes}
-                gridClasses={gridClasses}
-                showTrash={showTrash}
-                showArchived={showArchived}
-                reorderMode={reorderMode}
-                viewMode={viewMode}
-                draggingNoteId={draggingNoteId}
-                canLoadMore={canLoadMore}
-                loading={loading}
-                getTagsForNote={getTagsForNote}
-                getFolderById={getFolderById}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-                onDragCancel={handleDragCancel}
-                onOpenNote={handleOpenNote}
-                onPin={handlePin}
-                onArchive={handleArchive}
-                onDelete={handleDelete}
-                onRestore={handleRestore}
-                onPermanentDelete={handlePermanentDelete}
-                onShare={handleShare}
-                onDuplicate={handleDuplicate}
-                onMoveToFolder={handleMoveToFolder}
-                onLoadMore={loadMoreNotes}
-              />
-            )}
-          </div>
-        </main>
+        <ListViewContent
+          pinnedNotes={pinnedNotes}
+          unpinnedNotes={unpinnedNotes}
+          gridClasses={gridClasses}
+          showTrash={showTrash}
+          showArchived={showArchived}
+          reorderMode={reorderMode}
+          viewMode={viewMode}
+          draggingNoteId={draggingNoteId}
+          canLoadMore={canLoadMore}
+          loading={loading}
+          getTagsForNote={getTagsForNote}
+          getFolderById={getFolderById}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+          onOpenNote={handleOpenNote}
+          onPin={handlePin}
+          onArchive={handleArchive}
+          onDelete={handleDelete}
+          onRestore={handleRestore}
+          onPermanentDelete={handlePermanentDelete}
+          onShare={handleShare}
+          onDuplicate={handleDuplicate}
+          onMoveToFolder={handleMoveToFolder}
+          onLoadMore={loadMoreNotes}
+          onExitReorder={() => setReorderMode(false)}
+          trashCount={trashCount}
+          onEmptyTrash={handleEmptyTrash}
+          showShared={showShared}
+          sharedTab={sharedTab}
+          onSharedTabChange={setSharedTab}
+          sharedWithMeNotes={sharedWithMeNotes}
+          sharedWithMeLoading={sharedWithMeLoading}
+          onRemoveSharedWithMe={handleRemoveSharedWithMe}
+          searchQuery={searchQuery}
+          selectedTagIds={selectedTagIds}
+          selectedFolderId={selectedFolderId}
+          displayedNotesCount={displayedNotes.length}
+          onCreateNote={handleCreateNote}
+        />
       )}
 
       {/* Floating action button - hide in folder view on desktop (tree has create buttons) */}
