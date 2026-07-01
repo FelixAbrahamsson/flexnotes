@@ -10,6 +10,7 @@ import { useNoteStore } from '@/stores/noteStore'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { FolderTreeItem } from './FolderTreeItem'
 import { NoteTreeItem } from './NoteTreeItem'
+import { notesInFolder } from '@/utils/noteFilters'
 import type { Folder } from '@/types'
 
 interface FolderTreeViewProps {
@@ -104,7 +105,7 @@ export function FolderTreeView({
   const rootFolders = folders.filter(f => f.parent_folder_id === null)
 
   // Get notes without a folder (root level)
-  const rootNotes = notes.filter(n => n.folder_id === null && !n.is_deleted && !n.is_archived)
+  const rootNotes = notesInFolder(notes, null)
 
   // Droppable for root level (unfiled notes)
   const { isOver: isOverRoot, setNodeRef: setRootDropRef } = useDroppable({

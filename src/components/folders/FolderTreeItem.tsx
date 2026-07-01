@@ -15,6 +15,7 @@ import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { DropdownMenu, DropdownMenuItem } from '@/components/ui/DropdownMenu'
 import { NoteTreeItem } from './NoteTreeItem'
 import { getFolderColor, DEFAULT_COLORS } from './FolderBadge'
+import { notesInFolder } from '@/utils/noteFilters'
 import type { Folder, Note } from '@/types'
 
 export interface FolderTreeItemProps {
@@ -116,7 +117,7 @@ export function FolderTreeItem({
   }, [setDragRef, setDropRef])
 
   // Get notes in this folder
-  const folderNotes = notes.filter(n => n.folder_id === folder.id && !n.is_deleted && !n.is_archived)
+  const folderNotes = notesInFolder(notes, folder.id)
 
   // Get subfolders
   const childFolders = allFolders.filter(f => f.parent_folder_id === folder.id)

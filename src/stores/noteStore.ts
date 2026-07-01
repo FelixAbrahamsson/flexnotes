@@ -10,6 +10,7 @@ import { useTagStore } from './tagStore'
 import { useSyncStore, triggerSyncIfOnline } from './syncStore'
 import { useImageStore } from './imageStore'
 import { TRASH_RETENTION_DAYS } from '@/constants'
+import { activeNotes, trashedNotes } from '@/utils/noteFilters'
 
 // Re-export types from UI store for backward compatibility
 export type { SharedTab } from './noteUIStore'
@@ -85,6 +86,36 @@ function isNoteEmpty(note: Note): boolean {
   return textContent.length === 0
 }
 
+/**
+ * Shared happy-path for note write operations (update/trash/restore/move):
+ * bump the version, mark the row pending, persist locally, queue the change
+ * for sync, and trigger a sync. No-ops if the note is missing locally; throws
+ * on DB error so the caller can revert its optimistic UI update.
+ */
+async function persistNoteUpdate(
+  id: string,
+  updates: Partial<LocalNote>
+): Promise<void> {
+  const existingNote = await db.notes.get(id)
+  if (!existingNote) return
+
+  const now = getCurrentTimestamp()
+  const version = existingNote.version + 1
+
+  await db.notes.update(id, {
+    ...updates,
+    updated_at: now,
+    version,
+    _syncStatus: 'pending',
+    _localUpdatedAt: now,
+  })
+
+  await queueChange('note', id, 'update', { ...updates, version })
+
+  await useSyncStore.getState().refreshPendingCount()
+  triggerSyncIfOnline()
+}
+
 export const useNoteStore = create<NoteState>((set, get) => ({
   notes: [],
   loading: false,
@@ -158,7 +189,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     const now = getCurrentTimestamp()
 
     // Get lowest sort_order from existing notes and subtract 1 to place new note at top
-    const existingNotes = get().notes.filter(n => !n.is_deleted && !n.is_archived)
+    const existingNotes = activeNotes(get().notes)
     const minSortOrder = existingNotes.length > 0
       ? Math.min(...existingNotes.map(n => n.sort_order))
       : 0
@@ -223,7 +254,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     const now = getCurrentTimestamp()
 
     // Get lowest sort_order from existing notes and subtract 1 to place new note at top
-    const existingNotes = get().notes.filter(n => !n.is_deleted && !n.is_archived)
+    const existingNotes = activeNotes(get().notes)
     const minSortOrder = existingNotes.length > 0
       ? Math.min(...existingNotes.map(n => n.sort_order))
       : 0
@@ -338,29 +369,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     }))
 
     try {
-      // Update local DB
-      const existingNote = await db.notes.get(id)
-      if (!existingNote) return
-
-      await db.notes.update(id, {
-        ...updates,
-        updated_at: now,
-        version: existingNote.version + 1,
-        _syncStatus: 'pending',
-        _localUpdatedAt: now,
-      })
-
-      // Queue for sync
-      await queueChange('note', id, 'update', {
-        ...updates,
-        version: existingNote.version + 1,
-      })
-
-      // Update pending count
-      await useSyncStore.getState().refreshPendingCount()
-
-      // Try to sync if online
-      triggerSyncIfOnline()
+      await persistNoteUpdate(id, updates)
     } catch (error) {
       // Revert on error - reload from local
       await get().loadFromLocal()
@@ -382,29 +391,11 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     }))
 
     try {
-      const existingNote = await db.notes.get(id)
-      if (!existingNote) return
-
-      await db.notes.update(id, {
+      await persistNoteUpdate(id, {
         is_deleted: true,
         deleted_at: now,
         is_pinned: false,
-        updated_at: now,
-        version: existingNote.version + 1,
-        _syncStatus: 'pending',
-        _localUpdatedAt: now,
       })
-
-      await queueChange('note', id, 'update', {
-        is_deleted: true,
-        deleted_at: now,
-        is_pinned: false,
-        version: existingNote.version + 1,
-      })
-
-      await useSyncStore.getState().refreshPendingCount()
-
-      triggerSyncIfOnline()
     } catch (error) {
       await get().loadFromLocal()
       set({ error: (error as Error).message })
@@ -413,8 +404,6 @@ export const useNoteStore = create<NoteState>((set, get) => ({
 
   // Restore from trash
   restoreNote: async (id: string) => {
-    const now = getCurrentTimestamp()
-
     set(state => ({
       notes: state.notes.map(n =>
         n.id === id
@@ -424,27 +413,10 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     }))
 
     try {
-      const existingNote = await db.notes.get(id)
-      if (!existingNote) return
-
-      await db.notes.update(id, {
+      await persistNoteUpdate(id, {
         is_deleted: false,
         deleted_at: null,
-        updated_at: now,
-        version: existingNote.version + 1,
-        _syncStatus: 'pending',
-        _localUpdatedAt: now,
       })
-
-      await queueChange('note', id, 'update', {
-        is_deleted: false,
-        deleted_at: null,
-        version: existingNote.version + 1,
-      })
-
-      await useSyncStore.getState().refreshPendingCount()
-
-      triggerSyncIfOnline()
     } catch (error) {
       await get().loadFromLocal()
       set({ error: (error as Error).message })
@@ -505,9 +477,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
 
   // Empty all trash
   emptyTrash: async () => {
-    const trashedNotes = get().notes.filter(n => n.is_deleted)
-
-    for (const note of trashedNotes) {
+    for (const note of trashedNotes(get().notes)) {
       await get().permanentlyDeleteNote(note.id)
     }
   },
@@ -659,24 +629,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     }))
 
     try {
-      const existingNote = await db.notes.get(noteId)
-      if (!existingNote) return
-
-      await db.notes.update(noteId, {
-        folder_id: folderId,
-        updated_at: now,
-        version: existingNote.version + 1,
-        _syncStatus: 'pending',
-        _localUpdatedAt: now,
-      })
-
-      await queueChange('note', noteId, 'update', {
-        folder_id: folderId,
-        version: existingNote.version + 1,
-      })
-
-      await useSyncStore.getState().refreshPendingCount()
-      triggerSyncIfOnline()
+      await persistNoteUpdate(noteId, { folder_id: folderId })
     } catch (error) {
       await get().loadFromLocal()
       set({ error: (error as Error).message })
@@ -737,10 +690,10 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   },
 
   getTrashedNotes: () => {
-    return get().notes.filter(n => n.is_deleted)
+    return trashedNotes(get().notes)
   },
 
   getTrashCount: () => {
-    return get().notes.filter(n => n.is_deleted).length
+    return trashedNotes(get().notes).length
   },
 }))
