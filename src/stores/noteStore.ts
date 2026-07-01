@@ -221,6 +221,10 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       if (navigator.onLine) {
         await useSyncStore.getState().sync()
       }
+
+      // Purge notes that have been in trash longer than the retention period.
+      // Runs on local state, so it works offline too.
+      await get().cleanupOldTrash()
     } catch (error) {
       set({ error: (error as Error).message })
     } finally {
