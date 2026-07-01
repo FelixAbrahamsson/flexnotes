@@ -19,6 +19,7 @@ import { useResizableSidebar } from "@/hooks/useResizableSidebar";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useNoteFromUrl } from "@/hooks/useNoteFromUrl";
 import { MESSAGES } from "@/constants";
+import { getEmptyStateMessage } from "@/utils/notesEmptyState";
 import { useNoteStore } from "@/stores/noteStore";
 import { useNoteUIStore } from "@/stores/noteUIStore";
 import { useTagStore } from "@/stores/tagStore";
@@ -826,21 +827,15 @@ export function NotesPage() {
                   ) : null}
                 </div>
                 <p className="text-gray-500 dark:text-gray-400 mb-4">
-                  {showTrash
-                    ? "Trash is empty"
-                    : showArchived
-                      ? "No archived notes"
-                      : showShared
-                        ? "You haven't shared any notes yet"
-                        : searchQuery
-                          ? "No notes match your search"
-                          : selectedTagIds.length > 0
-                            ? "No notes with selected tags"
-                            : viewMode === "folder"
-                              ? selectedFolderId
-                                ? "No notes in this folder"
-                                : "No notes without a folder"
-                              : "No notes yet"}
+                  {getEmptyStateMessage({
+                    showTrash,
+                    showArchived,
+                    showShared,
+                    searchQuery,
+                    hasSelectedTags: selectedTagIds.length > 0,
+                    viewMode,
+                    hasSelectedFolder: !!selectedFolderId,
+                  })}
                 </p>
                 {showShared && sharedTab === 'by_me' && (
                   <p className="text-sm text-gray-400 dark:text-gray-500">

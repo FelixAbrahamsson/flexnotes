@@ -146,10 +146,14 @@ src/
 ├── types/               # TypeScript type definitions
 │   └── index.ts         # Note, Tag, NoteTag, Folder, etc.
 │
-├── utils/               # Utility functions
+├── utils/               # Utility functions (pure, unit-tested)
 │   ├── formatters.ts    # Date formatting, content preview generation
+│   ├── listItems.ts     # List-item tree helpers (getItemWithChildren)
 │   ├── markdown.ts      # Markdown detection + Markdown→sanitized-HTML for paste
-│   └── noteContentConverter.ts # Note type conversion (text↔markdown↔list)
+│   ├── noteContentConverter.ts # Note type conversion (text↔markdown↔list)
+│   ├── noteFilters.ts   # Shared note predicates (activeNotes/notesInFolder/trashedNotes)
+│   ├── notesEmptyState.ts # Empty-state message selection for the notes list
+│   └── sortOrder.ts     # computeReorderSortOrder (drag reorder math)
 │
 ├── App.tsx              # Router setup
 ├── main.tsx             # Entry point
