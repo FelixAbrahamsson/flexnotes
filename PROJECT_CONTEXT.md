@@ -96,7 +96,7 @@ src/
 │   ├── folders/         # FolderTreeView, FolderTreeItem, NoteTreeItem, FolderPicker, FolderBadge, FolderManager
 │   ├── images/          # ImageGallery, ImageViewer
 │   ├── import/          # GoogleKeepImport, NotesExportImport (JSON export/import)
-│   ├── notes/           # NoteCard, NoteEditor, NoteEditorCore, NoteEditorPane, NoteGrid, TextEditor, ListEditor, ListItemRow, MarkdownEditor, HeadingOutline, SharedWithMeView, SortableNoteCard, ActionDropZone
+│   ├── notes/           # NoteCard, NoteEditor, NoteEditorCore, NoteEditorPane, NoteGrid, ListViewContent, TextEditor, ListEditor (+ useListKeyboardHandling), ListItemRow, MarkdownEditor, HeadingOutline, SharedWithMeView, SortableNoteCard, ActionDropZone
 │   ├── sharing/         # ShareModal
 │   ├── tags/            # TagBadge, TagFilter, TagPicker
 │   ├── ui/              # Reusable UI (ConfirmDialog, DropdownMenu, Toast, ViewSwitcher)
@@ -120,7 +120,8 @@ src/
 ├── pages/               # Page-level components
 │   ├── LoginPage.tsx    # Login
 │   ├── SignupPage.tsx   # Signup
-│   ├── NotesPage.tsx    # Main notes view with list/folder modes, shared view tabs
+│   ├── NotesPage.tsx    # Main notes view: header, effects, modals, note-action handlers
+│   ├── FolderViewPane.tsx # Folder view split-pane (tree + inline editor + drag-drop), extracted from NotesPage
 │   └── SharedNotePage.tsx # Public shared note view, auto-saves to "shared with me"
 │
 ├── services/            # Business logic (no React)
@@ -496,7 +497,12 @@ npm test             # Run unit tests once (Vitest)
 npm run test:watch   # Run unit tests in watch mode
 ```
 
-Unit tests use **Vitest** (jsdom environment, config in `vitest.config.ts`). Tests live next to the code as `*.test.ts`. Current coverage focuses on pure logic (`utils/noteContentConverter`, `utils/markdown`, `utils/formatters`). Store/sync integration tests would need `fake-indexeddb` + Supabase mocks — not yet set up. Prefer extracting pure functions so they can be tested without mounting React or the DB.
+Unit tests use **Vitest** (jsdom, config in `vitest.config.ts`, matchers/stubs in `src/test/setup.ts`). Tests live next to the code as `*.test.ts(x)`. Coverage:
+
+- **Pure logic**: `utils/noteContentConverter`, `utils/markdown`, `utils/formatters`, `utils/sortOrder`, `utils/listItems`, `utils/notesEmptyState`.
+- **Components** (React Testing Library): `ListEditor` (keyboard/checkbox behavior), `NotesPage` (behavioral tests via a store-mock harness inline in `NotesPage.test.tsx` — the six Zustand stores, provider/custom hooks, and heavy children are mocked so the page can be driven through controllable state).
+
+When splitting UI, prefer extracting pure functions or presentational components (props in) so they're testable without the DB. Store/sync integration tests would still need `fake-indexeddb` + Supabase mocks (not yet set up).
 
 ### Testing on Mobile via Local Network
 
