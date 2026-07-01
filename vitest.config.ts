@@ -9,9 +9,10 @@ export default defineConfig({
   },
   test: {
     // jsdom gives us DOMParser/document for utils that manipulate HTML
-    // (e.g. src/utils/markdown.ts). Pure-logic tests run fine here too.
+    // (e.g. src/utils/markdown.ts) and for React Testing Library.
     environment: 'jsdom',
     globals: true,
+    setupFiles: ['src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
   },
 })
