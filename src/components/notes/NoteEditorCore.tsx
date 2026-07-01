@@ -30,6 +30,7 @@ import { ImageGallery, ImageViewer } from "@/components/images/ImageGallery";
 import { ShareModal } from "@/components/sharing/ShareModal";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/DropdownMenu";
 import { convertNoteContent } from "@/utils/noteContentConverter";
+import { MESSAGES, AUTO_SAVE_DEBOUNCE_MS } from "@/constants";
 import type { Note, NoteType } from "@/types";
 
 export interface NoteEditorCoreProps {
@@ -194,7 +195,7 @@ export function NoteEditorCore({
 
   // Auto-save on changes
   useEffect(() => {
-    const timer = setTimeout(handleSave, 500);
+    const timer = setTimeout(handleSave, AUTO_SAVE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [handleSave]);
 
@@ -228,7 +229,7 @@ export function NoteEditorCore({
       if (isTrash) {
         trashNote(note.id);
         showToast({
-          message: "Note moved to trash. Deleted notes are stored for 30 days.",
+          message: MESSAGES.noteMovedToTrash,
           onUndo: () => restoreNote(note.id),
         });
       } else {

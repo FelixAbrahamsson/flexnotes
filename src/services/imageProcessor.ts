@@ -84,14 +84,6 @@ function calculateTargetDimensions(
   }
 }
 
-export function createObjectURL(blob: Blob): string {
-  return URL.createObjectURL(blob)
-}
-
-export function revokeObjectURL(url: string): void {
-  URL.revokeObjectURL(url)
-}
-
 export function generateImageId(): string {
   return `img-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }

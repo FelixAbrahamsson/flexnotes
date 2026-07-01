@@ -204,7 +204,6 @@ export async function parseGoogleKeepZip(file: File): Promise<ImportResult> {
 
     await Promise.all(filePromises)
 
-    console.log(`Found ${noteFiles.length} note files (${noteFiles.filter(f => f.type === 'json').length} JSON, ${noteFiles.filter(f => f.type === 'html').length} HTML)`)
 
     // Second pass: parse note files and match images
     for (const { path, content, type } of noteFiles) {
@@ -271,7 +270,6 @@ export async function parseGoogleKeepZip(file: File): Promise<ImportResult> {
       result.notes.push(note)
     }
 
-    console.log(`Parsed ${result.notes.length} notes, skipped ${result.skipped}`)
     return result
   } catch (error) {
     result.errors.push(`Failed to read zip file: ${(error as Error).message}`)

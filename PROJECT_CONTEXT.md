@@ -1,7 +1,6 @@
 # Project Context for AI Agents
 
 This document provides context for AI agents working on the FlexNotes codebase. It explains the architecture, patterns, and conventions used throughout the project.
-C
 
 ## Overview
 
@@ -96,25 +95,31 @@ src/
 ├── components/           # React components
 │   ├── folders/         # FolderTreeView, FolderTreeItem, NoteTreeItem, FolderPicker, FolderBadge, FolderManager
 │   ├── images/          # ImageGallery, ImageViewer
-│   ├── import/          # GoogleKeepImport
-│   ├── notes/           # NoteCard, NoteEditor, NoteEditorPane, TextEditor, ListEditor, MarkdownEditor
+│   ├── import/          # GoogleKeepImport, NotesExportImport (JSON export/import)
+│   ├── notes/           # NoteCard, NoteEditor, NoteEditorCore, NoteEditorPane, NoteGrid, TextEditor, ListEditor, ListItemRow, MarkdownEditor, HeadingOutline, SharedWithMeView, SortableNoteCard, ActionDropZone
 │   ├── sharing/         # ShareModal
 │   ├── tags/            # TagBadge, TagFilter, TagPicker
 │   ├── ui/              # Reusable UI (ConfirmDialog, DropdownMenu, Toast, ViewSwitcher)
 │   ├── SettingsModal.tsx  # Theme, layout, tags, folders, import, password, logout
 │   └── SyncStatus.tsx
 │
+├── constants/           # App-wide config + user-facing message strings
+│   └── index.ts         # TRASH_RETENTION_DAYS, debounce values, MESSAGES
+│
 ├── hooks/               # Custom React hooks
 │   ├── useCapacitor.ts  # Native platform utilities (haptics, etc.)
+│   ├── useDocumentTitle.ts # Sets browser tab title from active note
 │   ├── useEscapeKey.ts  # ESC key handler for closing modals
 │   ├── useImageUpload.ts # Image upload handling with drag & drop
 │   ├── useNoteDragAndDrop.ts # DnD sensors, drag start/end, reorder mode
 │   ├── useNoteEditorLifecycle.ts # Modal stack, popstate, beforeunload, editor close
 │   ├── useNoteFromUrl.ts # URL-based note restoration across tabs
-│   └── usePullToRefresh.ts # Pull-to-refresh gesture for mobile
+│   ├── usePullToRefresh.ts # Pull-to-refresh gesture for mobile
+│   └── useResizableSidebar.ts # Draggable sidebar width (folder view)
 │
 ├── pages/               # Page-level components
-│   ├── AuthPage.tsx     # Login/signup
+│   ├── LoginPage.tsx    # Login
+│   ├── SignupPage.tsx   # Signup
 │   ├── NotesPage.tsx    # Main notes view with list/folder modes, shared view tabs
 │   └── SharedNotePage.tsx # Public shared note view, auto-saves to "shared with me"
 │
@@ -122,6 +127,7 @@ src/
 │   ├── db.ts            # Dexie.js setup, LocalNote/LocalTag/LocalFolder types
 │   ├── googleKeepImport.ts # Google Keep ZIP parser
 │   ├── imageProcessor.ts # Image compression/WebP conversion
+│   ├── notesExport.ts   # Export/import notes as JSON
 │   ├── share.ts         # Share link generation, "shared with me" tracking
 │   ├── supabase.ts      # Supabase client instance
 │   └── sync.ts          # Sync queue processing, conflict resolution
@@ -130,7 +136,8 @@ src/
 │   ├── authStore.ts     # User authentication (email/password, Google SSO)
 │   ├── folderStore.ts   # Folders CRUD, hierarchy navigation
 │   ├── imageStore.ts    # Note images state
-│   ├── noteStore.ts     # Notes CRUD, trash, filters, folder assignment
+│   ├── noteStore.ts     # Notes CRUD, trash, folder assignment, shared notes
+│   ├── noteUIStore.ts   # Note view UI state: active note, filters (search/tags/archived/trash/shared), pagination
 │   ├── preferencesStore.ts # Theme, layout, view mode preferences
 │   ├── shareStore.ts    # Share links state
 │   ├── syncStore.ts     # Sync status, online/offline, visibility-based sync
@@ -141,6 +148,7 @@ src/
 │
 ├── utils/               # Utility functions
 │   ├── formatters.ts    # Date formatting, content preview generation
+│   ├── markdown.ts      # Markdown detection + Markdown→sanitized-HTML for paste
 │   └── noteContentConverter.ts # Note type conversion (text↔markdown↔list)
 │
 ├── App.tsx              # Router setup
@@ -180,19 +188,25 @@ Parses Google Keep Takeout exports:
 
 ### `src/stores/noteStore.ts`
 
-Main note operations:
+Main note **data** operations (view/filter UI state lives in `noteUIStore.ts`):
 
 - CRUD operations with optimistic updates
-- Trash/restore/permanent delete
-- Filters: archived, trash, shared, search, tags
+- Trash/restore/permanent delete; `cleanupOldTrash()` purges notes older than `TRASH_RETENTION_DAYS` (called from `fetchNotes`)
 - `deleteNoteIfEmpty()` - Auto-cleanup empty notes
 - `duplicateNote()` - Create a copy of a note with its content and tags
 - `reorderNotes()` - Drag-and-drop reordering with sort_order persistence
 - `moveNoteToFolder()` - Move note to a folder or root
 - `getNotesInFolder()` - Get notes in a specific folder (or root)
-- Pagination: `getPaginatedNotes()`, `loadMoreNotes()`, `hasMoreNotes()`
-- Shared view: `sharedTab` ('by_me' | 'with_me'), `sharedWithMeNotes`, `fetchSharedWithMeNotes()`
-- `setSharedTab()` - Switch between "Shared by me" and "Shared with me" tabs
+- Shared notes data: `sharedNoteIds`, `sharedWithMeNotes`, `fetchSharedNoteIds()`, `fetchSharedWithMeNotes()`
+
+### `src/stores/noteUIStore.ts`
+
+Note **view/UI** state, kept separate from note data:
+
+- `activeNoteId` and view flags: `showArchived`, `showTrash`, `showShared`, `sharedTab` ('by_me' | 'with_me')
+- Filters: `searchQuery`, `selectedTagIds`
+- Filtering/derivation helpers: `getFilteredNotes()`, `getPaginatedNotes()`, `getActiveNote()`
+- Pagination: `displayLimit`, `loadMoreNotes()`, `hasMoreNotes()`
 
 ### `src/stores/folderStore.ts`
 
@@ -218,19 +232,13 @@ User preferences with persistence:
 - `applyTheme()` updates document class
 - Cross-tab sync: a `storage` event listener rehydrates the store and re-applies the theme when another tab writes to `flexnotes-preferences`, so theme/layout/view changes propagate live without a reload
 
-### `src/components/notes/NoteEditor.tsx`
+### Note editor components (`NoteEditorCore`, `NoteEditor`, `NoteEditorPane`)
 
-Modal for editing a note:
+The editing form is shared; only the surrounding chrome differs:
 
-- Title input
-- Tag picker (rendered via portal to avoid overflow clipping)
-- Type switcher (text/list/markdown)
-- Image upload/gallery
-- Auto-save on changes (500ms debounce)
-- Tracks `lastNoteId` to prevent sync from overwriting local edits
-- Flushes pending save before close to prevent data loss with `deleteNoteIfEmpty`
-- Resizable width on desktop via drag handles on left/right edges
-- Fullscreen mode: content column rendered on distinct background, resizable width
+- **`NoteEditorCore.tsx`** — the actual editing form (title, tag picker, type switcher text/list/markdown, image upload/gallery, per-type editor selection). Owns auto-save (`AUTO_SAVE_DEBOUNCE_MS` debounce), dirty tracking, flush-before-close, and sync-conflict avoidance via `lastSynced*` refs. Both wrappers below render this.
+- **`NoteEditor.tsx`** — modal wrapper around `NoteEditorCore`. Resizable width via drag handles; fullscreen mode renders the content column on a distinct background. Flushes pending save before close to avoid data loss with `deleteNoteIfEmpty`.
+- **`NoteEditorPane.tsx`** — inline (non-modal) wrapper for the desktop folder-view split-pane; empty state when no note selected; `hideTags` prop.
 
 ### `src/components/notes/ListEditor.tsx`
 
@@ -297,15 +305,6 @@ Tree-based file browser for folder view:
 - `NoteTreeItem` (separate file): draggable note with context menu (pin, share, duplicate, move, archive, delete)
 - `FolderTreeItem` (separate file): folder node with expand/collapse, drag+drop, rename, color picker, subfolder creation
 - Delete and archive actions are routed via callbacks (`onDeleteNote`, `onArchiveNote`) to the parent for toast notifications
-
-### `src/components/notes/NoteEditorPane.tsx`
-
-Inline note editor for split-pane layout (desktop folder view):
-
-- Similar to NoteEditor but without modal wrapper
-- Displays empty state when no note selected
-- `hideTags` prop to hide tag management in folder view
-- Auto-save with debouncing
 
 ### `src/components/ui/ViewSwitcher.tsx`
 
@@ -397,6 +396,10 @@ All modals support:
 - ESC key to close
 - Click outside (backdrop) to close
 - Nested modals close innermost first
+
+### Constants & Messages
+
+Tunable values (retention periods, debounce timings) and user-facing strings live in `src/constants/index.ts`. Import from `@/constants` instead of hardcoding magic numbers or duplicating toast/banner text — e.g. `TRASH_RETENTION_DAYS`, `AUTO_SAVE_DEBOUNCE_MS`, `MESSAGES.noteMovedToTrash`.
 
 ### Local-Only Fields
 

@@ -56,10 +56,6 @@ export function SharedNotePage() {
           if (error) {
             console.error('Failed to save shared note:', error)
           }
-        } else if (user) {
-          console.log('Not saving to shared with me: viewing own note')
-        } else {
-          console.log('Not saving to shared with me: not logged in')
         }
       }
 

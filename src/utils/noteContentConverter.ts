@@ -25,7 +25,7 @@ export function htmlToPlainText(html: string): string {
  * Each line becomes a `<p>` element; empty lines use `<br>`.
  * HTML special characters are escaped.
  */
-export function plainTextToHtml(text: string): string {
+function plainTextToHtml(text: string): string {
   if (!text.trim()) return "";
   const escaped = text
     .replace(/&/g, "&amp;")

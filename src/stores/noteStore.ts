@@ -9,9 +9,7 @@ import { useAuthStore } from './authStore'
 import { useTagStore } from './tagStore'
 import { useSyncStore, triggerSyncIfOnline } from './syncStore'
 import { useImageStore } from './imageStore'
-
-// Constants
-const TRASH_RETENTION_DAYS = 30
+import { TRASH_RETENTION_DAYS } from '@/constants'
 
 // Re-export types from UI store for backward compatibility
 export type { SharedTab } from './noteUIStore'
@@ -63,7 +61,6 @@ interface NoteState {
 
   // Local-first helpers
   loadFromLocal: () => Promise<void>
-  syncFromServer: () => Promise<void>
 }
 
 // Check if a note is empty (no title and no meaningful content)
@@ -127,85 +124,6 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       set({ notes })
     } catch (error) {
       console.error('Failed to load notes from local:', error)
-    }
-  },
-
-  // Sync notes from server (called after local load)
-  syncFromServer: async () => {
-    const user = useAuthStore.getState().user
-    if (!user || !navigator.onLine) return
-
-    try {
-      const { data, error } = await supabase
-        .from('notes')
-        .select('*')
-        .eq('owner_id', user.id)
-
-      if (error) throw error
-
-      // Get pending changes to check if a note has pending operations
-      const pendingChanges = await db.pendingChanges.where('entityType').equals('note').toArray()
-      const pendingNoteIds = new Set(pendingChanges.map(p => p.entityId))
-
-      // Merge server data with local
-      await db.transaction('rw', db.notes, async () => {
-        for (const serverNote of data || []) {
-          const localNote = await db.notes.get(serverNote.id)
-
-          // Skip if local has pending changes (check both _syncStatus AND pending queue)
-          if (localNote && (localNote._syncStatus === 'pending' || pendingNoteIds.has(serverNote.id))) {
-            continue
-          }
-
-          // Skip if local version is newer than server version
-          if (localNote && localNote._localUpdatedAt && serverNote.updated_at) {
-            const localTime = new Date(localNote._localUpdatedAt).getTime()
-            const serverTime = new Date(serverNote.updated_at).getTime()
-            if (localTime > serverTime) {
-              console.log('Skipping server data - local is newer:', serverNote.id)
-              continue
-            }
-          }
-
-          const noteData: LocalNote = {
-            ...serverNote,
-            is_deleted: serverNote.is_deleted ?? false,
-            deleted_at: serverNote.deleted_at ?? null,
-            folder_id: serverNote.folder_id ?? null,
-            // Use server sort_order if available, otherwise preserve local or use timestamp
-            sort_order: serverNote.sort_order ?? localNote?.sort_order ?? -new Date(serverNote.updated_at).getTime(),
-            _syncStatus: 'synced',
-            _localUpdatedAt: serverNote.updated_at,
-            _serverUpdatedAt: serverNote.updated_at,
-          }
-          await db.notes.put(noteData)
-        }
-
-        // Check for notes deleted on server
-        const localNotes = await db.notes.where('owner_id').equals(user.id).toArray()
-        const serverIds = new Set((data || []).map(n => n.id))
-
-        for (const localNote of localNotes) {
-          // Don't delete notes that:
-          // - Are in local trash (intentionally not on server)
-          // - Have pending sync status
-          // - Have pending changes in the queue
-          if (!serverIds.has(localNote.id) &&
-              localNote._syncStatus === 'synced' &&
-              !localNote.is_deleted &&
-              !pendingNoteIds.has(localNote.id)) {
-            await db.notes.delete(localNote.id)
-          }
-        }
-      })
-
-      // Reload from local
-      await get().loadFromLocal()
-
-      // Cleanup old trash
-      await get().cleanupOldTrash()
-    } catch (error) {
-      console.error('Failed to sync from server:', error)
     }
   },
 
@@ -375,7 +293,6 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       // Check if note already exists in store (prevent duplicates)
       const existingNote = get().notes.find(n => n.id === note.id)
       if (existingNote) {
-        console.log('Note already exists, skipping:', note.id)
         return note.id
       }
 

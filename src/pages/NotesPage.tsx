@@ -18,6 +18,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useResizableSidebar } from "@/hooks/useResizableSidebar";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useNoteFromUrl } from "@/hooks/useNoteFromUrl";
+import { MESSAGES } from "@/constants";
 import { useNoteStore } from "@/stores/noteStore";
 import { useNoteUIStore } from "@/stores/noteUIStore";
 import { useTagStore } from "@/stores/tagStore";
@@ -342,7 +343,7 @@ export function NotesPage() {
       hapticLight();
       trashNote(noteId);
       showToast({
-        message: "Note moved to trash. Deleted notes are stored for 30 days.",
+        message: MESSAGES.noteMovedToTrash,
         onUndo: () => restoreNote(noteId),
       });
     },
@@ -697,7 +698,7 @@ export function NotesPage() {
                   hapticLight();
                   trashNote(noteId);
                   showToast({
-                    message: "Note moved to trash. Deleted notes are stored for 30 days.",
+                    message: MESSAGES.noteMovedToTrash,
                     onUndo: () => restoreNote(noteId),
                   });
                 }}
@@ -764,7 +765,7 @@ export function NotesPage() {
             {showTrash && trashCount > 0 && (
               <div className="flex items-center justify-between mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                 <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  Notes in trash are automatically deleted after 30 days
+                  {MESSAGES.trashAutoDeleteNotice}
                 </p>
                 <button
                   onClick={handleEmptyTrash}

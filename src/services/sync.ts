@@ -141,7 +141,6 @@ async function processNoteChange(change: PendingChange, userId: string): Promise
 
       // If note doesn't exist on server, create it instead
       if (fetchError && fetchError.code === 'PGRST116') {
-        console.log('Note not found on server, creating instead:', entityId)
         const cleanData = stripSyncMetadataFields(localNote as unknown as Record<string, unknown>)
 
         const { error } = await supabase.from('notes').insert({
@@ -364,7 +363,6 @@ export async function fullSync(userId: string): Promise<void> {
         const localTime = new Date(localNote._localUpdatedAt).getTime()
         const serverTime = new Date(note.updated_at).getTime()
         if (localTime > serverTime) {
-          console.log('Full sync: Skipping server data - local is newer:', note.id)
           continue
         }
       }
@@ -501,7 +499,6 @@ export async function incrementalSync(userId: string): Promise<void> {
       const localTime = new Date(localNote._localUpdatedAt).getTime()
       const serverTime = new Date(note.updated_at).getTime()
       if (localTime > serverTime) {
-        console.log('Incremental sync: Skipping server data - local is newer:', note.id)
         continue
       }
     }

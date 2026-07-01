@@ -210,7 +210,7 @@ export async function removeSavedShare(savedShareId: string): Promise<{ error: E
 }
 
 // Get all saved shares for the current user (notes shared with me)
-export async function getSavedShares(): Promise<SavedShare[]> {
+async function getSavedShares(): Promise<SavedShare[]> {
   const { data, error } = await supabase
     .from('saved_shares')
     .select('*')

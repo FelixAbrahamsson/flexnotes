@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { HEADING_EXTRACTION_DEBOUNCE_MS } from "@/constants";
 
 interface Heading {
   level: number;
@@ -65,7 +66,7 @@ export function HeadingOutline({
     let debounceTimer: ReturnType<typeof setTimeout>;
     const observer = new MutationObserver(() => {
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(extractHeadings, 150);
+      debounceTimer = setTimeout(extractHeadings, HEADING_EXTRACTION_DEBOUNCE_MS);
     });
 
     observer.observe(container, {

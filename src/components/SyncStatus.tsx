@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { Cloud, CloudOff, RefreshCw, AlertCircle } from "lucide-react";
 import { useSyncStore } from "@/stores/syncStore";
 
@@ -82,22 +81,4 @@ export function SyncStatus() {
       <span className="text-xs">Synced</span>
     </div>
   );
-}
-
-// Hook to initialize sync on app load
-export function useSyncInit() {
-  const { fullSync, subscribeToChanges, refreshPendingCount } = useSyncStore();
-
-  useEffect(() => {
-    // Initial sync
-    fullSync();
-    refreshPendingCount();
-
-    // Subscribe to realtime changes
-    const unsubscribe = subscribeToChanges();
-
-    return () => {
-      unsubscribe();
-    };
-  }, [fullSync, subscribeToChanges, refreshPendingCount]);
 }

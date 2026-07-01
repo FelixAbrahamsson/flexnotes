@@ -57,24 +57,6 @@ export async function hapticLight() {
   }
 }
 
-export async function hapticMedium() {
-  if (!isNative) return
-  try {
-    await Haptics.impact({ style: ImpactStyle.Medium })
-  } catch {
-    // Haptics not available
-  }
-}
-
-export async function hapticHeavy() {
-  if (!isNative) return
-  try {
-    await Haptics.impact({ style: ImpactStyle.Heavy })
-  } catch {
-    // Haptics not available
-  }
-}
-
 // Hook to handle keyboard visibility (for adjusting UI)
 export function useKeyboardVisibility(callback: (visible: boolean, height: number) => void) {
   useEffect(() => {
