@@ -13,6 +13,7 @@ import { common, createLowlight } from 'lowlight'
 const lowlight = createLowlight(common)
 
 import { ImagePlus } from 'lucide-react'
+import { looksLikeMarkdown, markdownToSafeHtml } from '@/utils/markdown'
 
 interface MarkdownEditorProps {
   content: string
@@ -112,6 +113,20 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
             return true // Handled
           }
         }
+
+        // Render pasted Markdown text instead of inserting it verbatim.
+        // TipTap has no Markdown parser, so we detect Markdown in the plain
+        // text payload and convert it to HTML before inserting. Rich HTML
+        // sources (e.g. copying from a rendered page or another note) have
+        // their Markdown syntax already stripped from the plain text, so they
+        // won't match and TipTap's normal HTML paste is preserved.
+        const plainText = event.clipboardData?.getData('text/plain')
+        if (plainText && looksLikeMarkdown(plainText)) {
+          event.preventDefault()
+          editor?.chain().focus().insertContent(markdownToSafeHtml(plainText)).run()
+          return true // Handled
+        }
+
         return false // Let TipTap handle it
       },
       // Use single newlines between paragraphs when copying as plain text
