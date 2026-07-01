@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react
 import { Plus, Trash2, RotateCcw } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { ListItemRow } from "./ListItemRow";
+import { getItemWithChildren } from "@/utils/listItems";
 import type { ListItem, ListContent } from "@/types";
 
 interface ListEditorProps {
@@ -134,27 +135,6 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
   );
 
   // Get an item and all its children (items with higher indent that follow it)
-  const getItemWithChildren = useCallback(
-    (itemId: string, itemList: ListItem[]): string[] => {
-      const index = itemList.findIndex((item) => item.id === itemId);
-      if (index === -1) return [];
-
-      const parentIndent = itemList[index].indent ?? 0;
-      const ids = [itemId];
-
-      for (let i = index + 1; i < itemList.length; i++) {
-        const itemIndent = itemList[i].indent ?? 0;
-        if (itemIndent > parentIndent) {
-          ids.push(itemList[i].id);
-        } else {
-          break;
-        }
-      }
-
-      return ids;
-    },
-    [],
-  );
 
   const addItem = useCallback((afterId?: string, initialText?: string) => {
     const currentItems = itemsRef.current;
@@ -273,7 +253,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
       // Unchecking - only uncheck this item
       updateItem(id, { checked: false });
     }
-  }, [getItemWithChildren, saveItems, updateItem]);
+  }, [saveItems, updateItem]);
 
   const deleteItem = useCallback((id: string) => {
     const currentItems = itemsRef.current;
@@ -703,7 +683,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
       };
       setDraggedIds(ids);
     },
-    [getItemWithChildren],
+    [],
   );
 
   // Unified drag move handler
