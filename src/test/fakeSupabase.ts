@@ -57,12 +57,15 @@ interface Filter {
 }
 
 class QueryBuilder implements PromiseLike<{ data: unknown; error: unknown }> {
+  private table: string
   private op: Op = 'select'
   private payload: Row | Row[] | null = null
   private filters: Filter[] = []
   private isSingle = false
 
-  constructor(private table: string) {}
+  constructor(table: string) {
+    this.table = table
+  }
 
   private get rows(): Row[] {
     return (serverTables[this.table] ??= [])

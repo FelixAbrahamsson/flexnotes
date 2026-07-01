@@ -501,8 +501,9 @@ Unit tests use **Vitest** (jsdom, config in `vitest.config.ts`, matchers/stubs i
 
 - **Pure logic**: `utils/noteContentConverter`, `utils/markdown`, `utils/formatters`, `utils/sortOrder`, `utils/listItems`, `utils/notesEmptyState`.
 - **Components** (React Testing Library): `ListEditor` (keyboard/checkbox behavior), `NotesPage` (behavioral tests via a store-mock harness inline in `NotesPage.test.tsx` — the six Zustand stores, provider/custom hooks, and heavy children are mocked so the page can be driven through controllable state).
+- **Store/sync layer** (`fake-indexeddb` + in-memory fake server): `services/sync.test.ts` and `stores/noteStore.test.ts` run the real Dexie code against `fake-indexeddb` (loaded in `src/test/setup.ts`) and a controllable fake Supabase (`src/test/fakeSupabase.ts`, mocked in via `vi.mock('@/services/supabase')`). These cover conflict detection, the create-on-missing-server path, sync merge skips, retry/give-up, `resolveConflict`, and trash/cleanup queueing — the historically bug-prone areas.
 
-When splitting UI, prefer extracting pure functions or presentational components (props in) so they're testable without the DB. Store/sync integration tests would still need `fake-indexeddb` + Supabase mocks (not yet set up).
+When splitting UI, prefer extracting pure functions or presentational components (props in) so they're testable without the DB. To test store/sync logic, seed `serverTables` (fake server) and `db` (real Dexie), call the function, then assert both sides; use `forceNextError()` to exercise error branches.
 
 ### Testing on Mobile via Local Network
 
