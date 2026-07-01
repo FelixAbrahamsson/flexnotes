@@ -11,6 +11,7 @@ import { useSyncStore, triggerSyncIfOnline } from './syncStore'
 import { useImageStore } from './imageStore'
 import { TRASH_RETENTION_DAYS } from '@/constants'
 import { activeNotes, trashedNotes } from '@/utils/noteFilters'
+import { computeReorderSortOrder } from '@/utils/sortOrder'
 
 // Re-export types from UI store for backward compatibility
 export type { SharedTab } from './noteUIStore'
@@ -567,25 +568,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
 
     // Calculate new sort_order
-    let newSortOrder: number
-
-    if (newIndex === 0) {
-      // Moving to top
-      newSortOrder = targetList[0].sort_order - 1
-    } else if (newIndex === targetList.length - 1) {
-      // Moving to bottom
-      newSortOrder = targetList[targetList.length - 1].sort_order + 1
-    } else if (newIndex < oldIndex) {
-      // Moving up - place between newIndex-1 and newIndex
-      const above = targetList[newIndex - 1]
-      const below = targetList[newIndex]
-      newSortOrder = (above.sort_order + below.sort_order) / 2
-    } else {
-      // Moving down - place between newIndex and newIndex+1
-      const above = targetList[newIndex]
-      const below = targetList[newIndex + 1]
-      newSortOrder = (above.sort_order + below.sort_order) / 2
-    }
+    const newSortOrder = computeReorderSortOrder(targetList, oldIndex, newIndex)
 
     // Update state optimistically
     set(state => ({
