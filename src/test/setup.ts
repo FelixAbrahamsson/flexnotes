@@ -1,3 +1,6 @@
+// Provides a real in-memory IndexedDB so Dexie works in tests. Must load
+// before any module that instantiates the `db` singleton.
+import 'fake-indexeddb/auto'
 import '@testing-library/jest-dom/vitest'
 import { afterEach, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
