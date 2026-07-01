@@ -488,7 +488,11 @@ Image cleanup:
 npm run dev          # Start dev server at localhost:5173
 npm run build        # Production build
 npm run preview      # Preview production build
+npm test             # Run unit tests once (Vitest)
+npm run test:watch   # Run unit tests in watch mode
 ```
+
+Unit tests use **Vitest** (jsdom environment, config in `vitest.config.ts`). Tests live next to the code as `*.test.ts`. Current coverage focuses on pure logic (`utils/noteContentConverter`, `utils/markdown`, `utils/formatters`). Store/sync integration tests would need `fake-indexeddb` + Supabase mocks — not yet set up. Prefer extracting pure functions so they can be tested without mounting React or the DB.
 
 ### Testing on Mobile via Local Network
 
