@@ -142,7 +142,23 @@ vi.mock('@/components/notes/NoteGrid', () => ({
   ),
 }))
 vi.mock('@/components/notes/SharedWithMeView', () => ({ SharedWithMeView: () => <div data-testid="shared-with-me" /> }))
-vi.mock('@/components/folders/FolderTreeView', () => ({ FolderTreeView: () => <div data-testid="folder-tree" /> }))
+vi.mock('@/components/folders/FolderTreeView', () => ({
+  FolderTreeView: ({
+    onSelectNote,
+    onCreateNote,
+    onDeleteNote,
+  }: {
+    onSelectNote: (id: string) => void
+    onCreateNote: (folderId: string | null) => void
+    onDeleteNote: (id: string) => void
+  }) => (
+    <div data-testid="folder-tree">
+      <button onClick={() => onSelectNote('a')}>tree-select-a</button>
+      <button onClick={() => onCreateNote('f1')}>tree-create-in-f1</button>
+      <button onClick={() => onDeleteNote('a')}>tree-delete-a</button>
+    </div>
+  ),
+}))
 vi.mock('@/components/notes/NoteEditorPane', () => ({ NoteEditorPane: () => <div data-testid="editor-pane" /> }))
 vi.mock('@/components/notes/NoteEditor', () => ({ NoteEditor: () => <div data-testid="note-editor" /> }))
 vi.mock('@/components/SettingsModal', () => ({ SettingsModal: () => <div data-testid="settings-modal" /> }))
@@ -256,5 +272,23 @@ describe('NotesPage', () => {
     h.prefs.viewMode = 'folder'
     render(<NotesPage />)
     expect(screen.getByTestId('folder-tree')).toBeInTheDocument()
+  })
+
+  it('creates a note in a folder from the folder tree', () => {
+    h.prefs.viewMode = 'folder'
+    render(<NotesPage />)
+    fireEvent.click(screen.getByText('tree-create-in-f1'))
+    expect(h.note.createNote).toHaveBeenCalledWith({ folder_id: 'f1' })
+  })
+
+  it('deletes a note from the folder tree (trash + toast)', () => {
+    h.prefs.viewMode = 'folder'
+    h.note.notes = [makeNote({ id: 'a', title: 'X' })]
+    render(<NotesPage />)
+    fireEvent.click(screen.getByText('tree-delete-a'))
+    expect(h.note.trashNote).toHaveBeenCalledWith('a')
+    expect(h.toastFn).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('trash') })
+    )
   })
 })

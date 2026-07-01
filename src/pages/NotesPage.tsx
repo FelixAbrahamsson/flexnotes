@@ -7,7 +7,6 @@ import {
   RefreshCw,
   X,
 } from "lucide-react";
-import { DndContext } from "@dnd-kit/core";
 import { hapticLight } from "@/hooks/useCapacitor";
 import { useNoteEditorLifecycle } from "@/hooks/useNoteEditorLifecycle";
 import { useNoteDragAndDrop } from "@/hooks/useNoteDragAndDrop";
@@ -25,14 +24,13 @@ import { useFolderStore } from "@/stores/folderStore";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import { NoteEditor } from "@/components/notes/NoteEditor";
-import { NoteEditorPane } from "@/components/notes/NoteEditorPane";
 import { ListViewContent } from "@/components/notes/ListViewContent";
+import { FolderViewPane } from "@/pages/FolderViewPane";
 import { TagFilter } from "@/components/tags/TagFilter";
 import { SyncStatus } from "@/components/SyncStatus";
 import { SettingsModal } from "@/components/SettingsModal";
 import { ShareModal } from "@/components/sharing/ShareModal";
 import { ViewSwitcher } from "@/components/ui/ViewSwitcher";
-import { FolderTreeView } from "@/components/folders/FolderTreeView";
 import { FolderPicker } from "@/components/folders/FolderPicker";
 import { FolderManager } from "@/components/folders/FolderManager";
 import { removeSavedShare } from "@/services/share";
@@ -583,161 +581,31 @@ export function NotesPage() {
       {/* Main content */}
       {/* Folder View - Split Pane Layout */}
       {viewMode === "folder" && !showArchived && !showTrash && !showShared ? (
-        <main className="flex h-[calc(100vh-120px)]">
-          {/* Tree Panel */}
-          <div
-            className="flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden"
-            style={{ width: isMobile ? "100%" : sidebarWidth }}
-          >
-            <DndContext
-              sensors={sensors}
-              onDragEnd={(event) => {
-                const { active, over } = event;
-                if (!over) return;
-
-                const dragData = active.data.current;
-                const overId = over.id.toString();
-
-                // Handle dropping note onto folder
-                if (
-                  dragData?.type === "note" &&
-                  overId.startsWith("folder-")
-                ) {
-                  const folderId = overId.replace("folder-", "");
-                  const noteId = dragData.note.id;
-                  hapticLight();
-                  useNoteStore
-                    .getState()
-                    .moveNoteToFolder(
-                      noteId,
-                      folderId === "root" ? null : folderId,
-                    );
-                }
-
-                // Handle dropping folder onto another folder
-                if (
-                  dragData?.type === "folder" &&
-                  overId.startsWith("folder-")
-                ) {
-                  const targetFolderId = overId.replace("folder-", "");
-                  const sourceFolderId = dragData.folder.id;
-
-                  // Don't drop onto self
-                  if (targetFolderId === sourceFolderId) return;
-
-                  hapticLight();
-                  useFolderStore
-                    .getState()
-                    .moveFolder(
-                      sourceFolderId,
-                      targetFolderId === "root" ? null : targetFolderId,
-                    );
-                }
-              }}
-            >
-              <FolderTreeView
-                selectedNoteId={isMobile ? null : folderViewSelectedNoteId}
-                searchQuery={searchQuery}
-                reorderMode={reorderMode}
-                onSelectNote={(noteId) => {
-                  hapticLight();
-                  if (isMobileRef.current) {
-                    // On mobile, open in modal
-                    setActiveNote(noteId);
-                    // Push to history stack so back button closes the note
-                    modalStackRef.current.push("note");
-                    window.history.pushState({ modal: "note" }, "");
-                  } else {
-                    // On desktop, show in pane (close any modal first)
-                    setActiveNote(null);
-                    setFolderViewSelectedNoteId(noteId);
-                  }
-                  setNoteInUrl(noteId);
-                }}
-                onCreateNote={async (folderId) => {
-                  hapticLight();
-                  const note = await createNote({ folder_id: folderId });
-                  if (note) {
-                    if (isMobileRef.current) {
-                      setActiveNote(note.id);
-                      // Push to history stack so back button closes the note
-                      modalStackRef.current.push("note");
-                      window.history.pushState({ modal: "note" }, "");
-                    } else {
-                      // On desktop, show in pane (close any modal first)
-                      setActiveNote(null);
-                      setFolderViewSelectedNoteId(note.id);
-                    }
-                    setNoteInUrl(note.id);
-                  }
-                }}
-                onMoveNote={(noteId) => {
-                  hapticLight();
-                  setFolderPickerNoteId(noteId);
-                }}
-                onShareNote={(noteId) => {
-                  hapticLight();
-                  setShareNoteId(noteId);
-                }}
-                onArchiveNote={(noteId) => {
-                  const isArchived = notes.find((n) => n.id === noteId)?.is_archived;
-                  hapticLight();
-                  updateNote(noteId, { is_archived: !isArchived });
-                  if (!isArchived) {
-                    showToast({
-                      message: "Note archived",
-                      onUndo: () => updateNote(noteId, { is_archived: false }),
-                    });
-                  }
-                }}
-                onDeleteNote={(noteId) => {
-                  hapticLight();
-                  trashNote(noteId);
-                  showToast({
-                    message: MESSAGES.noteMovedToTrash,
-                    onUndo: () => restoreNote(noteId),
-                  });
-                }}
-                onPinNote={(noteId) => {
-                  hapticLight();
-                  updateNote(noteId, {
-                    is_pinned: !notes.find((n) => n.id === noteId)?.is_pinned,
-                  });
-                }}
-                onDuplicateNote={(noteId) => {
-                  hapticLight();
-                  duplicateNote(noteId);
-                }}
-              />
-            </DndContext>
-          </div>
-
-          {/* Resize Handle - Desktop only */}
-          {!isMobile && (
-            <div
-              className="w-1 bg-gray-200 dark:bg-gray-700 hover:bg-primary-400 dark:hover:bg-primary-600 cursor-col-resize flex-shrink-0 transition-colors"
-              onMouseDown={handleResizeStart}
-              onTouchStart={handleResizeStart}
-            />
-          )}
-
-          {/* Editor Panel - Desktop only */}
-          {!isMobile && (
-            <div className="flex-1 min-w-0 overflow-hidden">
-              <NoteEditorPane
-                noteId={folderViewSelectedNoteId || ""}
-                onMoveToFolder={() => {
-                  if (folderViewSelectedNoteId) {
-                    setFolderPickerNoteId(folderViewSelectedNoteId);
-                  }
-                }}
-                hideTags
-                flushSaveRef={paneFlushSaveRef}
-                dirtyRef={paneDirtyRef}
-              />
-            </div>
-          )}
-        </main>
+        <FolderViewPane
+          sensors={sensors}
+          isMobile={isMobile}
+          sidebarWidth={sidebarWidth}
+          searchQuery={searchQuery}
+          reorderMode={reorderMode}
+          folderViewSelectedNoteId={folderViewSelectedNoteId}
+          notes={notes}
+          isMobileRef={isMobileRef}
+          modalStackRef={modalStackRef}
+          paneFlushSaveRef={paneFlushSaveRef}
+          paneDirtyRef={paneDirtyRef}
+          onResizeStart={handleResizeStart}
+          setActiveNote={setActiveNote}
+          setFolderViewSelectedNoteId={setFolderViewSelectedNoteId}
+          setNoteInUrl={setNoteInUrl}
+          setFolderPickerNoteId={setFolderPickerNoteId}
+          setShareNoteId={setShareNoteId}
+          createNote={createNote}
+          updateNote={updateNote}
+          trashNote={trashNote}
+          restoreNote={restoreNote}
+          duplicateNote={duplicateNote}
+          showToast={showToast}
+        />
       ) : (
         /* List View and Archive/Trash */
         <ListViewContent
