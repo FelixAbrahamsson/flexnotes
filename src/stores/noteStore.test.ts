@@ -71,7 +71,7 @@ describe('trashNote', () => {
     expect(stored?.is_deleted).toBe(true)
     expect(stored?.deleted_at).toBeTruthy()
     expect(stored?.is_pinned).toBe(false)
-    expect(stored?.version).toBe(2)
+    expect(stored?.version).toBe(1) // server-assigned, not bumped locally
     expect(stored?._syncStatus).toBe('pending')
 
     const pending = await db.pendingChanges.toArray()
@@ -96,7 +96,7 @@ describe('restoreNote', () => {
 })
 
 describe('updateNote', () => {
-  it('applies the update, bumps the version and queues a change', async () => {
+  it('applies the update without touching the server version and queues a change', async () => {
     await db.notes.put(seedNote({ id: 'n1', title: 'Before', version: 4 }))
     await useNoteStore.getState().loadFromLocal()
 
@@ -104,10 +104,52 @@ describe('updateNote', () => {
 
     const stored = await db.notes.get('n1')
     expect(stored?.title).toBe('After')
-    expect(stored?.version).toBe(5)
+    expect(stored?.version).toBe(4)
     expect(stored?._syncStatus).toBe('pending')
     const pending = await db.pendingChanges.toArray()
-    expect(pending[0].data).toMatchObject({ title: 'After', version: 5 })
+    expect(pending[0].data).toMatchObject({ title: 'After' })
+  })
+
+  it('merges an editor save with a change that landed underneath it', async () => {
+    // The editor loaded "a\nb"; meanwhile a sync stored another device's edit.
+    await db.notes.put(seedNote({ id: 'n1', content: '<p>a</p><p>b from B</p>' }))
+    await useNoteStore.getState().loadFromLocal()
+
+    await useNoteStore.getState().updateNote(
+      'n1',
+      { content: '<p>a from A</p><p>b</p>' },
+      { content: '<p>a</p><p>b</p>' }
+    )
+
+    const stored = await db.notes.get('n1')
+    expect(stored?.content).toBe('<p>a from A</p><p>b from B</p>')
+    expect(stored?._syncStatus).toBe('pending')
+    // The UI shows the merged result, not just the editor's copy
+    expect(useNoteStore.getState().notes[0].content).toBe('<p>a from A</p><p>b from B</p>')
+  })
+
+  it('marks a conflict instead of overwriting when both edited the same block', async () => {
+    await db.notes.put(seedNote({ id: 'n1', content: '<p>from B</p>' }))
+    await useNoteStore.getState().loadFromLocal()
+
+    await useNoteStore.getState().updateNote(
+      'n1',
+      { content: '<p>from A</p>' },
+      { content: '<p>original</p>' }
+    )
+
+    const stored = await db.notes.get('n1')
+    expect(stored?.content).toBe('<p>from A</p>') // ours kept for the resolver
+    expect(stored?._syncStatus).toBe('conflict')
+  })
+
+  it('keeps a conflicted note in conflict when it is edited again', async () => {
+    await db.notes.put(seedNote({ id: 'n1', _syncStatus: 'conflict' }))
+    await useNoteStore.getState().loadFromLocal()
+
+    await useNoteStore.getState().updateNote('n1', { title: 'More edits' })
+
+    expect((await db.notes.get('n1'))?._syncStatus).toBe('conflict')
   })
 })
 

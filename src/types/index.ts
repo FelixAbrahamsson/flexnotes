@@ -15,6 +15,8 @@ export interface Note {
   updated_at: string
   version: number
   sort_order: number
+  /** Server-assigned change counter (set by the database on every write) */
+  server_seq?: number
   // Local-only fields
   _pendingSync?: boolean
   _localUpdatedAt?: string

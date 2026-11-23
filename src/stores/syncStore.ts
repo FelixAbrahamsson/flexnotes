@@ -3,6 +3,7 @@ import { useAuthStore } from './authStore'
 import {
   fullSync,
   incrementalSync,
+  reconcileNotes,
   processPendingChanges,
   getPendingCount,
   getConflictedNotes,
@@ -24,7 +25,12 @@ interface SyncState {
 
   // Actions
   setOnline: (online: boolean) => void
-  sync: () => Promise<void>
+  /**
+   * Push local changes, then pull. `reconcile` compares every note with the
+   * server (catches deletions and anything the incremental pull missed).
+   * Requests made while a sync runs are queued and run right after it.
+   */
+  sync: (opts?: { reconcile?: boolean }) => Promise<void>
   fullSync: () => Promise<void>
   resolveConflict: (noteId: string, choice: 'local' | 'server') => Promise<void>
   refreshPendingCount: () => Promise<void>
@@ -33,6 +39,11 @@ interface SyncState {
   // Realtime subscription
   subscribeToChanges: () => () => void
 }
+
+// Sync scheduling state (module-level: not UI state)
+let resyncRequested = false
+let reconcileRequested = false
+let hasReconciled = false
 
 export const useSyncStore = create<SyncState>((set, get) => ({
   isSyncing: false,
@@ -51,39 +62,54 @@ export const useSyncStore = create<SyncState>((set, get) => ({
     }
   },
 
-  sync: async () => {
+  sync: async (opts) => {
     const user = useAuthStore.getState().user
-    if (!user || get().isSyncing || !navigator.onLine) return
+    if (!user || !navigator.onLine) return
+
+    if (opts?.reconcile) reconcileRequested = true
+    if (get().isSyncing) {
+      // Don't drop it: an event that arrives mid-sync may be for a change the
+      // running pull has already passed.
+      resyncRequested = true
+      return
+    }
 
     set({ isSyncing: true, error: null })
 
     try {
-      // First, push local changes
-      const { failed, errors } = await processPendingChanges(user.id)
+      // Reconcile on the first sync of a session too
+      let rounds = 0
+      do {
+        resyncRequested = false
+        const reconcile = reconcileRequested || !hasReconciled
+        reconcileRequested = false
 
-      if (failed > 0) {
-        console.warn('Some changes failed to sync:', errors)
-      }
+        // First, push local changes
+        const { failed, errors } = await processPendingChanges(user.id)
+        if (failed > 0) {
+          console.warn('Some changes failed to sync:', errors)
+        }
 
-      // Then pull remote changes
-      await incrementalSync(user.id)
+        // Then pull remote changes
+        const merged = reconcile
+          ? await reconcileNotes(user.id)
+          : await incrementalSync(user.id)
+        if (reconcile) hasReconciled = true
 
-      // Check for conflicts
-      const conflicts = await getConflictedNotes()
+        // Remote edits merged into local ones need pushing
+        if (merged > 0) await processPendingChanges(user.id)
 
-      // Update pending count
-      const pendingCount = await getPendingCount()
+        set({
+          pendingCount: await getPendingCount(),
+          conflicts: await getConflictedNotes(),
+          lastSyncTime: new Date().toISOString(),
+        })
 
-      set({
-        pendingCount,
-        conflicts,
-        lastSyncTime: new Date().toISOString(),
-      })
-
-      // Refresh note, tag, and folder stores to update UI with new sync status
-      await useNoteStore.getState().loadFromLocal()
-      await useTagStore.getState().loadFromLocal()
-      await useFolderStore.getState().loadFromLocal()
+        // Refresh note, tag, and folder stores to update UI with new sync status
+        await useNoteStore.getState().loadFromLocal()
+        await useTagStore.getState().loadFromLocal()
+        await useFolderStore.getState().loadFromLocal()
+      } while (resyncRequested && ++rounds < 5)
     } catch (error) {
       set({ error: (error as Error).message })
     } finally {
@@ -125,7 +151,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
     if (!user) return
 
     try {
-      await resolveConflict(noteId, choice, user.id)
+      await resolveConflict(noteId, choice)
 
       const conflicts = await getConflictedNotes()
       const pendingCount = await getPendingCount()
@@ -146,6 +172,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
 
   clearAllData: async () => {
     await clearLocalData()
+    hasReconciled = false
     set({
       pendingCount: 0,
       conflicts: [],
@@ -168,9 +195,9 @@ export const useSyncStore = create<SyncState>((set, get) => ({
           table: 'notes',
           filter: `owner_id=eq.${user.id}`,
         },
-        () => {
-          // Trigger sync on remote changes
-          get().sync()
+        (payload) => {
+          // Deletions don't show up in the incremental pull; reconcile for them
+          get().sync({ reconcile: payload.eventType === 'DELETE' })
         }
       )
       .subscribe()
@@ -187,7 +214,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
           filter: `owner_id=eq.${user.id}`,
         },
         () => {
-          get().sync()
+          useTagStore.getState().syncFromServer()
         }
       )
       .subscribe()
@@ -204,7 +231,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
           filter: `owner_id=eq.${user.id}`,
         },
         () => {
-          get().sync()
+          useFolderStore.getState().syncFromServer()
         }
       )
       .subscribe()
@@ -231,10 +258,11 @@ if (typeof window !== 'undefined') {
   // Sync when app becomes visible (user returns from another tab/app)
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && navigator.onLine) {
-      // Small delay to let the app fully resume
+      // Realtime may have been asleep while hidden, so compare everything.
+      // Small delay to let the app fully resume.
       setTimeout(() => {
-        useSyncStore.getState().sync()
-      }, 500)
+        useSyncStore.getState().sync({ reconcile: true })
+      }, 300)
     }
   })
 }
