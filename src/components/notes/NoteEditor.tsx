@@ -42,16 +42,11 @@ export function NoteEditor({
   });
   const [fullscreenContentWidth, setFullscreenContentWidth] = useState<number | null>(null);
 
-  // Save modal width to localStorage on unmount so it's restored next time
+  // Persisted when a resize drag ends (not on unmount, which a page refresh skips)
   const modalWidthRef = useRef(modalWidth);
   useEffect(() => { modalWidthRef.current = modalWidth; }, [modalWidth]);
-  useEffect(() => {
-    return () => {
-      if (modalWidthRef.current !== null) {
-        try { localStorage.setItem(`note-width:${noteId}`, String(Math.round(modalWidthRef.current))); } catch {}
-      }
-    };
-  }, [noteId]);
+  const noteIdRef = useRef(noteId);
+  useEffect(() => { noteIdRef.current = noteId; }, [noteId]);
   const { contentRef, flushSaveRef, dirtyRef, setContent } = useNoteEditorContent();
 
   // Resize handling for desktop modal / fullscreen content width
@@ -89,6 +84,7 @@ export function NoteEditor({
       if (resizeTarget.current === "content") {
         setFullscreenContentWidth(clamped);
       } else {
+        modalWidthRef.current = clamped; // read synchronously on mouseup
         setModalWidth(clamped);
       }
     };
@@ -98,6 +94,16 @@ export function NoteEditor({
       isResizing.current = false;
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
+      if (resizeTarget.current === "modal" && modalWidthRef.current !== null) {
+        try {
+          localStorage.setItem(
+            `note-width:${noteIdRef.current}`,
+            String(Math.round(modalWidthRef.current)),
+          );
+        } catch {
+          // Storage unavailable (private mode / quota) - width just won't persist
+        }
+      }
     };
 
     document.addEventListener("mousemove", handleResizeMove);
