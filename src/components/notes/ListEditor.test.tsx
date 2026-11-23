@@ -76,6 +76,58 @@ describe('ListEditor keyboard behavior', () => {
     expect(items[1].text).toBe('')
   })
 
+  it('Enter on a parent with children adds the new item as its first child', () => {
+    const { onChange } = renderEditor([
+      { text: 'parent', indent: 0 },
+      { text: 'child', indent: 1 },
+      { text: 'next', indent: 0 },
+    ])
+    const ta = textareas()[0]
+    ta.focus()
+    ta.setSelectionRange(6, 6)
+    fireEvent.keyDown(ta, { key: 'Enter' })
+
+    const items = lastItems(onChange)
+    expect(items.map((i) => [i.text, i.indent])).toEqual([
+      ['parent', 0],
+      ['', 1],
+      ['child', 1],
+      ['next', 0],
+    ])
+  })
+
+  it('Enter at the start of a parent inserts an empty sibling above and keeps the parent intact', () => {
+    const { onChange } = renderEditor([
+      { id: 'a', text: 'a', indent: 0 },
+      { id: 'b', text: 'b', indent: 1 },
+    ])
+    const ta = textareas()[0]
+    ta.focus()
+    ta.setSelectionRange(0, 0)
+    fireEvent.keyDown(ta, { key: 'Enter' })
+
+    const items = lastItems(onChange)
+    expect(items.map((i) => [i.text, i.indent])).toEqual([
+      ['', 0],
+      ['a', 0],
+      ['b', 1],
+    ])
+    expect(items[1].id).toBe('a') // same item, not a copy
+  })
+
+  it('Enter on an item without children keeps the new item a sibling', () => {
+    const { onChange } = renderEditor([
+      { text: 'child', indent: 1 },
+      { text: 'next', indent: 0 },
+    ])
+    const ta = textareas()[0]
+    ta.focus()
+    ta.setSelectionRange(5, 5)
+    fireEvent.keyDown(ta, { key: 'Enter' })
+
+    expect(lastItems(onChange).map((i) => i.indent)).toEqual([1, 1, 0])
+  })
+
   it('Backspace at the start of an item merges it into the previous one', () => {
     const { onChange } = renderEditor([{ text: 'foo' }, { text: 'bar' }])
     const second = textareas()[1]

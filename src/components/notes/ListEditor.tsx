@@ -12,6 +12,17 @@ interface ListEditorProps {
 }
 
 const MAX_INDENT = 5;
+
+/**
+ * Indent for a new item inserted directly after `items[index]`. If that item
+ * has children, the new item becomes its first child; otherwise a sibling.
+ * (Using the parent's indent would make the new item adopt its children.)
+ */
+function indentForItemAfter(items: ListItem[], index: number): number {
+  const ownIndent = items[index]?.indent ?? 0;
+  const nextIndent = items[index + 1]?.indent ?? 0;
+  return nextIndent > ownIndent ? nextIndent : ownIndent;
+}
 const SWIPE_THRESHOLD = 40; // pixels to swipe for one indent level
 
 interface DragState {
@@ -149,8 +160,7 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     let newItems: ListItem[];
     if (afterId) {
       const index = currentItems.findIndex((item) => item.id === afterId);
-      const currentItem = currentItems[index];
-      newItem.indent = currentItem?.indent ?? 0;
+      newItem.indent = indentForItemAfter(currentItems, index);
       newItems = [
         ...currentItems.slice(0, index + 1),
         newItem,
@@ -180,11 +190,38 @@ export function ListEditor({ content, onChange }: ListEditorProps) {
     if (index === -1) return;
 
     const currentItem = currentItems[index];
+
+    // Cursor at the very start of a non-empty item: insert an empty sibling
+    // above and leave this item (text, indent, children) where it is.
+    if (textBefore === "" && textAfter !== "") {
+      const emptyItem: ListItem = {
+        id: `item-${Date.now()}`,
+        text: "",
+        checked: false,
+        indent: currentItem.indent ?? 0,
+      };
+      const newItems = [
+        ...currentItems.slice(0, index),
+        emptyItem,
+        { ...currentItem, text: textAfter },
+        ...currentItems.slice(index + 1),
+      ];
+      setItems(newItems);
+      saveItems(newItems);
+      setFocusedId(currentItem.id);
+      // Keep the caret before the text (the mobile newline path may have moved it)
+      setTimeout(() => {
+        const textarea = inputRefs.current.get(currentItem.id);
+        if (textarea) textarea.setSelectionRange(0, 0);
+      }, 0);
+      return;
+    }
+
     const newItem: ListItem = {
       id: `item-${Date.now()}`,
       text: textAfter,
       checked: false,
-      indent: currentItem.indent ?? 0,
+      indent: indentForItemAfter(currentItems, index),
     };
 
     const newItems = [
