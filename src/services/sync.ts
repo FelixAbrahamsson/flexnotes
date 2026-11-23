@@ -36,8 +36,13 @@ import type { Tag, Folder, Note } from '@/types'
  * Tags, folders and note-tag links still use the simpler queue/full-sync model.
  */
 
+type PushResult =
+  | { status: 'ok' | 'conflict'; note: Note }
+  | { status: 'missing'; note: null }
+
 const NOTES_SEQ_KEY = 'notesSeq'
 const PULL_PAGE_SIZE = 500
+const MANIFEST_PAGE_SIZE = 1000
 const MAX_PUSH_ATTEMPTS = 3
 
 // Queue a change for sync
@@ -167,10 +172,17 @@ async function processNoteChanges(noteId: string, changes: PendingChange[]): Pro
     })
     if (error) throw error
 
-    const result = data as { status: 'ok' | 'conflict'; note: Note }
+    const result = data as PushResult
     if (result.status === 'ok') {
       await applyPushed(noteId, fields, result.note)
       return true
+    }
+
+    if (result.status === 'missing') {
+      // Deleted on another device while we had unpushed edits. Keep the edits:
+      // re-create the note with all of its fields on the next attempt.
+      await db.notes.update(noteId, { _serverVersion: undefined, _base: undefined })
+      continue
     }
 
     // Server moved on: merge into the local copy, then try again on top of it.
@@ -325,13 +337,23 @@ export async function pullNotes(userId: string): Promise<number> {
  * skipped (a write that committed after a later seq had been pulled).
  */
 export async function reconcileNotes(userId: string): Promise<number> {
-  const { data, error } = await supabase
-    .from('notes')
-    .select('id, version, server_seq')
-    .eq('owner_id', userId)
-  if (error) throw error
-
-  const manifest = (data ?? []) as { id: string; version: number; server_seq: number }[]
+  // Page through all of it: PostgREST caps responses (1000 rows by default),
+  // and a truncated manifest would make the deletion pass below drop notes.
+  const manifest: { id: string; version: number; server_seq: number }[] = []
+  // Stop only on an empty page: a short page may just mean the server's cap
+  // is lower than our page size.
+  for (;;) {
+    const { data, error } = await supabase
+      .from('notes')
+      .select('id, version, server_seq')
+      .eq('owner_id', userId)
+      .order('id', { ascending: true })
+      .range(manifest.length, manifest.length + MANIFEST_PAGE_SIZE - 1)
+    if (error) throw error
+    const page = (data ?? []) as typeof manifest
+    if (page.length === 0) break
+    manifest.push(...page)
+  }
   const locals = await db.notes.where('owner_id').equals(userId).toArray()
   const localById = new Map(locals.map((n) => [n.id, n]))
 
@@ -540,7 +562,7 @@ export async function resolveConflict(
   })
   if (error) throw error
 
-  const result = data as { status: 'ok' | 'conflict'; note: Note }
+  const result = data as PushResult
   if (result.status !== 'ok') {
     throw new Error('The note changed on the server again - please try again')
   }

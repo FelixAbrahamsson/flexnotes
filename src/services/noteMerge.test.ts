@@ -80,6 +80,25 @@ describe('mergeNote', () => {
     ).toBe(true)
   })
 
+  it('keeps note_type with the content it belongs to when only one side converted', () => {
+    // Remote converted text -> list (rewrites content); local edited the text
+    const { merged, conflict } = mergeNote(
+      base,
+      { ...base, content: '<p>a edited</p><p>b</p><p>c</p>' },
+      { ...base, note_type: 'list', content: list([{ id: '1', text: 'a' }]) }
+    )
+    expect(conflict).toBe(true)
+    expect(merged.note_type).toBe('text')
+    expect(merged.content).toBe('<p>a edited</p><p>b</p><p>c</p>')
+  })
+
+  it('takes a one-sided type conversion when the other side did not touch content', () => {
+    const converted = { ...base, note_type: 'list' as const, content: list([{ id: '1', text: 'a' }]) }
+    const { merged, conflict } = mergeNote(base, { ...base, is_pinned: true }, converted)
+    expect(conflict).toBe(false)
+    expect(merged).toMatchObject({ note_type: 'list', content: converted.content, is_pinned: true })
+  })
+
   describe('list notes', () => {
     const lb = { ...base, note_type: 'list' as const, content: list([{ id: '1', text: 'milk' }, { id: '2', text: 'eggs' }]) }
 

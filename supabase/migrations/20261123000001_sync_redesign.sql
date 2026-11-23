@@ -78,7 +78,9 @@ create trigger notes_stamp_write_trigger
 -- version the client's edits are based on, or null if the client has never
 -- seen the note on the server (a create).
 --
--- Returns {"status": "ok" | "conflict", "note": <current server row>}.
+-- Returns {"status": "ok" | "conflict", "note": <current server row>}, or
+-- {"status": "missing", "note": null} if a base version was given but the
+-- note no longer exists.
 -- SECURITY INVOKER, so the regular RLS policies on notes apply.
 
 create or replace function public.push_note(
@@ -95,6 +97,13 @@ declare
   v_note public.notes;
 begin
   select * into v_note from public.notes where id = p_id for update;
+
+  if not found and p_base_version is not null then
+    -- The client had this note on the server, but it's gone (deleted on
+    -- another device). Don't recreate it from a partial field set; let the
+    -- client decide (it re-creates it with all fields to keep the edits).
+    return jsonb_build_object('status', 'missing', 'note', null);
+  end if;
 
   if not found then
     insert into public.notes (

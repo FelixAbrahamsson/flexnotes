@@ -13,6 +13,7 @@ import {
   seedServerNote,
   editServerNote,
   rpcHooks,
+  setMaxRows,
 } from '@/test/fakeSupabase'
 import { db, type LocalNote } from '@/services/db'
 import { pickSyncFields } from '@/services/noteMerge'
@@ -192,6 +193,24 @@ describe('push', () => {
     expect(local?._base?.title).toBe('ab') // next push sends only the newer edit
   })
 
+  it('re-creates a note deleted on another device with all its fields, keeping local edits', async () => {
+    const row = seedServerNote({ id: 'n1', title: 'T', content: '<p>body</p>', note_type: 'markdown', folder_id: 'f1' })
+    await syncedCopy(row)
+    serverTables.notes = [] // permanently deleted on device B
+    await editLocally('n1', { is_pinned: true }) // A only pinned it
+
+    await processPendingChanges(USER)
+
+    expect(serverNote('n1')).toMatchObject({
+      title: 'T',
+      content: '<p>body</p>',
+      note_type: 'markdown',
+      folder_id: 'f1',
+      is_pinned: true,
+    })
+    expect(await db.notes.get('n1')).toMatchObject({ content: '<p>body</p>', _syncStatus: 'synced' })
+  })
+
   it('deletes the note from the server', async () => {
     seedServerNote({ id: 'n1' })
     await queueChange('note', 'n1', 'delete')
@@ -311,6 +330,15 @@ describe('reconcileNotes', () => {
 
     expect(await db.notes.get('gone')).toBeUndefined()
     expect(await db.notes.get('new-local')).toBeDefined()
+  })
+
+  it('pages through the manifest instead of deleting notes past the row cap', async () => {
+    for (const id of ['a', 'b', 'c', 'd', 'e']) await syncedCopy(seedServerNote({ id }))
+    setMaxRows(2) // server returns at most 2 rows per request
+
+    await reconcileNotes(USER)
+
+    expect(await db.notes.count()).toBe(5)
   })
 
   it('catches a change the seq cursor skipped', async () => {
