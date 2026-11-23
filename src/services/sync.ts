@@ -340,15 +340,19 @@ export async function reconcileNotes(userId: string): Promise<number> {
   // Page through all of it: PostgREST caps responses (1000 rows by default),
   // and a truncated manifest would make the deletion pass below drop notes.
   const manifest: { id: string; version: number; server_seq: number }[] = []
-  // Stop only on an empty page: a short page may just mean the server's cap
-  // is lower than our page size.
+  // Keyset pages (id > last id seen), so deletes landing between requests
+  // can't shift a live row past a page boundary. Stop only on an empty page:
+  // a short page may just mean the server's cap is lower than our page size.
   for (;;) {
-    const { data, error } = await supabase
+    let query = supabase
       .from('notes')
       .select('id, version, server_seq')
       .eq('owner_id', userId)
+    const lastId = manifest.at(-1)?.id
+    if (lastId !== undefined) query = query.gt('id', lastId)
+    const { data, error } = await query
       .order('id', { ascending: true })
-      .range(manifest.length, manifest.length + MANIFEST_PAGE_SIZE - 1)
+      .limit(MANIFEST_PAGE_SIZE)
     if (error) throw error
     const page = (data ?? []) as typeof manifest
     if (page.length === 0) break
