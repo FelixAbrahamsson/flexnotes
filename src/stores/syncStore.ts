@@ -128,9 +128,13 @@ export const useSyncStore = create<SyncState>((set, get) => ({
       await resolveConflict(noteId, choice, user.id)
 
       const conflicts = await getConflictedNotes()
-      set({ conflicts })
+      const pendingCount = await getPendingCount()
+      set({ conflicts, pendingCount })
+
+      await useNoteStore.getState().loadFromLocal()
     } catch (error) {
       set({ error: (error as Error).message })
+      throw error
     }
   },
 

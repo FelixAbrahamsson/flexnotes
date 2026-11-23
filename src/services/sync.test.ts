@@ -96,13 +96,52 @@ describe('processPendingChanges - notes', () => {
     serverTables.notes.push({ id: 'n1', owner_id: USER, version: 2, updated_at: '2026-01-02T00:00:00.000Z' })
     await queueChange('note', 'n1', 'update')
 
-    const result = await processPendingChanges(USER)
+    await processPendingChanges(USER)
 
-    expect(result.failed).toBe(1)
     expect((await db.notes.get('n1'))?._syncStatus).toBe('conflict')
+    expect(serverTables.notes[0]).not.toHaveProperty('title') // not overwritten
     const pending = await db.pendingChanges.toArray()
     expect(pending).toHaveLength(1)
-    expect(pending[0].retryCount).toBe(1)
+    expect(pending[0].retryCount).toBe(0) // waits for the user, doesn't burn retries
+  })
+
+  it('detects a conflict against the server version the local edits are based on', async () => {
+    // Local edited from base v2 up to v4; another device pushed v3 meanwhile.
+    await db.notes.put(localNote({ id: 'n1', version: 4, _serverVersion: 2 }))
+    serverTables.notes.push({ id: 'n1', owner_id: USER, version: 3, title: 'Other device' })
+    await queueChange('note', 'n1', 'update')
+
+    await processPendingChanges(USER)
+
+    expect((await db.notes.get('n1'))?._syncStatus).toBe('conflict')
+    expect(serverTables.notes[0]).toMatchObject({ title: 'Other device' })
+  })
+
+  it('records the pushed version as the new base so later edits push cleanly', async () => {
+    await db.notes.put(localNote({ id: 'n1', version: 3, _serverVersion: 2, title: 'First' }))
+    serverTables.notes.push({ id: 'n1', owner_id: USER, version: 2 })
+    await queueChange('note', 'n1', 'update')
+    await processPendingChanges(USER)
+    expect((await db.notes.get('n1'))?._serverVersion).toBe(3)
+
+    await db.notes.update('n1', { version: 4, title: 'Second', _syncStatus: 'pending' })
+    await queueChange('note', 'n1', 'update')
+    await processPendingChanges(USER)
+
+    expect((await db.notes.get('n1'))?._syncStatus).toBe('synced')
+    expect(serverTables.notes[0]).toMatchObject({ title: 'Second', version: 4 })
+  })
+
+  it('leaves pending changes for conflicted notes untouched', async () => {
+    await db.notes.put(localNote({ id: 'n1', _syncStatus: 'conflict' }))
+    await queueChange('note', 'n1', 'update')
+    const change = (await db.pendingChanges.toArray())[0]
+    await db.pendingChanges.update(change.id, { retryCount: 5 })
+
+    const result = await processPendingChanges(USER)
+
+    expect(result.failed).toBe(0)
+    expect(await db.pendingChanges.count()).toBe(1) // not dropped at the retry ceiling
   })
 
   it('pushes the update when local version is not older than the server', async () => {
@@ -198,12 +237,34 @@ describe('incrementalSync', () => {
 
   it('flags a conflict when a pending local note also changed on the server', async () => {
     await setLastSyncTime('full', '2026-01-01T00:00:00.000Z')
-    await db.notes.put(localNote({ id: 'a', _syncStatus: 'pending', _localUpdatedAt: '2026-01-02T00:00:00.000Z' }))
+    await db.notes.put(localNote({ id: 'a', _syncStatus: 'pending', _serverVersion: 1, _localUpdatedAt: '2026-01-02T00:00:00.000Z' }))
     serverTables.notes.push({ id: 'a', owner_id: USER, title: 'Server changed', version: 2, updated_at: '2026-01-03T00:00:00.000Z' })
 
     await incrementalSync(USER)
 
     expect((await db.notes.get('a'))?._syncStatus).toBe('conflict')
+  })
+
+  it('does not flag our own just-pushed write as a conflict while edits are pending', async () => {
+    // We pushed v3 (base=3) at 10:00:05, then kept typing; the edit landed
+    // locally with an earlier timestamp than the server's updated_at.
+    await setLastSyncTime('full', '2026-01-01T00:00:00.000Z')
+    await db.notes.put(localNote({ id: 'a', version: 4, _serverVersion: 3, _syncStatus: 'pending', _localUpdatedAt: '2026-01-02T10:00:04.000Z' }))
+    serverTables.notes.push({ id: 'a', owner_id: USER, title: 'Mine', version: 3, updated_at: '2026-01-02T10:00:05.000Z' })
+
+    await incrementalSync(USER)
+
+    expect((await db.notes.get('a'))?._syncStatus).toBe('pending')
+  })
+
+  it('does not overwrite a conflicted note', async () => {
+    await setLastSyncTime('full', '2026-01-01T00:00:00.000Z')
+    await db.notes.put(localNote({ id: 'a', title: 'Local', _syncStatus: 'conflict', _localUpdatedAt: '2026-01-01T00:00:00.000Z' }))
+    serverTables.notes.push({ id: 'a', owner_id: USER, title: 'Server', version: 9, updated_at: '2026-01-05T00:00:00.000Z' })
+
+    await incrementalSync(USER)
+
+    expect((await db.notes.get('a'))?.title).toBe('Local')
   })
 })
 
@@ -218,7 +279,18 @@ describe('resolveConflict', () => {
     const local = await db.notes.get('n1')
     expect(local?.title).toBe('Server wins')
     expect(local?._syncStatus).toBe('synced')
+    expect(local?._serverVersion).toBe(5)
     expect(await db.pendingChanges.count()).toBe(0)
+  })
+
+  it('local choice ends above the server version so the server copy is superseded', async () => {
+    await db.notes.put(localNote({ id: 'n1', title: 'Local', version: 2, _syncStatus: 'conflict' }))
+    serverTables.notes.push({ id: 'n1', owner_id: USER, title: 'Server', version: 7 })
+
+    await resolveConflict('n1', 'local', USER)
+
+    expect(serverTables.notes[0]).toMatchObject({ title: 'Local', version: 8 })
+    expect((await db.notes.get('n1'))?._serverVersion).toBe(8)
   })
 
   it('local choice upserts to the server, bumps version and clears pending', async () => {

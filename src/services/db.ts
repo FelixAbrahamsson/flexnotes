@@ -6,6 +6,8 @@ export interface LocalNote extends Note {
   _syncStatus: 'synced' | 'pending' | 'conflict'
   _localUpdatedAt: string
   _serverUpdatedAt?: string
+  /** Server `version` this local copy was last based on (set on push/pull). */
+  _serverVersion?: number
 }
 
 export interface LocalTag extends Tag {

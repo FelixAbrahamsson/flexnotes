@@ -2,7 +2,7 @@
  * Minimal in-memory fake of the Supabase client, covering the query-builder
  * subset used by `services/sync.ts` and the stores:
  *
- *   from(t).select(cols).eq(col,val).single()
+ *   from(t).select(cols).eq(col,val).single() / .maybeSingle()
  *   from(t).select('*').eq(col,val)          (awaited directly)
  *   from(t).insert(obj)
  *   from(t).update(obj).eq(col,val)
@@ -62,6 +62,7 @@ class QueryBuilder implements PromiseLike<{ data: unknown; error: unknown }> {
   private payload: Row | Row[] | null = null
   private filters: Filter[] = []
   private isSingle = false
+  private isMaybeSingle = false
 
   constructor(table: string) {
     this.table = table
@@ -106,6 +107,10 @@ class QueryBuilder implements PromiseLike<{ data: unknown; error: unknown }> {
     this.isSingle = true
     return this
   }
+  maybeSingle() {
+    this.isMaybeSingle = true
+    return this
+  }
 
   private matches(row: Row): boolean {
     return this.filters.every((f) => {
@@ -129,6 +134,9 @@ class QueryBuilder implements PromiseLike<{ data: unknown; error: unknown }> {
     switch (this.op) {
       case 'select': {
         const found = this.rows.filter((r) => this.matches(r))
+        if (this.isMaybeSingle) {
+          return { data: found[0] ? { ...found[0] } : null, error: null }
+        }
         if (this.isSingle) {
           if (found.length === 0) {
             return { data: null, error: { code: 'PGRST116', message: 'No rows found' } }

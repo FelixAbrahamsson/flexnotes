@@ -11,7 +11,7 @@ import {
   type LocalFolder,
   type PendingChange,
 } from './db'
-import type { Tag, Folder } from '@/types'
+import type { Tag, Folder, Note } from '@/types'
 
 // Sync status for UI
 export interface SyncState {
@@ -19,6 +19,14 @@ export interface SyncState {
   pendingCount: number
   lastSyncTime: string | null
   error: string | null
+}
+
+/** Thrown when a push finds the server copy changed since our base version. */
+class SyncConflictError extends Error {
+  constructor(noteId: string) {
+    super(`Conflict on note ${noteId}`)
+    this.name = 'SyncConflictError'
+  }
 }
 
 // Queue a change for sync
@@ -53,11 +61,21 @@ export async function processPendingChanges(userId: string): Promise<{
   const errors: string[] = []
 
   for (const change of pending) {
+    // Notes in conflict wait for the user to resolve them; don't burn retries
+    // (which would eventually drop the change and lose local edits).
+    if (change.entityType === 'note') {
+      const note = await db.notes.get(change.entityId)
+      if (note?._syncStatus === 'conflict') continue
+    }
+
     try {
       await processChange(change, userId)
       await db.pendingChanges.delete(change.id)
       success++
     } catch (error) {
+      // Conflict: keep the change queued (no retry count) until resolved
+      if (error instanceof SyncConflictError) continue
+
       const message = (error as Error).message
       errors.push(`${change.entityType}/${change.operation}: ${message}`)
 
@@ -100,8 +118,20 @@ async function processChange(change: PendingChange, userId: string): Promise<voi
 
 // Helper to strip sync metadata fields from note data before syncing to server
 function stripSyncMetadataFields(noteData: Record<string, unknown>): Record<string, unknown> {
-  const { _syncStatus, _localUpdatedAt, _serverUpdatedAt, _pendingSync, ...cleanData } = noteData
+  const { _syncStatus, _localUpdatedAt, _serverUpdatedAt, _serverVersion, _pendingSync, ...cleanData } = noteData
   return cleanData
+}
+
+/**
+ * Has the server copy changed since this local copy was last synced?
+ * Uses the server version we last saw; for notes synced before that was
+ * tracked, falls back to "server is ahead of our local version".
+ */
+function serverChangedSinceBase(localNote: LocalNote, serverVersion: number): boolean {
+  if (localNote._serverVersion !== undefined) {
+    return serverVersion !== localNote._serverVersion
+  }
+  return serverVersion > localNote.version
 }
 
 async function processNoteChange(change: PendingChange, userId: string): Promise<void> {
@@ -123,7 +153,8 @@ async function processNoteChange(change: PendingChange, userId: string): Promise
 
       await db.notes.update(entityId, {
         _syncStatus: 'synced',
-        _serverUpdatedAt: getCurrentTimestamp(),
+        _serverUpdatedAt: localNote.updated_at,
+        _serverVersion: localNote.version,
       })
       break
     }
@@ -152,27 +183,30 @@ async function processNoteChange(change: PendingChange, userId: string): Promise
 
         await db.notes.update(entityId, {
           _syncStatus: 'synced',
-          _serverUpdatedAt: getCurrentTimestamp(),
+          _serverUpdatedAt: localNote.updated_at,
+          _serverVersion: localNote.version,
         })
         return
       }
 
       if (fetchError) throw fetchError
 
-      if (serverNote && serverNote.version > localNote.version) {
-        // Server has newer version - mark as conflict
+      if (serverNote && serverChangedSinceBase(localNote, serverNote.version)) {
+        // Someone else changed the note since we last synced it. Park it as a
+        // conflict for the user to resolve; the pending change stays queued.
         await db.notes.update(entityId, { _syncStatus: 'conflict' })
-        throw new Error('Conflict detected - server has newer version')
+        throw new SyncConflictError(entityId)
       }
 
       // Strip sync metadata fields from update data
       const cleanData = stripSyncMetadataFields(localNote as unknown as Record<string, unknown>)
+      const pushedAt = getCurrentTimestamp()
 
       const { error } = await supabase
         .from('notes')
         .update({
           ...cleanData,
-          updated_at: getCurrentTimestamp(),
+          updated_at: pushedAt,
         })
         .eq('id', entityId)
 
@@ -180,7 +214,8 @@ async function processNoteChange(change: PendingChange, userId: string): Promise
 
       await db.notes.update(entityId, {
         _syncStatus: 'synced',
-        _serverUpdatedAt: getCurrentTimestamp(),
+        _serverUpdatedAt: pushedAt,
+        _serverVersion: localNote.version,
       })
       break
     }
@@ -352,9 +387,13 @@ export async function fullSync(userId: string): Promise<void> {
     for (const note of notes || []) {
       const localNote = await db.notes.get(note.id)
 
-      // Skip if local has pending changes (check both _syncStatus AND pending queue)
-      if (localNote && (localNote._syncStatus === 'pending' || pendingNoteIds.has(note.id))) {
-        // Local has pending changes - keep local version
+      // Skip if local has pending changes or an unresolved conflict
+      if (
+        localNote &&
+        (localNote._syncStatus === 'pending' ||
+          localNote._syncStatus === 'conflict' ||
+          pendingNoteIds.has(note.id))
+      ) {
         continue
       }
 
@@ -377,6 +416,7 @@ export async function fullSync(userId: string): Promise<void> {
         _syncStatus: 'synced',
         _localUpdatedAt: note.updated_at,
         _serverUpdatedAt: note.updated_at,
+        _serverVersion: note.version,
       }
       await db.notes.put(localNoteData)
     }
@@ -485,10 +525,14 @@ export async function incrementalSync(userId: string): Promise<void> {
   for (const note of notes || []) {
     const localNote = await db.notes.get(note.id)
 
+    if (localNote?._syncStatus === 'conflict') continue
+
     // Skip if local has pending changes (check both _syncStatus AND pending queue)
     if (localNote && (localNote._syncStatus === 'pending' || pendingNoteIds.has(note.id))) {
-      // Check for conflict - server has changes that might conflict with ours
-      if (new Date(note.updated_at) > new Date(localNote._localUpdatedAt)) {
+      // Conflict only if the server moved past the version our edits are based
+      // on. Comparing timestamps here flagged our own just-pushed writes (echoed
+      // back via realtime) as conflicts whenever we kept typing during a sync.
+      if (localNote._serverVersion !== undefined && note.version !== localNote._serverVersion) {
         await db.notes.update(note.id, { _syncStatus: 'conflict' })
       }
       continue
@@ -513,11 +557,23 @@ export async function incrementalSync(userId: string): Promise<void> {
       _syncStatus: 'synced',
       _localUpdatedAt: note.updated_at,
       _serverUpdatedAt: note.updated_at,
+      _serverVersion: note.version,
     }
     await db.notes.put(localNoteData)
   }
 
   await setLastSyncTime('full', getCurrentTimestamp())
+}
+
+// Fetch the server copy of a note (for showing conflicts side by side)
+export async function fetchServerNote(noteId: string): Promise<Note | null> {
+  const { data, error } = await supabase
+    .from('notes')
+    .select('*')
+    .eq('id', noteId)
+    .maybeSingle()
+  if (error) throw error
+  return data
 }
 
 // Resolve conflict by choosing local or server version
@@ -526,54 +582,54 @@ export async function resolveConflict(
   choice: 'local' | 'server',
   userId: string
 ): Promise<void> {
-  if (choice === 'server') {
-    // Fetch server version and overwrite local
-    const { data: serverNote } = await supabase
-      .from('notes')
-      .select('*')
-      .eq('id', noteId)
-      .single()
+  const serverNote = await fetchServerNote(noteId)
 
+  if (choice === 'server') {
     if (serverNote) {
       const localNoteData: LocalNote = {
         ...serverNote,
         _syncStatus: 'synced',
         _localUpdatedAt: serverNote.updated_at,
         _serverUpdatedAt: serverNote.updated_at,
+        _serverVersion: serverNote.version,
       }
       await db.notes.put(localNoteData)
-
-      // Remove any pending changes for this note
-      await db.pendingChanges.where('entityId').equals(noteId).delete()
+    } else {
+      // Deleted on the server - drop the local copy too
+      await db.notes.delete(noteId)
     }
-  } else {
-    // Push local version to server
-    const localNote = await db.notes.get(noteId)
-    if (!localNote) return
+    await db.pendingChanges.where('entityId').equals(noteId).delete()
+    return
+  }
 
-    const { _syncStatus, _localUpdatedAt, _serverUpdatedAt, ...noteData } = localNote
-    const cleanData = stripSyncMetadataFields(noteData)
+  // Push local version to server, on top of whatever the server has now
+  const localNote = await db.notes.get(noteId)
+  if (!localNote) return
 
-    const { error } = await supabase
-      .from('notes')
-      .upsert({
-        ...cleanData,
-        owner_id: userId,
-        updated_at: getCurrentTimestamp(),
-        version: (localNote.version || 0) + 1,
-      })
+  const cleanData = stripSyncMetadataFields(localNote as unknown as Record<string, unknown>)
+  const version = Math.max(localNote.version || 0, serverNote?.version || 0) + 1
+  const pushedAt = getCurrentTimestamp()
 
-    if (error) throw error
-
-    await db.notes.update(noteId, {
-      _syncStatus: 'synced',
-      _serverUpdatedAt: getCurrentTimestamp(),
-      version: (localNote.version || 0) + 1,
+  const { error } = await supabase
+    .from('notes')
+    .upsert({
+      ...cleanData,
+      owner_id: userId,
+      updated_at: pushedAt,
+      version,
     })
 
-    // Remove pending changes
-    await db.pendingChanges.where('entityId').equals(noteId).delete()
-  }
+  if (error) throw error
+
+  await db.notes.update(noteId, {
+    _syncStatus: 'synced',
+    updated_at: pushedAt,
+    _serverUpdatedAt: pushedAt,
+    _serverVersion: version,
+    version,
+  })
+
+  await db.pendingChanges.where('entityId').equals(noteId).delete()
 }
 
 // Get pending changes count

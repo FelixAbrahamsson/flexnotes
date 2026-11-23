@@ -1,9 +1,18 @@
 import { Cloud, CloudOff, RefreshCw, AlertCircle } from "lucide-react";
+import { useState } from "react";
 import { useSyncStore } from "@/stores/syncStore";
+import { ConflictResolver } from "./ConflictResolver";
 
 export function SyncStatus() {
   const { isOnline, isSyncing, pendingCount, conflicts, error } =
     useSyncStore();
+  const [showConflicts, setShowConflicts] = useState(false);
+
+  // Rendered alongside whatever status is showing, so it doesn't vanish
+  // while a sync runs in the background.
+  const resolver = showConflicts && conflicts.length > 0 && (
+    <ConflictResolver onClose={() => setShowConflicts(false)} />
+  );
 
   // Show different states
   if (!isOnline) {
@@ -31,19 +40,27 @@ export function SyncStatus() {
       >
         <RefreshCw className="w-4 h-4 animate-spin" />
         <span className="text-xs">Syncing</span>
+        {resolver}
       </div>
     );
   }
 
   if (conflicts.length > 0) {
     return (
-      <div
-        className="flex items-center gap-1.5 text-orange-600 dark:text-orange-500"
-        title="Conflicts need resolution"
-      >
-        <AlertCircle className="w-4 h-4" />
-        <span className="text-xs">{conflicts.length} conflict(s)</span>
-      </div>
+      <>
+        <button
+          type="button"
+          onClick={() => setShowConflicts(true)}
+          className="flex items-center gap-1.5 text-orange-600 dark:text-orange-500 hover:underline"
+          title="Click to review and resolve conflicts"
+        >
+          <AlertCircle className="w-4 h-4" />
+          <span className="text-xs">
+            {conflicts.length} conflict{conflicts.length === 1 ? "" : "s"}
+          </span>
+        </button>
+        {resolver}
+      </>
     );
   }
 
