@@ -35,3 +35,6 @@ ios/
 
 # Supabase CLI
 supabase/.temp/
+
+# Wrangler local state
+.wrangler/
