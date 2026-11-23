@@ -174,13 +174,28 @@ Dexie.js database setup. Defines:
 
 ### `src/services/sync.ts`
 
-Handles syncing between local and server:
+Handles syncing between local and server. Notes use a version-based protocol
+(migration `20261123000001_sync_redesign.sql`):
 
-- `queueChange()` - Add operation to sync queue
-- `processPendingChanges()` - Push local changes to server
-- `fullSync()` / `incrementalSync()` - Pull changes from server
-- `resolveConflict()` - Handle version conflicts
-- Handles edge case where note exists locally but not on server (creates instead of updates)
+- **Base tracking**: each local note stores `_serverVersion` (the server version its
+  edits start from) and `_base` (its synced fields at that version). `version` is
+  server-assigned; local edits never bump it.
+- **Push** (`processPendingChanges()`): queued changes are collapsed per note and only
+  fields that differ from `_base` are sent through the `push_note` RPC, an atomic
+  compare-and-swap on the base version. If the server moved on, it returns the
+  server row and the client three-way merges (`noteMerge.ts`) and retries.
+- **Pull** (`pullNotes()`): rows with `server_seq` after the local cursor
+  (`server_seq` and `updated_at` are set by a DB trigger, so device clocks don't
+  matter). `reconcileNotes()` compares every id/version with the server, catching
+  server-side deletions and anything the cursor skipped; it runs on the first sync
+  of a session, on focus, and on realtime DELETE events.
+- **Merging** (`src/services/noteMerge.ts`): per field; text/markdown HTML by block,
+  list notes by item id, titles by word. Only overlapping edits become a
+  `conflict`, which the user resolves in `ConflictResolver` (`resolveConflict()`).
+  Conflicted notes stay conflicted (and unpushed) until resolved.
+- **Editor saves** pass the content they started from (`updateNote(id, updates, base)`);
+  if the stored note changed underneath (a pull landed mid-edit), the store merges.
+- Tags, folders and note-tag links still use the simpler queue + full refetch model.
 
 ### `src/services/googleKeepImport.ts`
 
@@ -355,7 +370,7 @@ interface PendingChange {
 
 ```sql
 -- Main tables
-notes (id, owner_id, title, content, note_type, is_pinned, is_archived, folder_id, sort_order, version, created_at, updated_at)
+notes (id, owner_id, title, content, note_type, is_pinned, is_archived, folder_id, sort_order, version, server_seq, created_at, updated_at)
 folders (id, owner_id, name, color, parent_folder_id, sort_order, created_at, updated_at)
 tags (id, owner_id, name, color, sort_order, created_at)
 note_tags (note_id, tag_id)
