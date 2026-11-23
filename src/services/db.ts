@@ -1,13 +1,16 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { Note, Tag, NoteTag, NoteImage, Folder } from '@/types'
+import { pickSyncFields, type SyncFields } from './noteMerge'
 
 // Extended types for local storage
 export interface LocalNote extends Note {
   _syncStatus: 'synced' | 'pending' | 'conflict'
   _localUpdatedAt: string
   _serverUpdatedAt?: string
-  /** Server `version` this local copy was last based on (set on push/pull). */
+  /** Server `version` this local copy's edits are based on (unset = never on server). */
   _serverVersion?: number
+  /** Synced fields as they were at `_serverVersion`; the base for three-way merges. */
+  _base?: SyncFields
 }
 
 export interface LocalTag extends Tag {
@@ -128,6 +131,18 @@ class NotesDatabase extends Dexie {
       // Add folder_id to existing notes
       return tx.table('notes').toCollection().modify(note => {
         note.folder_id = note.folder_id ?? null
+      })
+    })
+
+    // Version 6: sync redesign. Synced notes match the server exactly, so their
+    // current fields/version are the merge base. Pending notes keep whatever
+    // base version they had; without a snapshot, merges fall back to two-way.
+    this.version(6).stores({}).upgrade(tx => {
+      return tx.table('notes').toCollection().modify((note: LocalNote) => {
+        if (note._syncStatus === 'synced') {
+          note._serverVersion = note.version
+          note._base = pickSyncFields(note)
+        }
       })
     })
   }

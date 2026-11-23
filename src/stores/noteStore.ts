@@ -3,6 +3,7 @@ import type { Note, NewNote, NoteType } from '@/types'
 import { supabase } from '@/services/supabase'
 import { db, generateLocalId, getCurrentTimestamp, type LocalNote } from '@/services/db'
 import { queueChange } from '@/services/sync'
+import { mergeField } from '@/services/noteMerge'
 import { stripHtml } from '@/utils/formatters'
 import { getSharedWithMeNotes } from '@/services/share'
 import { useAuthStore } from './authStore'
@@ -38,7 +39,7 @@ interface NoteState {
   createNote: (note?: NewNote) => Promise<Note | null>
   createNoteFromImport: (note: Omit<Note, 'id'> & { id: string }) => Promise<string>
   duplicateNote: (id: string) => Promise<Note | null>
-  updateNote: (id: string, updates: Partial<Note>) => Promise<void>
+  updateNote: (id: string, updates: Partial<Note>, base?: EditBase) => Promise<void>
   deleteNote: (id: string) => Promise<void>
   trashNote: (id: string) => Promise<void>
   restoreNote: (id: string) => Promise<void>
@@ -88,31 +89,76 @@ function isNoteEmpty(note: Note): boolean {
 }
 
 /**
+ * What an editor's edits were based on: the title/content it last loaded from
+ * the store. If the stored note changed since (e.g. a sync pulled another
+ * device's edit while the user was typing), the save is merged instead of
+ * overwriting that change.
+ */
+export interface EditBase {
+  title?: string | null
+  content?: string
+}
+
+/**
  * Shared happy-path for note write operations (update/trash/restore/move):
- * bump the version, mark the row pending, persist locally, queue the change
- * for sync, and trigger a sync. No-ops if the note is missing locally; throws
- * on DB error so the caller can revert its optimistic UI update.
+ * mark the row pending, persist locally, queue the change for sync, and
+ * trigger a sync. No-ops if the note is missing locally; throws on DB error so
+ * the caller can revert its optimistic UI update.
+ *
+ * `version` is not touched: it is the server's version, assigned on push.
  */
 async function persistNoteUpdate(
   id: string,
-  updates: Partial<LocalNote>
+  updates: Partial<LocalNote>,
+  base?: EditBase
 ): Promise<void> {
-  const existingNote = await db.notes.get(id)
-  if (!existingNote) return
+  let changed = false
+  let mergedUnderneath = false
+  await db.transaction('rw', db.notes, db.pendingChanges, async () => {
+    const existingNote = await db.notes.get(id)
+    if (!existingNote) return
 
-  const now = getCurrentTimestamp()
-  const version = existingNote.version + 1
+    const resolved: Partial<LocalNote> = { ...updates }
+    let conflict = existingNote._syncStatus === 'conflict'
 
-  await db.notes.update(id, {
-    ...updates,
-    updated_at: now,
-    version,
-    _syncStatus: 'pending',
-    _localUpdatedAt: now,
+    for (const field of ['title', 'content'] as const) {
+      if (!(field in updates) || !base || !(field in base)) continue
+      const baseValue = base[field] ?? ''
+      const stored = existingNote[field] ?? ''
+      if (stored === baseValue) continue // nothing changed underneath
+      mergedUnderneath = true
+
+      const merged = mergeField(
+        field,
+        existingNote.note_type,
+        baseValue,
+        (updates[field] as string | null) ?? '',
+        stored
+      )
+      if (merged === null) {
+        // Overlapping edits: keep ours, let the user pick in the resolver
+        conflict = true
+      } else {
+        if (field === 'title') resolved.title = merged === '' ? null : merged
+        else resolved.content = merged
+      }
+    }
+
+    const now = getCurrentTimestamp()
+    await db.notes.update(id, {
+      ...resolved,
+      updated_at: now,
+      _syncStatus: conflict ? 'conflict' : 'pending',
+      _localUpdatedAt: now,
+    })
+    // `data` is informational; the push diffs the note against its base
+    await queueChange('note', id, 'update', resolved as Record<string, unknown>)
+    changed = true
   })
+  if (!changed) return
 
-  await queueChange('note', id, 'update', { ...updates, version })
-
+  // The optimistic UI state holds our unmerged edit; show the merged result
+  if (mergedUnderneath) await useNoteStore.getState().loadFromLocal()
   await useSyncStore.getState().refreshPendingCount()
   triggerSyncIfOnline()
 }
@@ -138,7 +184,8 @@ export const useNoteStore = create<NoteState>((set, get) => ({
         .toArray()
 
       // Convert LocalNote to Note for the UI
-      const notes: Note[] = localNotes.map(({ _syncStatus, _localUpdatedAt, _serverUpdatedAt, ...note }) => ({
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const notes: Note[] = localNotes.map(({ _syncStatus, _localUpdatedAt, _serverUpdatedAt, _serverVersion, _base, ...note }) => ({
         ...note,
         is_deleted: note.is_deleted ?? false,
         deleted_at: note.deleted_at ?? null,
@@ -357,7 +404,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     }
   },
 
-  updateNote: async (id: string, updates: Partial<Note>) => {
+  updateNote: async (id: string, updates: Partial<Note>, base?: EditBase) => {
     const now = getCurrentTimestamp()
 
     // Optimistic UI update
@@ -370,7 +417,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     }))
 
     try {
-      await persistNoteUpdate(id, updates)
+      await persistNoteUpdate(id, updates, base)
     } catch (error) {
       // Revert on error - reload from local
       await get().loadFromLocal()
@@ -583,9 +630,11 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     // Persist to database
     try {
       const now = getCurrentTimestamp()
+      const existing = await db.notes.get(activeId)
       await db.notes.update(activeId, {
         sort_order: newSortOrder,
-        _syncStatus: 'pending',
+        // A conflicted note stays a conflict until the user resolves it
+        _syncStatus: existing?._syncStatus === 'conflict' ? 'conflict' : 'pending',
         _localUpdatedAt: now,
       })
 

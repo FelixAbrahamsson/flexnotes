@@ -171,7 +171,13 @@ export function NoteEditorCore({
     }
 
     if (Object.keys(updates).length > 0) {
-      updateNote(note.id, updates);
+      // Tell the store what these edits started from. If the stored note
+      // changed underneath (a sync pulled another device's edit while the user
+      // was typing), the store merges instead of overwriting that edit.
+      updateNote(note.id, updates, {
+        title: lastSyncedTitleRef.current || null,
+        content: lastSyncedContentRef.current,
+      });
     }
     // Update synced refs so future sync updates are correctly accepted
     lastSyncedTitleRef.current = title;
