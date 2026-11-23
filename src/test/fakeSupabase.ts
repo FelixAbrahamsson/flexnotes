@@ -83,6 +83,12 @@ export function resetServer() {
     serverTables[key] = []
   }
   rpcHooks.beforePushNote = undefined
+  QueryBuilder.maxRows = Infinity
+}
+
+/** Cap every select at `n` rows, like the PostgREST max-rows setting. */
+export function setMaxRows(n: number) {
+  QueryBuilder.maxRows = n
 }
 
 // Lets a test force the next matching operation to fail, to exercise
@@ -113,6 +119,9 @@ class QueryBuilder implements PromiseLike<{ data: unknown; error: unknown }> {
   private isMaybeSingle = false
   private orderBy: { col: string; ascending: boolean } | null = null
   private limitN: number | null = null
+  private rangeFrom = 0
+  /** Like PostgREST's max-rows: responses never exceed this many rows. */
+  static maxRows = Infinity
 
   constructor(table: string) {
     this.table = table
@@ -169,6 +178,11 @@ class QueryBuilder implements PromiseLike<{ data: unknown; error: unknown }> {
     this.limitN = n
     return this
   }
+  range(from: number, to: number) {
+    this.rangeFrom = from
+    this.limitN = to - from + 1
+    return this
+  }
   single() {
     this.isSingle = true
     return this
@@ -204,11 +218,12 @@ class QueryBuilder implements PromiseLike<{ data: unknown; error: unknown }> {
         let found = this.rows.filter((r) => this.matches(r))
         if (this.orderBy) {
           const { col, ascending } = this.orderBy
-          found = [...found].sort(
-            (a, b) => ((a[col] as number) - (b[col] as number)) * (ascending ? 1 : -1)
-          )
+          const cmp = (a: unknown, b: unknown) =>
+            typeof a === 'string' ? a.localeCompare(b as string) : (a as number) - (b as number)
+          found = [...found].sort((a, b) => cmp(a[col], b[col]) * (ascending ? 1 : -1))
         }
-        if (this.limitN !== null) found = found.slice(0, this.limitN)
+        const n = Math.min(this.limitN ?? Infinity, QueryBuilder.maxRows)
+        found = found.slice(this.rangeFrom, this.rangeFrom + n)
         if (this.isMaybeSingle) {
           return { data: found[0] ? { ...found[0] } : null, error: null }
         }
@@ -276,6 +291,9 @@ function pushNote(args: { p_id: string; p_base_version: number | null; p_fields:
   rpcHooks.beforePushNote?.(args.p_id)
   const rows = serverTables.notes
   const existing = rows.find((r) => r.id === args.p_id)
+  if (!existing && args.p_base_version !== null) {
+    return { status: 'missing', note: null }
+  }
   if (!existing) {
     const row: Row = {
       id: args.p_id,

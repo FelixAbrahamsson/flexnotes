@@ -91,6 +91,15 @@ export function mergeNote(
     // Other metadata (pin, archive, folder, order...): last writer is us.
   }
 
+  // note_type and content must come from the same side: a one-sided type
+  // conversion (which rewrites content) must not be paired with the other
+  // side's content.
+  if (merged.content === local.content && local.content !== remote.content) {
+    merged.note_type = local.note_type
+  } else if (merged.content === remote.content && local.content !== remote.content) {
+    merged.note_type = remote.note_type
+  }
+
   return { merged, conflict }
 }
 
