@@ -198,7 +198,10 @@ class QueryBuilder implements PromiseLike<{ data: unknown; error: unknown }> {
       if (f.col.includes('.')) return true
       if (f.kind === 'eq') return row[f.col] === f.val
       if (f.kind === 'in') return (f.val as unknown[]).includes(row[f.col])
-      if (f.kind === 'gt') return (row[f.col] as number) > (f.val as number)
+      if (f.kind === 'gt') {
+        const v = row[f.col]
+        return typeof v === 'string' ? v > (f.val as string) : (v as number) > (f.val as number)
+      }
       return (
         row[f.col] != null &&
         new Date(String(row[f.col])).getTime() >= new Date(String(f.val)).getTime()

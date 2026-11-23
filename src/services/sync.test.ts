@@ -341,6 +341,30 @@ describe('reconcileNotes', () => {
     expect(await db.notes.count()).toBe(5)
   })
 
+  it('does not skip a live note when another note is deleted between manifest pages', async () => {
+    for (const id of ['a', 'b', 'c', 'd', 'e']) await syncedCopy(seedServerNote({ id }))
+    setMaxRows(2)
+    // Device B deletes 'a' right after the first page (a, b) was returned
+    let calls = 0
+    const origFrom = (await import('@/test/fakeSupabase')).fakeSupabase.from
+    const spy = vi
+      .spyOn((await import('@/test/fakeSupabase')).fakeSupabase, 'from')
+      .mockImplementation((table: string) => {
+        if (table === 'notes' && calls++ === 1) {
+          serverTables.notes = serverTables.notes.filter((r) => r.id !== 'a')
+        }
+        return origFrom(table)
+      })
+
+    await reconcileNotes(USER)
+    spy.mockRestore()
+
+    // With offset paging, 'c' shifted into the already-read range and was
+    // dropped as "deleted". 'a' was read before its deletion, so it stays
+    // until the next reconcile.
+    expect((await db.notes.toArray()).map((n) => n.id).sort()).toEqual(['a', 'b', 'c', 'd', 'e'])
+  })
+
   it('catches a change the seq cursor skipped', async () => {
     const row = seedServerNote({ id: 'a', title: 'A' })
     await syncedCopy(row)
