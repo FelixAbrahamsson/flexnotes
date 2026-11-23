@@ -9,7 +9,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
   )
 }
 
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key'
-)
+const resolvedUrl = supabaseUrl || 'https://placeholder.supabase.co'
+
+/**
+ * localStorage key holding the auth session. This is supabase-js's default
+ * (`sb-<project-ref>-auth-token`), spelled out so we can read the cached
+ * session directly when starting offline.
+ */
+export const authStorageKey = `sb-${new URL(resolvedUrl).hostname.split('.')[0]}-auth-token`
+
+export const supabase = createClient(resolvedUrl, supabaseAnonKey || 'placeholder-key', {
+  auth: { storageKey: authStorageKey },
+})
